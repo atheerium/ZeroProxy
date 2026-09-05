@@ -209,6 +209,26 @@ static PROVIDER_CAPABILITIES: LazyLock<HashMap<&'static str, HashMap<&'static st
             ("laguna-s-2.1", serde_json::json!({ "reasoning": true, "thinkingFormat": "openai", "contextWindow": 1000000, "maxOutput": 32000 })),
             ("laguna-xs-2.1", serde_json::json!({ "reasoning": true, "thinkingFormat": "openai", "contextWindow": 200000, "maxOutput": 32000 })),
         ]));
+        // kimi-web and deepseek-web are text-only cookie executors — drop the
+        // vision flag the generic *kimi* / *deepseek-v4* patterns would otherwise
+        // set, so capability filter doesn't route image requests into a guaranteed
+        // failure path.
+        table.insert("kimi-web", HashMap::from([
+            ("k3", serde_json::json!({ "vision": false, "videoInput": false, "reasoning": true, "thinkingFormat": "kimi", "contextWindow": 128000 })),
+            ("k2d6", serde_json::json!({ "vision": false, "videoInput": false, "reasoning": true, "thinkingFormat": "kimi", "contextWindow": 128000 })),
+        ]));
+        table.insert("deepseek-web", HashMap::from([
+            ("deepseek-v4-pro", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "contextWindow": 128000 })),
+            ("deepseek-v4-pro-think", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "contextWindow": 128000 })),
+            ("deepseek-v4-pro-search", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "search": true, "contextWindow": 128000 })),
+            ("deepseek-v4-pro-think-search", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "search": true, "contextWindow": 128000 })),
+            ("deepseek-v4-flash", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "contextWindow": 128000 })),
+            ("deepseek-v4-flash-think", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "contextWindow": 128000 })),
+            ("deepseek-v4-flash-search", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "search": true, "contextWindow": 128000 })),
+            ("deepseek-v4-flash-think-search", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "search": true, "contextWindow": 128000 })),
+            ("deepseek-chat", serde_json::json!({ "vision": false, "contextWindow": 128000 })),
+            ("deepseek-reasoner", serde_json::json!({ "vision": false, "reasoning": true, "thinkingFormat": "deepseek", "thinkingCanDisable": false, "contextWindow": 128000 })),
+        ]));
         table
     });
 

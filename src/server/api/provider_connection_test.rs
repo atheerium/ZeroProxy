@@ -1048,17 +1048,17 @@ async fn test_kimi_web_connection(
     connection: &ProviderConnection,
     effective_proxy: &EffectiveProxy,
 ) -> ConnectionTestResult {
-    let mut token = connection.api_key.clone().unwrap_or_default();
-    if let Some(value) = token.strip_prefix("access_token=") {
-        token = value.to_string();
+    let raw = connection.api_key.clone().unwrap_or_default();
+    let token = crate::core::executor::extract_kimi_access_token(&raw);
+    if token.is_empty() {
+        return invalid("Missing Kimi access_token — paste from kimi.ai localStorage");
     }
 
     let request = PreparedRequest {
-        method: Method::POST,
-        url: "https://www.kimi.ai/apiv2/kimi.gateway.chat.v1.ChatService/Chat".to_string(),
+        method: Method::GET,
+        url: "https://www.kimi.ai/api/user".to_string(),
         headers: vec![
             ("Accept".to_string(), "*/*".to_string()),
-            ("Content-Type".to_string(), "application/json".to_string()),
             (
                 "Authorization".to_string(),
                 format!("Bearer {token}"),
@@ -1070,9 +1070,7 @@ async fn test_kimi_web_connection(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36".to_string(),
             ),
         ],
-        body: Some(PreparedBody::Json(json!({
-            "message": "ping"
-        }))),
+        body: None,
     };
 
     match execute_request(state, &connection.provider, effective_proxy, request).await {
@@ -1086,7 +1084,7 @@ async fn test_kimi_web_connection(
                 error: if valid {
                     None
                 } else {
-                    Some("Invalid access token".to_string())
+                    Some("Invalid or expired Kimi access_token — re-paste from kimi.ai localStorage".to_string())
                 },
                 refreshed: false,
                 new_tokens: None,
@@ -1101,9 +1099,11 @@ async fn test_deepseek_web_connection(
     connection: &ProviderConnection,
     effective_proxy: &EffectiveProxy,
 ) -> ConnectionTestResult {
-    let mut token = connection.api_key.clone().unwrap_or_default();
-    if let Some(value) = token.strip_prefix("userToken=") {
-        token = value.to_string();
+    let raw = connection.api_key.clone().unwrap_or_default();
+    let token = crate::core::executor::extract_user_token(Some(&raw))
+        .unwrap_or_default();
+    if token.is_empty() {
+        return invalid("Missing DeepSeek userToken — paste from chat.deepseek.com localStorage");
     }
 
     let request = PreparedRequest {
@@ -1115,8 +1115,12 @@ async fn test_deepseek_web_connection(
                 "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36".to_string(),
             ),
             (
-                "Cookie".to_string(),
-                format!("userToken={token}"),
+                "Authorization".to_string(),
+                format!("Bearer {token}"),
+            ),
+            (
+                "Accept".to_string(),
+                "application/json, text/plain, */*".to_string(),
             ),
         ],
         body: None,
@@ -1124,18 +1128,35 @@ async fn test_deepseek_web_connection(
 
     match execute_request(state, &connection.provider, effective_proxy, request).await {
         Ok(response) => {
+            if response.status() == StatusCode::UNAUTHORIZED
+                || response.status() == StatusCode::FORBIDDEN
+            {
+                return invalid("Invalid userToken — re-paste from chat.deepseek.com localStorage");
+            }
             if !response.status().is_success() {
-                return invalid("Invalid userToken — re-paste from localStorage");
+                return invalid("DeepSeek connection test failed");
             }
 
             match response.json::<Value>().await {
-                Ok(payload) if payload.get("data").is_some() => ConnectionTestResult {
-                    valid: true,
-                    error: None,
-                    refreshed: false,
-                    new_tokens: None,
-                },
-                Ok(_) => invalid("Token expired — re-paste from localStorage"),
+                Ok(payload) => {
+                    // OmniRoute: read json.data.biz_data.token to confirm round-trip success
+                    let biz_data = payload.pointer("/data/biz_data").cloned().unwrap_or(Value::Null);
+                    let has_token = biz_data
+                        .get("token")
+                        .and_then(Value::as_str)
+                        .map(|s| !s.is_empty())
+                        .unwrap_or(false);
+                    if has_token {
+                        ConnectionTestResult {
+                            valid: true,
+                            error: None,
+                            refreshed: false,
+                            new_tokens: None,
+                        }
+                    } else {
+                        invalid("DeepSeek rejected token — re-paste from localStorage")
+                    }
+                }
                 Err(error) => invalid(&error.to_string()),
             }
         }

@@ -62,7 +62,7 @@ pub use cursor::{
     CursorExecutorResponse, SseEvent,
 };
 pub use deepseek_web::{
-    DeepSeekWebExecutionRequest, DeepSeekWebExecutor, DeepSeekWebExecutorError,
+    extract_user_token, DeepSeekWebExecutionRequest, DeepSeekWebExecutor, DeepSeekWebExecutorError,
     DeepSeekWebExecutorResponse,
 };
 pub use default::{
@@ -89,7 +89,8 @@ pub use grok_web::{
 pub use iflow::{IFlowExecutionRequest, IFlowExecutor, IFlowExecutorError, IFlowExecutorResponse};
 pub use kimchi::KimchiExecutor;
 pub use kimi_web::{
-    KimiWebExecutionRequest, KimiWebExecutor, KimiWebExecutorError, KimiWebExecutorResponse,
+    extract_kimi_access_token, extract_kimi_refresh_token, KimiWebExecutionRequest,
+    KimiWebExecutor, KimiWebExecutorError, KimiWebExecutorResponse,
 };
 pub use kiro::{
     consumed_eventstream_bytes, AwsCredentials, EventStreamDecoder, KiroEvent,

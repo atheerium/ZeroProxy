@@ -5458,16 +5458,16 @@
       "alias": "kimi-web",
       "format": "openai",
       "authType": "apikey",
-      "baseUrl": "https://kimi.moonshot.cn/api/chat",
+      "baseUrl": "https://www.kimi.ai",
       "models": [
         {
-          "id": "kimi-default",
-          "name": "Kimi Default",
+          "id": "k3",
+          "name": "K3",
           "kind": "llm"
         },
         {
-          "id": "kimi-128k",
-          "name": "Kimi 128K (Long Context)",
+          "id": "k2d6",
+          "name": "K2.6",
           "kind": "llm"
         }
       ]

@@ -1095,9 +1095,14 @@ impl DefaultExecutor {
 
             if matches!(
                 self.provider.as_str(),
-                "glm" | "kimi" | "agentrouter" | "enally"
+                "glm" | "kimi" | "enally"
             ) {
                 headers.insert("x-api-key", HeaderValue::from_str(token)?);
+            } else if self.provider == "agentrouter" {
+                headers.insert(
+                    AUTHORIZATION,
+                    HeaderValue::from_str(&format!("Bearer {token}"))?,
+                );
             } else if matches!(self.provider.as_str(), "minimax" | "minimax-cn") {
                 headers.insert(
                     AUTHORIZATION,

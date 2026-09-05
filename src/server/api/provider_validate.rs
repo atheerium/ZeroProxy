@@ -126,7 +126,7 @@ async fn validate_provider(
         }
         "agentrouter" => {
             match client.post("https://agentrouter.org/v1/messages")
-                .header("x-api-key", &api_key)
+                .header("Authorization", format!("Bearer {}", api_key))
                 .header("anthropic-version", "2023-06-01")
                 .header("Content-Type", "application/json")
                 .json(&json!({"model": "test", "max_tokens": 1, "messages": [{"role": "user", "content": "test"}]}))

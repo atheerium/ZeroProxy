@@ -147,7 +147,36 @@ export default function AddApiKeyModal({ isOpen, provider, providerName, isCompa
     if (isXiaomiTokenplan) {
       return { region: xiaomiRegion };
     }
+    // kimi-web accepts a JSON dump containing both access_token and refresh_token.
+    // If the user pastes one, peel off the refresh token so the executor can auto-refresh
+    // when the 15-min access_token expires.
+    if (provider === "kimi-web") {
+      const raw = formData.apiKey.trim();
+      if (raw.startsWith("{") && raw.endsWith("}")) {
+        try {
+          const parsed = JSON.parse(raw);
+          const refresh = typeof parsed?.refresh_token === "string" ? parsed.refresh_token : "";
+          if (refresh) return { refreshToken: refresh };
+        } catch {}
+      }
+    }
     return undefined;
+  };
+
+  // Pre-extract access_token from a kimi JSON dump so the displayed apiKey
+  // field doesn't store the raw JSON blob (the BE kimi executor accepts raw
+  // JWT too, but JSON-shape input is awkward in logs and connection tests).
+  const normalizeKimiApiKey = (raw: string): string => {
+    if (provider !== "kimi-web") return raw;
+    const trimmed = raw.trim();
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        const access = typeof parsed?.access_token === "string" ? parsed.access_token : "";
+        if (access) return access;
+      } catch {}
+    }
+    return raw;
   };
 
   const handleValidate = async (): Promise<void> => {
@@ -156,7 +185,7 @@ export default function AddApiKeyModal({ isOpen, provider, providerName, isCompa
       const res = await fetch("/api/providers/validate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ provider, apiKey: formData.apiKey, providerSpecificData: buildProviderSpecificData() }),
+        body: JSON.stringify({ provider, apiKey: normalizeKimiApiKey(formData.apiKey), providerSpecificData: buildProviderSpecificData() }),
       });
       const data = await res.json();
       setValidationResult(data.valid ? "success" : "failed");
@@ -185,7 +214,7 @@ export default function AddApiKeyModal({ isOpen, provider, providerName, isCompa
         const res = await fetch("/api/providers/validate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ provider, apiKey: formData.apiKey, providerSpecificData: buildProviderSpecificData() }),
+          body: JSON.stringify({ provider, apiKey: normalizeKimiApiKey(formData.apiKey), providerSpecificData: buildProviderSpecificData() }),
         });
         const data = await res.json();
         isValid = !!data.valid;
@@ -198,7 +227,7 @@ export default function AddApiKeyModal({ isOpen, provider, providerName, isCompa
 
       await onSave({
         name: formData.name || (isOllamaLocal ? "Ollama Local" : ""),
-        apiKey: formData.apiKey,
+        apiKey: normalizeKimiApiKey(formData.apiKey),
         defaultModel: isCompatible ? formData.defaultModel.trim() : undefined,
         priority: formData.priority,
         proxyPoolId: formData.proxyPoolId === NONE_PROXY_POOL_VALUE ? null : formData.proxyPoolId,

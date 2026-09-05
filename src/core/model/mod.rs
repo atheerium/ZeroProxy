@@ -71,6 +71,8 @@ static ALIAS_TO_PROVIDER_ID: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
         ("kw", "kimi-web"),
         ("kimi-web", "kimi-web"),
         ("dw", "deepseek-web"),
+        ("dsw", "deepseek-web"),
+        ("ds-web", "deepseek-web"),
         ("deepseek-web", "deepseek-web"),
         // ── Enterprise & Cloud ──
         ("databricks", "databricks"),

@@ -3324,60 +3324,95 @@
    ]
   },
   {
-   "alias": "kimi-web",
-   "models": [
-    {
-     "id": "kimi",
-     "name": "Kimi",
-     "kind": "llm"
-    },
-    {
-     "id": "kimi-k2",
-     "name": "Kimi K2 (Thinking)",
-     "kind": "llm"
-    },
-    {
-     "id": "moonshot-v1-8k",
-     "name": "Moonshot V1 8K",
-     "kind": "llm"
-    },
-    {
-     "id": "moonshot-v1-32k",
-     "name": "Moonshot V1 32K",
-     "kind": "llm"
-    },
-    {
-     "id": "moonshot-v1-128k",
-     "name": "Moonshot V1 128K",
-     "kind": "llm"
-    }
-   ]
-  },
+    "alias": "kimi-web",
+    "models": [
+     {
+      "id": "k3",
+      "name": "K3",
+      "kind": "llm"
+     },
+     {
+      "id": "k2d6",
+      "name": "K2.6",
+      "kind": "llm"
+     }
+    ]
+   },
   {
-   "alias": "deepseek-web",
-   "models": [
-    {
-     "id": "deepseek-v4-pro",
-     "name": "DeepSeek V4 Pro",
-     "kind": "llm"
-    },
-    {
-     "id": "deepseek-v4-flash",
-     "name": "DeepSeek V4 Flash",
-     "kind": "llm"
-    },
-    {
-     "id": "deepseek-chat",
-     "name": "DeepSeek Chat",
-     "kind": "llm"
-    },
-    {
-     "id": "deepseek-reasoner",
-     "name": "DeepSeek Reasoner",
-     "kind": "llm"
-    }
-   ]
-  },
+    "alias": "deepseek-web",
+    "models": [
+     {
+      "id": "deepseek-v4-pro",
+      "name": "DeepSeek V4 Pro",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-pro-think",
+      "name": "DeepSeek V4 Pro Think",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-pro-search",
+      "name": "DeepSeek V4 Pro Search",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-pro-think-search",
+      "name": "DeepSeek V4 Pro Think+Search",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-flash",
+      "name": "DeepSeek V4 Flash",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-flash-think",
+      "name": "DeepSeek V4 Flash Think",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-flash-search",
+      "name": "DeepSeek V4 Flash Search",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-v4-flash-think-search",
+      "name": "DeepSeek V4 Flash Think+Search",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-chat",
+      "name": "DeepSeek Chat",
+      "kind": "llm"
+     },
+     {
+      "id": "deepseek-reasoner",
+      "name": "DeepSeek Reasoner",
+      "kind": "llm"
+     },
+     {
+      "id": "DeepSeek-R1",
+      "name": "DeepSeek R1",
+      "kind": "llm"
+     },
+     {
+      "id": "DeepSeek-R1-Search",
+      "name": "DeepSeek R1 Search",
+      "kind": "llm"
+     },
+     {
+      "id": "DeepSeek-V3.2",
+      "name": "DeepSeek V3.2",
+      "kind": "llm"
+     },
+     {
+      "id": "DeepSeek-Search",
+      "name": "DeepSeek Search",
+      "kind": "llm"
+     }
+    ]
+   },
   {
    "alias": "openai-tts-models",
    "models": [
