@@ -56,7 +56,7 @@ pub fn probe_target(connection: &ProviderConnection) -> Option<ProbeTarget> {
     let dialect = auth_dialect(&connection.provider, &base_url);
     let url = models_url(&base_url, dialect);
 
-    let headers = match dialect {
+    let mut headers = match dialect {
         AuthDialect::Bearer => vec![("authorization".into(), format!("Bearer {api_key}"))],
         AuthDialect::Anthropic => vec![
             ("x-api-key".into(), api_key),
@@ -64,6 +64,13 @@ pub fn probe_target(connection: &ProviderConnection) -> Option<ProbeTarget> {
         ],
         AuthDialect::Google => vec![("x-goog-api-key".into(), api_key)],
     };
+
+    if connection.provider == "agentrouter" {
+        headers.push((
+            "user-agent".into(),
+            "claude-cli/2.0.14 (external, cli)".into(),
+        ));
+    }
 
     Some(ProbeTarget { url, headers })
 }

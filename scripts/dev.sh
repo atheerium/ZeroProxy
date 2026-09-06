@@ -129,11 +129,11 @@ HELP
 }
 
 kill_port() {
-  systemctl --user stop cipherroute.service 2>/dev/null || true
+  systemctl --user stop openproxy.service 2>/dev/null || true
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
   fi
-  pkill -f "cipherroute server start" 2>/dev/null || true
+  pkill -f "cipherroute server start"; pkill -f "openproxy" 2>/dev/null || true
   pkill -f "target/.*/cipherroute.*${PORT}" 2>/dev/null || true
   sleep 0.5
 }

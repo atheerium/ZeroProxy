@@ -574,6 +574,10 @@ impl ProviderConfig {
     }
 }
 
+pub(crate) fn provider_config_for(provider: &str) -> Option<&'static ProviderConfig> {
+    PROVIDER_CONFIGS.get(provider)
+}
+
 pub struct DefaultExecutor {
     provider: String,
     config: ProviderConfig,
@@ -973,7 +977,7 @@ impl DefaultExecutor {
 
         if matches!(
             self.provider.as_str(),
-            "claude" | "glm" | "kimi" | "minimax" | "minimax-cn" | "kimi-coding" | "agentrouter"
+            "claude" | "glm" | "kimi" | "minimax" | "minimax-cn" | "kimi-coding"
         ) {
             return Ok(format!("{}?beta=true", self.config.base_url));
         }
@@ -1093,16 +1097,11 @@ impl DefaultExecutor {
                 .or(credentials.api_key.as_deref())
                 .ok_or_else(|| ExecutorError::MissingCredentials(self.provider.clone()))?;
 
-            if matches!(
-                self.provider.as_str(),
-                "glm" | "kimi" | "enally"
-            ) {
+            if matches!(self.provider.as_str(), "glm" | "kimi" | "enally") {
                 headers.insert("x-api-key", HeaderValue::from_str(token)?);
             } else if self.provider == "agentrouter" {
-                headers.insert(
-                    AUTHORIZATION,
-                    HeaderValue::from_str(&format!("Bearer {token}"))?,
-                );
+                headers.insert("x-api-key", HeaderValue::from_str(token)?);
+                headers.insert("anthropic-version", HeaderValue::from_static("2023-06-01"));
             } else if matches!(self.provider.as_str(), "minimax" | "minimax-cn") {
                 headers.insert(
                     AUTHORIZATION,
@@ -1120,6 +1119,15 @@ impl DefaultExecutor {
                 headers.insert(
                     "User-Agent",
                     HeaderValue::from_static("Mozilla/5.0 KimiCoding"),
+                );
+            }
+            // AgentRouter blocks non-whitelisted clients with 401 "unauthorized client"
+            // and kills sockets mid-stream (matches user's "socket closed unexpectedly" error).
+            // Spoof Claude Code UA so AgentRouter accepts the proxy traffic.
+            if self.provider == "agentrouter" {
+                headers.insert(
+                    "User-Agent",
+                    HeaderValue::from_static("claude-cli/2.0.14 (external, cli)"),
                 );
             }
             if self.provider == "cline" || self.provider == "clinepass" {

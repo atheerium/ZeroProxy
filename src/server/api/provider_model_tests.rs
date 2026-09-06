@@ -7,11 +7,12 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use futures_util::future::join_all;
+use reqwest::header as reqwest_header;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::time::timeout;
 
+use crate::core::executor::provider_config_for;
 use crate::core::model::catalog::provider_catalog;
 use crate::server::state::AppState;
 
@@ -93,22 +94,12 @@ pub(super) async fn test_provider_models(
             .into_response();
     }
 
-    let api_key = internal_api_key(&state);
-    let (first_model, remaining_models) = models
-        .split_first()
-        .expect("models should contain at least one entry");
+    let api_key = connection.api_key.as_deref();
 
     let mut results = Vec::with_capacity(models.len());
-    results.push(ping_model(&state, &alias, first_model.clone(), api_key.as_deref()).await);
-
-    let remaining = join_all(
-        remaining_models
-            .iter()
-            .cloned()
-            .map(|model| ping_model(&state, &alias, model, api_key.as_deref())),
-    )
-    .await;
-    results.extend(remaining);
+    for model in models {
+        results.push(ping_model(&alias, &provider, model, api_key).await);
+    }
 
     Json(ProviderModelTestResponse {
         provider,
@@ -154,34 +145,106 @@ fn is_compatible_provider(provider: &str) -> bool {
 }
 
 async fn ping_model(
-    state: &AppState,
-    alias: &str,
+    _alias: &str,
+    provider: &str,
     model: TestModelTarget,
     api_key: Option<&str>,
 ) -> ProviderModelTestResult {
-    let model_name = format!("{alias}/{}", model.id);
     let start = Instant::now();
-    let mut ping_headers = HeaderMap::new();
-    if let Some(api_key) = api_key {
-        if let Ok(value) = HeaderValue::from_str(&format!("Bearer {api_key}")) {
-            ping_headers.insert(AUTHORIZATION, value);
+    let client = reqwest::Client::builder()
+        .timeout(MODEL_TEST_TIMEOUT)
+        .danger_accept_invalid_certs(true)
+        .build()
+        .unwrap_or_default();
+
+    let config = provider_config_for(provider);
+    let is_anthropic = config
+        .map(|c| {
+            c.default_headers
+                .iter()
+                .any(|(k, _)| k == "anthropic-version")
+        })
+        .unwrap_or(false);
+    let base_url = config
+        .map(|c| c.base_url.as_str())
+        .unwrap_or("https://api.openai.com/v1/chat/completions");
+
+    let mut headers = reqwest_header::HeaderMap::new();
+    headers.insert(
+        reqwest_header::CONTENT_TYPE,
+        reqwest_header::HeaderValue::from_static("application/json"),
+    );
+
+    if is_anthropic {
+        if let Some(key) = api_key {
+            if let Ok(v) = reqwest_header::HeaderValue::from_str(key) {
+                headers.insert("x-api-key", v);
+            }
+        }
+        headers.insert(
+            "anthropic-version",
+            reqwest_header::HeaderValue::from_static("2023-06-01"),
+        );
+        if provider == "agentrouter" {
+            if let Ok(v) =
+                reqwest_header::HeaderValue::from_str("claude-cli/2.0.14 (external, cli)")
+            {
+                headers.insert(reqwest_header::USER_AGENT, v);
+            }
+        }
+    } else {
+        if let Some(key) = api_key {
+            if let Ok(v) = reqwest_header::HeaderValue::from_str(&format!("Bearer {key}")) {
+                headers.insert(reqwest_header::AUTHORIZATION, v);
+            }
         }
     }
 
-    let body = json!({
-        "model": model_name,
-        "max_tokens": 1,
-        "stream": false,
-        "messages": [{ "role": "user", "content": "hi" }]
-    });
+    for (k, v) in config
+        .map(|c| c.default_headers.iter())
+        .into_iter()
+        .flatten()
+    {
+        if let Ok(val) = reqwest_header::HeaderValue::from_str(v) {
+            headers.entry(k.as_str()).or_insert(val);
+        }
+    }
+
+    let body = if is_anthropic {
+        json!({
+            "model": model.id,
+            "max_tokens": 1,
+            "messages": [{ "role": "user", "content": "hi" }]
+        })
+    } else {
+        json!({
+            "model": model.id,
+            "max_tokens": 1,
+            "stream": false,
+            "messages": [{ "role": "user", "content": "hi" }]
+        })
+    };
 
     let response = match timeout(
         MODEL_TEST_TIMEOUT,
-        chat::chat_completions(State(state.clone()), ping_headers, Ok(Json(body))),
+        client
+            .post(base_url)
+            .headers(headers)
+            .body(body.to_string())
+            .send(),
     )
     .await
     {
-        Ok(response) => response,
+        Ok(Ok(resp)) => resp,
+        Ok(Err(e)) => {
+            return ProviderModelTestResult {
+                model_id: model.id,
+                name: model.name,
+                ok: false,
+                latency_ms: start.elapsed().as_millis() as u64,
+                error: Some(format!("Request failed: {e}")),
+            };
+        }
         Err(_) => {
             return ProviderModelTestResult {
                 model_id: model.id,
@@ -195,11 +258,13 @@ async fn ping_model(
 
     let latency_ms = start.elapsed().as_millis() as u64;
     let status = response.status();
-    let ok = status == StatusCode::OK || status == StatusCode::BAD_REQUEST;
+    let ok = status.is_success();
     let error = if ok {
         None
     } else {
-        Some(read_error_text(response, status).await)
+        let text = response.text().await.unwrap_or_default();
+        let truncated: String = text.chars().take(120).collect();
+        Some(format!("HTTP {}: {truncated}", status.as_u16()))
     };
 
     ProviderModelTestResult {

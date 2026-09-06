@@ -359,9 +359,8 @@ pub fn get_target_format_for_provider(provider: &str) -> Format {
     }
     match provider {
         "openai" => Format::OpenAi,
-        "anthropic" | "claude" | "glm" | "kimi" | "minimax" | "minimax-cn" | "kimi-coding" => {
-            Format::Claude
-        }
+        "anthropic" | "claude" | "glm" | "kimi" | "minimax" | "minimax-cn" | "kimi-coding"
+        | "agentrouter" => Format::Claude,
         "gemini" => Format::Gemini,
         "gemini-cli" => Format::GeminiCli,
         "vertex" | "vertex-partner" => Format::Vertex,

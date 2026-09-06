@@ -1084,7 +1084,10 @@ async fn test_kimi_web_connection(
                 error: if valid {
                     None
                 } else {
-                    Some("Invalid or expired Kimi access_token — re-paste from kimi.ai localStorage".to_string())
+                    Some(
+                        "Invalid or expired Kimi access_token — re-paste from kimi.ai localStorage"
+                            .to_string(),
+                    )
                 },
                 refreshed: false,
                 new_tokens: None,
@@ -1100,8 +1103,7 @@ async fn test_deepseek_web_connection(
     effective_proxy: &EffectiveProxy,
 ) -> ConnectionTestResult {
     let raw = connection.api_key.clone().unwrap_or_default();
-    let token = crate::core::executor::extract_user_token(Some(&raw))
-        .unwrap_or_default();
+    let token = crate::core::executor::extract_user_token(Some(&raw)).unwrap_or_default();
     if token.is_empty() {
         return invalid("Missing DeepSeek userToken — paste from chat.deepseek.com localStorage");
     }
@@ -1140,7 +1142,10 @@ async fn test_deepseek_web_connection(
             match response.json::<Value>().await {
                 Ok(payload) => {
                     // OmniRoute: read json.data.biz_data.token to confirm round-trip success
-                    let biz_data = payload.pointer("/data/biz_data").cloned().unwrap_or(Value::Null);
+                    let biz_data = payload
+                        .pointer("/data/biz_data")
+                        .cloned()
+                        .unwrap_or(Value::Null);
                     let has_token = biz_data
                         .get("token")
                         .and_then(Value::as_str)

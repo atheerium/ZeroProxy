@@ -21,7 +21,10 @@ use futures_util::StreamExt;
 use hyper::http;
 use keccak::Keccak;
 use rand::Rng;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, AUTHORIZATION, CONTENT_TYPE, COOKIE, ORIGIN, REFERER, USER_AGENT};
+use reqwest::header::{
+    HeaderMap, HeaderValue, ACCEPT, ACCEPT_LANGUAGE, AUTHORIZATION, CONTENT_TYPE, COOKIE, ORIGIN,
+    REFERER, USER_AGENT,
+};
 use reqwest::Body as ReqwestBody;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -118,7 +121,7 @@ pub struct DeepSeekWebExecutor {
 fn fake_headers_json() -> Value {
     json!({
         "Accept": "*/*",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
+        "Accept-Encoding": "identity",
         "Accept-Language": "en-US,en;q=0.9",
         "Origin": DEEPSEEK_BASE,
         "Referer": format!("{}/", DEEPSEEK_BASE),
@@ -174,8 +177,30 @@ static ACCESS_TOKEN_CACHE: once_cell::sync::Lazy<
     tokio::sync::RwLock<HashMap<String, CachedToken>>,
 > = once_cell::sync::Lazy::new(|| tokio::sync::RwLock::new(HashMap::new()));
 
+/// Bare HTTP/1.1 client for the `/users/current` token exchange.
+///
+/// The shared pool client negotiates HTTP/2 + auto compression; DeepSeek's
+/// WAF answers that fingerprint with biz `40003` for the same userToken that
+/// succeeds over curl/HTTP-1.1. This client mirrors curl: HTTP/1.1 only, no
+/// auto-decompression (we send `Accept-Encoding: identity` explicitly).
+fn direct_http1_client(
+    proxy: Option<&ProxyTarget>,
+) -> Result<reqwest::Client, DeepSeekWebExecutorError> {
+    let mut builder = reqwest::Client::builder()
+        .http1_only()
+        .connect_timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(60));
+    if let Some(p) = proxy {
+        if !p.url.is_empty() {
+            let pr = reqwest::Proxy::all(&p.url).map_err(DeepSeekWebExecutorError::Request)?;
+            builder = builder.proxy(pr.no_proxy(reqwest::NoProxy::from_string(&p.no_proxy)));
+        }
+    }
+    builder.build().map_err(DeepSeekWebExecutorError::Request)
+}
+
 async fn acquire_access_token(
-    pool: &ClientPool,
+    _pool: &ClientPool,
     user_token: &str,
     proxy: Option<&ProxyTarget>,
 ) -> Result<String, DeepSeekWebExecutorError> {
@@ -189,7 +214,8 @@ async fn acquire_access_token(
         }
     }
 
-    let client = pool.get("deepseek-web", proxy)?;
+    // NOTE: intentionally NOT the shared pool client (see direct_http1_client).
+    let client = direct_http1_client(proxy)?;
     let resp = client
         .get(format!("{DEEPSEEK_API_BASE}/v0/users/current"))
         .header(AUTHORIZATION, format!("Bearer {user_token}"))
@@ -226,7 +252,10 @@ async fn acquire_access_token(
             )));
         }
     }
-    let biz_data = json.pointer("/data/biz_data").cloned().unwrap_or(Value::Null);
+    let biz_data = json
+        .pointer("/data/biz_data")
+        .cloned()
+        .unwrap_or(Value::Null);
     let access_token = biz_data
         .get("token")
         .and_then(Value::as_str)
@@ -348,9 +377,14 @@ async fn get_pow_response(
     }
 
     let json: Value = resp.json().await?;
-    let biz_data = json.pointer("/data/biz_data").cloned().unwrap_or(Value::Null);
-    let challenge: PowChallenge = serde_json::from_value(biz_data.get("challenge").cloned().unwrap_or(Value::Null))
-        .map_err(|e| DeepSeekWebExecutorError::PoWFailed(format!("Invalid PoW challenge: {e}")))?;
+    let biz_data = json
+        .pointer("/data/biz_data")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let challenge: PowChallenge = serde_json::from_value(
+        biz_data.get("challenge").cloned().unwrap_or(Value::Null),
+    )
+    .map_err(|e| DeepSeekWebExecutorError::PoWFailed(format!("Invalid PoW challenge: {e}")))?;
 
     if challenge.algorithm != POW_ALGORITHM {
         return Err(DeepSeekWebExecutorError::PoWFailed(format!(
@@ -379,9 +413,11 @@ async fn get_pow_response(
     // Run the CPU-bound PoW on a blocking thread (capped at 250k iterations; ~1s on modern hw)
     let prefix_for_task = prefix.clone();
     let challenge_for_task = challenge.challenge.clone();
-    let answer = tokio::task::spawn_blocking(move || solve_pow(&prefix_for_task, &challenge_for_task, difficulty))
-        .await
-        .map_err(|e| DeepSeekWebExecutorError::PoWFailed(format!("PoW join error: {e}")))?;
+    let answer = tokio::task::spawn_blocking(move || {
+        solve_pow(&prefix_for_task, &challenge_for_task, difficulty)
+    })
+    .await
+    .map_err(|e| DeepSeekWebExecutorError::PoWFailed(format!("PoW join error: {e}")))?;
     if answer < 0 {
         return Err(DeepSeekWebExecutorError::PoWFailed(format!(
             "Could not solve PoW in {difficulty} iterations"
@@ -429,7 +465,10 @@ async fn create_session(
     }
 
     let json: Value = resp.json().await?;
-    let biz_data = json.pointer("/data/biz_data").cloned().unwrap_or(Value::Null);
+    let biz_data = json
+        .pointer("/data/biz_data")
+        .cloned()
+        .unwrap_or(Value::Null);
     let session_id = biz_data
         .pointer("/chat_session/id")
         .and_then(Value::as_str)
@@ -513,11 +552,18 @@ fn is_expert_model(model: &str) -> bool {
 }
 
 fn resolve_model_options(model: &str, body: &Value) -> (String, bool, bool) {
-    let model_type = if is_expert_model(model) { "expert" } else { "default" };
+    let model_type = if is_expert_model(model) {
+        "expert"
+    } else {
+        "default"
+    };
     let thinking = is_thinking_model(model)
         || body.get("thinking_enabled").and_then(Value::as_bool) == Some(true)
         || body.get("thinking").and_then(Value::as_bool) == Some(true)
-        || body.get("reasoning_effort").map(|v| !v.is_null()).unwrap_or(false);
+        || body
+            .get("reasoning_effort")
+            .map(|v| !v.is_null())
+            .unwrap_or(false);
     let search = is_search_model(model)
         || body.get("search_enabled").and_then(Value::as_bool) == Some(true)
         || body.get("search").and_then(Value::as_bool) == Some(true)
@@ -543,7 +589,9 @@ fn build_prompt(messages: &[Value], history_window: usize) -> String {
     let mut last_user = String::new();
     for m in messages {
         let role = m.get("role").and_then(Value::as_str).unwrap_or("user");
-        let text = extract_message_text(m.get("content").unwrap_or(&Value::Null)).trim().to_string();
+        let text = extract_message_text(m.get("content").unwrap_or(&Value::Null))
+            .trim()
+            .to_string();
         if text.is_empty() {
             continue;
         }
@@ -645,7 +693,10 @@ fn append_search_citations(search_results: &[Value], is_search: bool) -> Option<
     for (i, c) in search_results.iter().enumerate() {
         let title = c.get("title").and_then(Value::as_str).unwrap_or("");
         let url = c.get("url").and_then(Value::as_str).unwrap_or("");
-        let cite_index = c.get("cite_index").and_then(Value::as_i64).unwrap_or(i as i64 + 1);
+        let cite_index = c
+            .get("cite_index")
+            .and_then(Value::as_i64)
+            .unwrap_or(i as i64 + 1);
         if !title.is_empty() {
             parts.push(format!("[{cite_index}] [{title}]({url})"));
         } else if !url.is_empty() {
@@ -662,7 +713,13 @@ fn append_search_citations(search_results: &[Value], is_search: bool) -> Option<
 // OpenAI SSE chunk helper
 // ---------------------------------------------------------------------------
 
-fn sse_chunk(cid: &str, created: i64, model: &str, delta: Value, finish_reason: Option<&str>) -> String {
+fn sse_chunk(
+    cid: &str,
+    created: i64,
+    model: &str,
+    delta: Value,
+    finish_reason: Option<&str>,
+) -> String {
     format!(
         "data: {}\n\n",
         serde_json::to_string(&json!({
@@ -703,9 +760,10 @@ struct SseState {
 const FINISH_DRAIN_MS: u64 = 80;
 
 fn emit_chunk(state: &mut SseState, out: &mut String, delta: Value, finish: Option<&str>) {
-    if !state.emitted_role && (delta.get("content").is_some()
-        || delta.get("reasoning_content").is_some()
-        || delta.get("role").is_some())
+    if !state.emitted_role
+        && (delta.get("content").is_some()
+            || delta.get("reasoning_content").is_some()
+            || delta.get("role").is_some())
     {
         out.push_str(&sse_chunk(
             &state.cid,
@@ -716,7 +774,13 @@ fn emit_chunk(state: &mut SseState, out: &mut String, delta: Value, finish: Opti
         ));
         state.emitted_role = true;
     }
-    out.push_str(&sse_chunk(&state.cid, state.created, &state.model, delta, finish));
+    out.push_str(&sse_chunk(
+        &state.cid,
+        state.created,
+        &state.model,
+        delta,
+        finish,
+    ));
 }
 
 fn path_for(state: &SseState) -> &'static str {
@@ -734,14 +798,22 @@ fn path_for(state: &SseState) -> &'static str {
 
 fn apply_fragment_type(state: &mut SseState, frag: &Value, set_path: bool) {
     if set_path {
-        let t = frag.get("type").and_then(Value::as_str).unwrap_or("").to_uppercase();
+        let t = frag
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_uppercase();
         if t == "THINK" {
             state.current_path = "thinking";
         } else if t == "ANSWER" || t == "RESPONSE" {
             state.current_path = "content";
         }
     } else {
-        let t = frag.get("type").and_then(Value::as_str).unwrap_or("").to_uppercase();
+        let t = frag
+            .get("type")
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_uppercase();
         if t == "THINK" {
             state.current_path = "thinking";
         } else if t == "ANSWER" || t == "RESPONSE" {
@@ -779,7 +851,8 @@ fn handle_data_line(state: &mut SseState, payload: &str, out: &mut String) {
     let v = val.get("v");
 
     // v.response wrapper: {response: {thinking_enabled, fragments}}
-    if let Some(resp_obj) = v.and_then(|x| x.as_object())
+    if let Some(resp_obj) = v
+        .and_then(|x| x.as_object())
         .and_then(|o| o.get("response"))
         .and_then(Value::as_object)
     {
@@ -809,7 +882,10 @@ fn handle_data_line(state: &mut SseState, payload: &str, out: &mut String) {
         if let Some(arr) = v.and_then(Value::as_array) {
             for entry in arr {
                 if entry.get("p").and_then(Value::as_str) == Some("response")
-                    && entry.pointer("/v/thinking_enabled").and_then(Value::as_bool) == Some(true)
+                    && entry
+                        .pointer("/v/thinking_enabled")
+                        .and_then(Value::as_bool)
+                        == Some(true)
                 {
                     state.current_path = "thinking";
                 }
@@ -887,7 +963,8 @@ fn handle_data_line(state: &mut SseState, payload: &str, out: &mut String) {
 
 fn schedule_drain_finish(state: &mut SseState) {
     state.finish_drain_pending = true;
-    state.finish_drain_at = Some(std::time::Instant::now() + Duration::from_millis(FINISH_DRAIN_MS));
+    state.finish_drain_at =
+        Some(std::time::Instant::now() + Duration::from_millis(FINISH_DRAIN_MS));
 }
 
 fn maybe_finish_drain(state: &mut SseState, out: &mut String) {
@@ -973,11 +1050,12 @@ async fn transform_deepseek_stream(
     let bytes = out.into_bytes();
     let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
     *http_resp.status_mut() = reqwest::StatusCode::OK;
-    http_resp.headers_mut().insert(
-        CONTENT_TYPE,
-        HeaderValue::from_static("text/event-stream"),
-    );
-    Ok(UpstreamResponse::Reqwest(reqwest::Response::from(http_resp)))
+    http_resp
+        .headers_mut()
+        .insert(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+    Ok(UpstreamResponse::Reqwest(reqwest::Response::from(
+        http_resp,
+    )))
 }
 
 async fn collect_deepseek_content_v2(
@@ -995,7 +1073,11 @@ async fn collect_deepseek_content_v2(
         is_thinking: bool,
         is_search: bool,
     }
-    let mut acc = Acc { is_thinking, is_search, ..Default::default() };
+    let mut acc = Acc {
+        is_thinking,
+        is_search,
+        ..Default::default()
+    };
     let mut byte_stream = response.bytes_stream();
     let mut line_buf = String::new();
     while let Some(chunk_result) = byte_stream.next().await {
@@ -1019,7 +1101,8 @@ async fn collect_deepseek_content_v2(
             let o = val.get("o").and_then(Value::as_str).unwrap_or("");
             let v = val.get("v");
 
-            if let Some(resp_obj) = v.and_then(|x| x.as_object())
+            if let Some(resp_obj) = v
+                .and_then(|x| x.as_object())
                 .and_then(|o| o.get("response"))
                 .and_then(Value::as_object)
             {
@@ -1030,15 +1113,31 @@ async fn collect_deepseek_content_v2(
                 }
                 if let Some(frags) = resp_obj.get("fragments").and_then(Value::as_array) {
                     for frag in frags {
-                        let t = frag.get("type").and_then(Value::as_str).unwrap_or("").to_uppercase();
-                        if t == "THINK" { acc.current_path = "thinking"; }
-                        else if t == "ANSWER" || t == "RESPONSE" { acc.current_path = "content"; }
+                        let t = frag
+                            .get("type")
+                            .and_then(Value::as_str)
+                            .unwrap_or("")
+                            .to_uppercase();
+                        if t == "THINK" {
+                            acc.current_path = "thinking";
+                        } else if t == "ANSWER" || t == "RESPONSE" {
+                            acc.current_path = "content";
+                        }
                         if let Some(c) = frag.get("content").and_then(Value::as_str) {
                             let cleaned = format_stream_content(c, acc.is_search);
                             if !cleaned.is_empty() {
-                                let path = if !acc.current_path.is_empty() { acc.current_path } else if acc.is_thinking { "thinking" } else { "content" };
-                                if path == "thinking" { acc.reasoning.push_str(&cleaned); }
-                                else { acc.content.push_str(&cleaned); }
+                                let path = if !acc.current_path.is_empty() {
+                                    acc.current_path
+                                } else if acc.is_thinking {
+                                    "thinking"
+                                } else {
+                                    "content"
+                                };
+                                if path == "thinking" {
+                                    acc.reasoning.push_str(&cleaned);
+                                } else {
+                                    acc.content.push_str(&cleaned);
+                                }
                             }
                         }
                     }
@@ -1054,15 +1153,31 @@ async fn collect_deepseek_content_v2(
                     Vec::new()
                 };
                 for frag in &frags_iter {
-                    let t = frag.get("type").and_then(Value::as_str).unwrap_or("").to_uppercase();
-                    if t == "THINK" { acc.current_path = "thinking"; }
-                    else if t == "ANSWER" || t == "RESPONSE" { acc.current_path = "content"; }
+                    let t = frag
+                        .get("type")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_uppercase();
+                    if t == "THINK" {
+                        acc.current_path = "thinking";
+                    } else if t == "ANSWER" || t == "RESPONSE" {
+                        acc.current_path = "content";
+                    }
                     if let Some(c) = frag.get("content").and_then(Value::as_str) {
                         let cleaned = format_stream_content(c, acc.is_search);
                         if !cleaned.is_empty() {
-                            let path = if !acc.current_path.is_empty() { acc.current_path } else if acc.is_thinking { "thinking" } else { "content" };
-                            if path == "thinking" { acc.reasoning.push_str(&cleaned); }
-                            else { acc.content.push_str(&cleaned); }
+                            let path = if !acc.current_path.is_empty() {
+                                acc.current_path
+                            } else if acc.is_thinking {
+                                "thinking"
+                            } else {
+                                "content"
+                            };
+                            if path == "thinking" {
+                                acc.reasoning.push_str(&cleaned);
+                            } else {
+                                acc.content.push_str(&cleaned);
+                            }
                         }
                     }
                 }
@@ -1072,20 +1187,33 @@ async fn collect_deepseek_content_v2(
                 if let Some(arr) = v.and_then(Value::as_array) {
                     for entry in arr {
                         if entry.get("p").and_then(Value::as_str) == Some("response")
-                            && entry.pointer("/v/thinking_enabled").and_then(Value::as_bool) == Some(true)
+                            && entry
+                                .pointer("/v/thinking_enabled")
+                                .and_then(Value::as_bool)
+                                == Some(true)
                         {
                             acc.current_path = "thinking";
                         }
                         if let Some(arr2) = entry.get("v").and_then(Value::as_array) {
-                            let joined: String = arr2.iter()
+                            let joined: String = arr2
+                                .iter()
                                 .filter_map(|x| x.get("content").and_then(Value::as_str))
                                 .collect::<Vec<_>>()
                                 .join("");
                             if !joined.is_empty() {
                                 let cleaned = format_stream_content(&joined, acc.is_search);
-                                let path = if !acc.current_path.is_empty() { acc.current_path } else if acc.is_thinking { "thinking" } else { "content" };
-                                if path == "thinking" { acc.reasoning.push_str(&cleaned); }
-                                else { acc.content.push_str(&cleaned); }
+                                let path = if !acc.current_path.is_empty() {
+                                    acc.current_path
+                                } else if acc.is_thinking {
+                                    "thinking"
+                                } else {
+                                    "content"
+                                };
+                                if path == "thinking" {
+                                    acc.reasoning.push_str(&cleaned);
+                                } else {
+                                    acc.content.push_str(&cleaned);
+                                }
                             }
                         }
                     }
@@ -1104,9 +1232,18 @@ async fn collect_deepseek_content_v2(
             if let Some(s) = v.and_then(Value::as_str) {
                 let cleaned = format_stream_content(s, acc.is_search);
                 if !cleaned.is_empty() {
-                    let path = if !acc.current_path.is_empty() { acc.current_path } else if acc.is_thinking { "thinking" } else { "content" };
-                    if path == "thinking" { acc.reasoning.push_str(&cleaned); }
-                    else { acc.content.push_str(&cleaned); }
+                    let path = if !acc.current_path.is_empty() {
+                        acc.current_path
+                    } else if acc.is_thinking {
+                        "thinking"
+                    } else {
+                        "content"
+                    };
+                    if path == "thinking" {
+                        acc.reasoning.push_str(&cleaned);
+                    } else {
+                        acc.content.push_str(&cleaned);
+                    }
                 }
             }
         }
@@ -1127,7 +1264,9 @@ fn json_error(status: u16, message: &str, err_type: &str, code: Option<&str>) ->
     let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
     *http_resp.status_mut() =
         reqwest::StatusCode::from_u16(status).unwrap_or(reqwest::StatusCode::BAD_GATEWAY);
-    http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    http_resp
+        .headers_mut()
+        .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     UpstreamResponse::Reqwest(reqwest::Response::from(http_resp))
 }
 
@@ -1217,11 +1356,19 @@ impl DeepSeekWebExecutor {
         let response = if status == 401 || status == 403 {
             // Token may have rotated; clear cache, re-acquire, retry once
             ACCESS_TOKEN_CACHE.write().await.remove(&user_token);
-            access_token = acquire_access_token(&self.pool, &user_token, request.proxy.as_ref()).await?;
-            pow_response = get_pow_response(&self.pool, &access_token, request.proxy.as_ref()).await?;
+            access_token =
+                acquire_access_token(&self.pool, &user_token, request.proxy.as_ref()).await?;
+            pow_response =
+                get_pow_response(&self.pool, &access_token, request.proxy.as_ref()).await?;
             let session_id_new =
                 create_session(&self.pool, &access_token, request.proxy.as_ref()).await?;
-            delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+            delete_session(
+                &self.pool,
+                &access_token,
+                &session_id,
+                request.proxy.as_ref(),
+            )
+            .await;
             // session id replaced below
             let mut headers2 = fake_headers_json();
             headers2["Authorization"] = Value::String(format!("Bearer {access_token}"));
@@ -1269,7 +1416,13 @@ impl DeepSeekWebExecutor {
                     format!("HTTP_{status}"),
                 ),
             };
-            delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+            delete_session(
+                &self.pool,
+                &access_token,
+                &session_id,
+                request.proxy.as_ref(),
+            )
+            .await;
             return Ok(DeepSeekWebExecutorResponse {
                 response: json_error(status, &msg, "upstream_error", Some(&code_str)),
                 url,
@@ -1291,7 +1444,10 @@ impl DeepSeekWebExecutor {
             let json: Value = response.json().await?;
             if let Some(code) = json.get("code").and_then(Value::as_i64) {
                 if code != 0 {
-                    let biz_msg = json.pointer("/data/biz_msg").and_then(Value::as_str).unwrap_or("");
+                    let biz_msg = json
+                        .pointer("/data/biz_msg")
+                        .and_then(Value::as_str)
+                        .unwrap_or("");
                     let msg = json.get("msg").and_then(Value::as_str).unwrap_or(biz_msg);
                     let err_msg = format!("DeepSeek error {code}: {msg}");
                     let mapped_status = match code {
@@ -1302,9 +1458,20 @@ impl DeepSeekWebExecutor {
                         40002 => 429,
                         _ => 502,
                     };
-                    delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+                    delete_session(
+                        &self.pool,
+                        &access_token,
+                        &session_id,
+                        request.proxy.as_ref(),
+                    )
+                    .await;
                     return Ok(DeepSeekWebExecutorResponse {
-                        response: json_error(mapped_status, &err_msg, "upstream_error", Some(&code.to_string())),
+                        response: json_error(
+                            mapped_status,
+                            &err_msg,
+                            "upstream_error",
+                            Some(&code.to_string()),
+                        ),
                         url,
                         headers: req_headers_for_resp,
                         transformed_body: payload,
@@ -1312,11 +1479,19 @@ impl DeepSeekWebExecutor {
                     });
                 }
                 // Non-stream JSON 200 — pass through
-                delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+                delete_session(
+                    &self.pool,
+                    &access_token,
+                    &session_id,
+                    request.proxy.as_ref(),
+                )
+                .await;
                 let bytes = serde_json::to_vec(&json)?;
                 let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
                 *http_resp.status_mut() = reqwest::StatusCode::OK;
-                http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+                http_resp
+                    .headers_mut()
+                    .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
                 return Ok(DeepSeekWebExecutorResponse {
                     response: UpstreamResponse::Reqwest(reqwest::Response::from(http_resp)),
                     url,
@@ -1326,11 +1501,19 @@ impl DeepSeekWebExecutor {
                 });
             }
             // No code field — treat as non-stream response, pass through
-            delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+            delete_session(
+                &self.pool,
+                &access_token,
+                &session_id,
+                request.proxy.as_ref(),
+            )
+            .await;
             let bytes = serde_json::to_vec(&json)?;
             let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
             *http_resp.status_mut() = reqwest::StatusCode::OK;
-            http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            http_resp
+                .headers_mut()
+                .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             return Ok(DeepSeekWebExecutorResponse {
                 response: UpstreamResponse::Reqwest(reqwest::Response::from(http_resp)),
                 url,
@@ -1372,11 +1555,19 @@ impl DeepSeekWebExecutor {
             let bytes = serde_json::to_vec(&body)?;
             let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
             *http_resp.status_mut() = reqwest::StatusCode::OK;
-            http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            http_resp
+                .headers_mut()
+                .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             UpstreamResponse::Reqwest(reqwest::Response::from(http_resp))
         };
 
-        delete_session(&self.pool, &access_token, &session_id, request.proxy.as_ref()).await;
+        delete_session(
+            &self.pool,
+            &access_token,
+            &session_id,
+            request.proxy.as_ref(),
+        )
+        .await;
 
         Ok(DeepSeekWebExecutorResponse {
             response: converted,

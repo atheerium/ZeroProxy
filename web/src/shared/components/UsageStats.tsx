@@ -5,8 +5,8 @@ import { FREE_PROVIDERS } from "@/shared/constants/providers";
 import Badge from "./Badge";
 import Card from "./Card";
 import OverviewCards from "@/components/usage/OverviewCards";
-import UsageTable, { fmt, fmtTime } from "@/components/usage/UsageTable";
 import ProviderTopology from "@/components/usage/ProviderTopologyWrapper";
+import RequestHistoryTable from "@/components/usage/RequestHistoryTable";
 
 import React from "react";
 
@@ -213,14 +213,9 @@ const PERIODS = [
 ];
 
 export default function UsageStats({ period: periodProp, setPeriod: setPeriodProp, hidePeriodSelector = false }: UsageStatsProps = {}) {
-  const [sortBy, setSortBy] = useState("rawModel");
-  const [sortOrder, setSortOrder] = useState("asc");
-
   const [stats, setStats] = useState<StatsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [fetching, setFetching] = useState(false);
-  const [tableView, setTableView] = useState("model");
-  const [viewMode, setViewMode] = useState("costs");
   const [providers, setProviders] = useState<Provider[]>([]);
   const [periodLocal, setPeriodLocal] = useState("7d");
   const period = periodProp ?? periodLocal;
@@ -451,61 +446,20 @@ export default function UsageStats({ period: periodProp, setPeriod: setPeriodPro
       {/* Overview cards */}
       {loading ? spinner : <OverviewCards stats={stats} />}
 
-      {/* Provider topology + Recent Requests */}
+      {/* Provider topology */}
       {loading ? spinner : (
-        <div className="grid min-w-0 grid-cols-1 items-stretch gap-2 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
-          <ProviderTopology
-            providers={providers}
-            activeRequests={stats.activeRequests || []}
-            lastProvider={stats.recentRequests?.[0]?.provider || ""}
-            errorProvider={stats.errorProvider || ""}
-          />
-          <RecentRequests requests={stats.recentRequests || []} />
-        </div>
+        <ProviderTopology
+          providers={providers}
+          activeRequests={stats.activeRequests || []}
+          lastProvider={stats.recentRequests?.[0]?.provider || ""}
+          errorProvider={stats.errorProvider || ""}
+        />
       )}
 
-      {/* Table with dropdown selector */}
+      {/* Unified requests table (merged Recent Requests + Usage by Model) */}
       <div className="flex flex-col gap-3">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <select
-            value={tableView}
-            onChange={(e) => setTableView(e.target.value)}
-            className="w-full rounded-lg border border-border bg-bg-subtle px-3 py-1.5 text-sm font-medium text-text focus:outline-none focus:ring-2 focus:ring-primary/50 sm:w-auto"
-          >
-            {TABLE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>{opt.label}</option>
-            ))}
-          </select>
-          <div className="grid grid-cols-2 items-center gap-1 rounded-lg border border-border bg-bg-subtle p-1 sm:flex">
-            <button
-              onClick={() => setViewMode("costs")}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === "costs" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-            >
-              Costs
-            </button>
-            <button
-              onClick={() => setViewMode("tokens")}
-              className={`px-3 py-1 rounded-md text-sm font-medium transition-colors ${viewMode === "tokens" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:text-text hover:bg-bg-hover"}`}
-            >
-              Tokens
-            </button>
-          </div>
-        </div>
-        {loading ? spinner : activeTableConfig && (
-          <UsageTable
-            title=""
-            columns={activeTableConfig.columns}
-            groupedData={activeTableConfig.groupedData}
-            tableType={tableView}
-            sortBy={sortBy}
-            sortOrder={sortOrder}
-            onToggleSort={toggleSort}
-            viewMode={viewMode}
-            storageKey={activeTableConfig.storageKey}
-            renderSummaryCells={activeTableConfig.renderSummaryCells}
-            renderDetailCells={activeTableConfig.renderDetailCells}
-            emptyMessage={activeTableConfig.emptyMessage}
-          />
+        {loading ? spinner : (
+          <RequestHistoryTable showFilters={false} pageSize={20} />
         )}
       </div>
     </div>

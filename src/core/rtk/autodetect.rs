@@ -45,17 +45,26 @@ static RE_NDJSON_LINE: Lazy<Regex> = Lazy::new(|| Regex::new(r"(?m)^\{.*\}\s*$")
 
 pub type FilterFn = fn(&str) -> String;
 
+/// Byte-safe head window: floors `DETECT_WINDOW` to a char boundary so
+/// multi-byte glyphs (e.g. `▶`) straddling byte 1024 can't panic the worker.
+fn head_window(text: &str) -> &str {
+    if text.len() <= DETECT_WINDOW {
+        return text;
+    }
+    let mut end = DETECT_WINDOW;
+    while !text.is_char_boundary(end) {
+        end -= 1;
+    }
+    &text[..end]
+}
+
 pub struct DetectedFilter {
     pub filter_fn: FilterFn,
     pub filter_name: &'static str,
 }
 
 pub fn auto_detect_filter(text: &str) -> Option<DetectedFilter> {
-    let head = if text.len() > DETECT_WINDOW {
-        &text[..DETECT_WINDOW]
-    } else {
-        text
-    };
+    let head = head_window(text);
 
     // git-log FIRST (9router autodetect.js checks RE_GIT_LOG before git-diff).
     if RE_GIT_LOG.is_match(head) {
@@ -166,9 +175,10 @@ pub fn auto_detect_filter(text: &str) -> Option<DetectedFilter> {
     // Use text.len() (not head.len()) because JSON_SUMMARY_MIN_BYTES (2000)
     // exceeds DETECT_WINDOW (1024), so the head window would never trigger.
     if text.len() >= JSON_SUMMARY_MIN_BYTES {
-        let peek_start = text[..DETECT_WINDOW.min(text.len())].trim_start();
+        let window = head_window(text);
+        let peek_start = window.trim_start();
         let is_json_like = peek_start.starts_with('{') || peek_start.starts_with('[');
-        if is_json_like || is_mostly_ndjson(&text[..DETECT_WINDOW.min(text.len())]) {
+        if is_json_like || is_mostly_ndjson(window) {
             return Some(DetectedFilter {
                 filter_fn: json_summary_impl,
                 filter_name: FILTER_JSON_SUMMARY,
@@ -401,5 +411,18 @@ mod tests {
             input.len()
         );
         assert_eq!(result.unwrap().filter_name, FILTER_JSON_SUMMARY);
+    }
+
+    #[test]
+    fn test_head_window_never_splits_multibyte_char() {
+        // Regression: `▶` (3 bytes) straddling byte 1024 panicked workers.
+        let mut input = "x".repeat(1022);
+        input.push('▶');
+        input.push_str(&"y".repeat(1100));
+        let result = auto_detect_filter(&input);
+        // Must not panic; classification result is irrelevant.
+        let _ = result;
+        assert!(head_window(&input).len() <= DETECT_WINDOW);
+        assert!(input.is_char_boundary(head_window(&input).len()));
     }
 }

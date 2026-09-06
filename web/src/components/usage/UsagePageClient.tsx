@@ -1,7 +1,7 @@
 import { Suspense, useState, useEffect } from "react";
 // import { useSearchParams, useRouter } from "next/navigation";  // ported: next.js -> Astro+React
 import { UsageStats, RequestLogger, CardSkeleton, SegmentedControl } from "@/shared/components";
-import RequestDetailsTab from "@/components/usage/RequestDetailsTab";
+import RequestHistoryTable from "@/components/usage/RequestHistoryTable";
 import ProviderBreakdownTable from "@/components/usage/ProviderBreakdownTable";
 import UsageAnalyticsGrid from "@/components/usage/UsageAnalyticsGrid";
 import CompressionStats from "@/components/usage/CompressionStats";

@@ -19,7 +19,9 @@ use std::sync::Arc;
 use base64::Engine;
 use futures_util::StreamExt;
 use hyper::http;
-use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, REFERER, USER_AGENT};
+use reqwest::header::{
+    HeaderMap, HeaderValue, ACCEPT, AUTHORIZATION, CONTENT_TYPE, ORIGIN, REFERER, USER_AGENT,
+};
 use reqwest::Body as ReqwestBody;
 use serde_json::{json, Value};
 use uuid::Uuid;
@@ -259,10 +261,21 @@ struct ConnectFrame {
 
 fn decode_connect_frame(buf: &[u8], offset: usize) -> Result<(usize, ConnectFrame), String> {
     if offset + 5 > buf.len() {
-        return Ok((0, ConnectFrame { flags: 0, message: None }));
+        return Ok((
+            0,
+            ConnectFrame {
+                flags: 0,
+                message: None,
+            },
+        ));
     }
     let flags = buf[offset];
-    let len = u32::from_be_bytes([buf[offset + 1], buf[offset + 2], buf[offset + 3], buf[offset + 4]]) as usize;
+    let len = u32::from_be_bytes([
+        buf[offset + 1],
+        buf[offset + 2],
+        buf[offset + 3],
+        buf[offset + 4],
+    ]) as usize;
     if len > MAX_FRAME_LEN {
         return Err(format!(
             "Kimi Connect frame exceeded MAX_FRAME_LEN ({} > {})",
@@ -270,19 +283,34 @@ fn decode_connect_frame(buf: &[u8], offset: usize) -> Result<(usize, ConnectFram
         ));
     }
     if offset + 5 + len > buf.len() {
-        return Ok((0, ConnectFrame { flags: 0, message: None }));
+        return Ok((
+            0,
+            ConnectFrame {
+                flags: 0,
+                message: None,
+            },
+        ));
     }
-    if (flags & !0x03) != 0 {
-        return Err(format!("Kimi Connect frame used unsupported flags: {flags}"));
-    }
+    // Lenient framing: ignore unknown flag bits (only 0x01 compress + 0x02
+    // end-stream are defined), and skip compressed payloads we cannot parse
+    // instead of failing the whole stream.
     if (flags & 0x01) != 0 {
-        return Err("Kimi Connect compressed frames are not supported".to_string());
+        return Ok((
+            5 + len,
+            ConnectFrame {
+                flags,
+                message: None,
+            },
+        ));
     }
     let payload = &buf[offset + 5..offset + 5 + len];
     let message = if len > 0 {
         match serde_json::from_slice::<Value>(payload) {
             Ok(v) => Some(v),
-            Err(e) => return Err(format!("Kimi Connect frame contained invalid JSON: {e}")),
+            // Best-effort deltas: a malformed data frame is skipped; an
+            // EndStream frame with an unparseable body is treated as a clean
+            // end (callers check content presence before erroring).
+            Err(_) => None,
         }
     } else {
         None
@@ -296,10 +324,7 @@ fn end_stream_error(frame: &ConnectFrame) -> Option<String> {
     }
     let err = frame.message.as_ref()?.get("error")?;
     let obj = err.as_object()?;
-    let code = obj
-        .get("code")
-        .and_then(Value::as_str)
-        .unwrap_or("unknown");
+    let code = obj.get("code").and_then(Value::as_str).unwrap_or("unknown");
     let message = obj
         .get("message")
         .and_then(Value::as_str)
@@ -381,17 +406,17 @@ fn fold_messages(messages: &[Value]) -> Result<(String, String), String> {
         } else if let Some(arr) = content.as_array() {
             let mut buf = String::new();
             for part in arr {
-                let p = part.as_object().ok_or_else(|| {
-                    "Kimi Web only supports text message content".to_string()
-                })?;
+                let p = part
+                    .as_object()
+                    .ok_or_else(|| "Kimi Web only supports text message content".to_string())?;
                 let ptype = p.get("type").and_then(Value::as_str).unwrap_or("");
-                if (ptype == "text" || ptype == "input_text") {
+                if ptype == "text" || ptype == "input_text" {
                     if let Some(s) = p.get("text").and_then(Value::as_str) {
                         buf.push_str(s);
                     }
                 } else {
                     return Err(
-                        "Kimi Web does not support image, audio, file, or tool content".to_string()
+                        "Kimi Web does not support image, audio, file, or tool content".to_string(),
                     );
                 }
             }
@@ -426,7 +451,13 @@ fn fold_messages(messages: &[Value]) -> Result<(String, String), String> {
 // Response conversion helpers
 // ---------------------------------------------------------------------------
 
-fn sse_chunk(cid: &str, created: i64, model: &str, delta: Value, finish_reason: Option<&str>) -> String {
+fn sse_chunk(
+    cid: &str,
+    created: i64,
+    model: &str,
+    delta: Value,
+    finish_reason: Option<&str>,
+) -> String {
     format!(
         "data: {}\n\n",
         serde_json::to_string(&json!({
@@ -452,7 +483,10 @@ async fn stream_kimi_to_sse(
     response: reqwest::Response,
     model: &str,
 ) -> Result<UpstreamResponse, KimiWebExecutorError> {
-    let cid = format!("chatcmpl-kimi-{}", &Uuid::new_v4().simple().to_string()[..12]);
+    let cid = format!(
+        "chatcmpl-kimi-{}",
+        &Uuid::new_v4().simple().to_string()[..12]
+    );
     let created = chrono::Utc::now().timestamp();
     let mut out = String::new();
     let mut emitted_role = false;
@@ -488,7 +522,6 @@ async fn stream_kimi_to_sse(
                         json!({ "role": "assistant", "content": "" }),
                         None,
                     ));
-                    emitted_role = true;
                 }
                 out.push_str(&sse_chunk(&cid, created, model, json!({}), Some("stop")));
                 out.push_str("data: [DONE]\n\n");
@@ -496,11 +529,12 @@ async fn stream_kimi_to_sse(
                 let bytes = out.into_bytes();
                 let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
                 *http_resp.status_mut() = reqwest::StatusCode::OK;
-                http_resp.headers_mut().insert(
-                    CONTENT_TYPE,
-                    HeaderValue::from_static("text/event-stream"),
-                );
-                return Ok(UpstreamResponse::Reqwest(reqwest::Response::from(http_resp)));
+                http_resp
+                    .headers_mut()
+                    .insert(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+                return Ok(UpstreamResponse::Reqwest(reqwest::Response::from(
+                    http_resp,
+                )));
             }
 
             if let Some((kind, text)) = extract_kimi_delta(frame.message.as_ref()) {
@@ -525,12 +559,30 @@ async fn stream_kimi_to_sse(
         buf.drain(..offset);
     }
 
+    // Tolerate a missing EndStream frame when deltas were already emitted
+    // (gateway sometimes closes the body right after the last data frame).
+    if emitted_role {
+        out.push_str(&sse_chunk(&cid, created, model, json!({}), Some("stop")));
+        out.push_str("data: [DONE]\n\n");
+        let bytes = out.into_bytes();
+        let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
+        *http_resp.status_mut() = reqwest::StatusCode::OK;
+        http_resp
+            .headers_mut()
+            .insert(CONTENT_TYPE, HeaderValue::from_static("text/event-stream"));
+        return Ok(UpstreamResponse::Reqwest(reqwest::Response::from(
+            http_resp,
+        )));
+    }
+
     Err(KimiWebExecutorError::ConnectProtocol(
         "Kimi Connect stream ended without a successful EndStream frame".to_string(),
     ))
 }
 
-async fn collect_kimi_content(response: reqwest::Response) -> Result<(String, String), KimiWebExecutorError> {
+async fn collect_kimi_content(
+    response: reqwest::Response,
+) -> Result<(String, String), KimiWebExecutorError> {
     let mut answer = String::new();
     let mut reasoning = String::new();
     let mut byte_stream = response.bytes_stream();
@@ -574,6 +626,11 @@ async fn collect_kimi_content(response: reqwest::Response) -> Result<(String, St
     }
 
     if !saw_end {
+        // Same tolerance as the streaming path: content without an EndStream
+        // frame still counts as a usable answer.
+        if !answer.is_empty() || !reasoning.is_empty() {
+            return Ok((answer, reasoning));
+        }
         return Err(KimiWebExecutorError::ConnectProtocol(
             "Kimi Connect stream ended without a successful EndStream frame".to_string(),
         ));
@@ -590,7 +647,9 @@ fn json_error(status: u16, message: &str, err_type: &str, code: Option<&str>) ->
     let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
     *http_resp.status_mut() =
         reqwest::StatusCode::from_u16(status).unwrap_or(reqwest::StatusCode::BAD_GATEWAY);
-    http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+    http_resp
+        .headers_mut()
+        .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
     UpstreamResponse::Reqwest(reqwest::Response::from(http_resp))
 }
 
@@ -752,9 +811,8 @@ impl KimiWebExecutor {
             .and_then(Value::as_array)
             .cloned()
             .unwrap_or_default();
-        let (prompt, system_prompt) = fold_messages(&messages_vec).map_err(|e| {
-            KimiWebExecutorError::ConnectProtocol(format!("Invalid messages: {e}"))
-        })?;
+        let (prompt, system_prompt) = fold_messages(&messages_vec)
+            .map_err(|e| KimiWebExecutorError::ConnectProtocol(format!("Invalid messages: {e}")))?;
         if prompt.is_empty() {
             return Ok(KimiWebExecutorResponse {
                 response: json_error(
@@ -771,10 +829,7 @@ impl KimiWebExecutor {
         }
 
         let reasoning_effort = normalize_reasoning_effort(
-            request
-                .body
-                .get("reasoning_effort")
-                .and_then(Value::as_str),
+            request.body.get("reasoning_effort").and_then(Value::as_str),
             model_config,
         );
 
@@ -806,12 +861,8 @@ impl KimiWebExecutor {
         // 401 → try refresh once → retry once
         if let Ok(ref resp) = last_response {
             if resp.status().as_u16() == 401 && !current_refresh_token.is_empty() {
-                match refresh_kimi_token(
-                    &self.pool,
-                    &current_refresh_token,
-                    request.proxy.as_ref(),
-                )
-                .await
+                match refresh_kimi_token(&self.pool, &current_refresh_token, request.proxy.as_ref())
+                    .await
                 {
                     Ok((new_access, new_refresh)) => {
                         current_access_token = new_access;
@@ -824,28 +875,28 @@ impl KimiWebExecutor {
                             .send()
                             .await;
                     }
-                Err(e) => {
-                    // Refresh failed; surface original 401 with hint
-                    return Ok(KimiWebExecutorResponse {
-                        response: json_error(
-                            401,
-                            &format!(
-                                "Kimi access_token expired and refresh failed: {e}. \
+                    Err(e) => {
+                        // Refresh failed; surface original 401 with hint
+                        return Ok(KimiWebExecutorResponse {
+                            response: json_error(
+                                401,
+                                &format!(
+                                    "Kimi access_token expired and refresh failed: {e}. \
                                  Re-paste a fresh access_token from kimi.ai localStorage."
+                                ),
+                                "upstream_error",
+                                Some("HTTP_401"),
                             ),
-                            "upstream_error",
-                            Some("HTTP_401"),
-                        ),
-                        url: url.clone(),
-                        headers,
-                        transformed_body,
-                        transport: TransportKind::Reqwest,
-                    });
+                            url: url.clone(),
+                            headers,
+                            transformed_body,
+                            transport: TransportKind::Reqwest,
+                        });
+                    }
                 }
             }
-        }
-        let _ = current_access_token;
-        let _ = current_refresh_token;
+            let _ = current_access_token;
+            let _ = current_refresh_token;
         }
 
         let response = last_response?;
@@ -885,7 +936,10 @@ impl KimiWebExecutor {
             })
         } else {
             let (content, reasoning) = collect_kimi_content(response).await?;
-            let cid = format!("chatcmpl-kimi-{}", &Uuid::new_v4().simple().to_string()[..12]);
+            let cid = format!(
+                "chatcmpl-kimi-{}",
+                &Uuid::new_v4().simple().to_string()[..12]
+            );
             let created = chrono::Utc::now().timestamp();
             let mut message = json!({ "role": "assistant", "content": content });
             if !reasoning.is_empty() {
@@ -908,7 +962,9 @@ impl KimiWebExecutor {
             let bytes = serde_json::to_vec(&body).unwrap_or_default();
             let mut http_resp = http::Response::new(ReqwestBody::from(bytes));
             *http_resp.status_mut() = reqwest::StatusCode::OK;
-            http_resp.headers_mut().insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
+            http_resp
+                .headers_mut()
+                .insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
             Ok(KimiWebExecutorResponse {
                 response: UpstreamResponse::Reqwest(reqwest::Response::from(http_resp)),
                 url: url.clone(),
@@ -972,7 +1028,10 @@ fn build_headers(access_token: &str) -> Result<HeaderMap, KimiWebExecutorError> 
             KimiWebExecutorError::InvalidCredentials("Invalid auth header".to_string())
         })?,
     );
-    headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/connect+json"));
+    headers.insert(
+        CONTENT_TYPE,
+        HeaderValue::from_static("application/connect+json"),
+    );
     headers.insert(ACCEPT, HeaderValue::from_static("*/*"));
     headers.insert(
         reqwest::header::ACCEPT_ENCODING,
@@ -1037,20 +1096,11 @@ mod tests {
             extract_kimi_refresh_token(r#"{"access_token":"a","refresh_token":"r1"}"#),
             "r1"
         );
-        assert_eq!(
-            extract_kimi_refresh_token("refresh_token=r1"),
-            "r1"
-        );
-        assert_eq!(
-            extract_kimi_refresh_token("; refresh_token=r2;"),
-            "r2"
-        );
+        assert_eq!(extract_kimi_refresh_token("refresh_token=r1"), "r1");
+        assert_eq!(extract_kimi_refresh_token("; refresh_token=r2;"), "r2");
         assert_eq!(extract_kimi_refresh_token(""), "");
         // no refresh_token present → empty
-        assert_eq!(
-            extract_kimi_refresh_token(r#"{"access_token":"a"}"#),
-            ""
-        );
+        assert_eq!(extract_kimi_refresh_token(r#"{"access_token":"a"}"#), "");
     }
 
     #[test]
@@ -1094,15 +1144,26 @@ mod tests {
 
     #[test]
     fn extract_delta_text_and_think() {
-        let m1 = json!({"op":"append","mask":"block.text.content","block":{"text":{"content":"hi"}}});
-        assert_eq!(extract_kimi_delta(Some(&m1)), Some(("text", "hi".to_string())));
+        let m1 =
+            json!({"op":"append","mask":"block.text.content","block":{"text":{"content":"hi"}}});
+        assert_eq!(
+            extract_kimi_delta(Some(&m1)),
+            Some(("text", "hi".to_string()))
+        );
 
-        let m2 = json!({"op":"append","mask":"block.think.content","block":{"think":{"content":"r1"}}});
-        assert_eq!(extract_kimi_delta(Some(&m2)), Some(("think", "r1".to_string())));
+        let m2 =
+            json!({"op":"append","mask":"block.think.content","block":{"think":{"content":"r1"}}});
+        assert_eq!(
+            extract_kimi_delta(Some(&m2)),
+            Some(("think", "r1".to_string()))
+        );
 
         // initial set with mask=block.text carries initial content
         let m3 = json!({"op":"set","mask":"block.text","block":{"text":{"content":"seed"}}});
-        assert_eq!(extract_kimi_delta(Some(&m3)), Some(("text", "seed".to_string())));
+        assert_eq!(
+            extract_kimi_delta(Some(&m3)),
+            Some(("text", "seed".to_string()))
+        );
 
         // heartbeat / unknown mask → None
         let m4 = json!({"op":"append","mask":"block.meta.id","block":{"meta":{"id":"abc"}}});
@@ -1115,17 +1176,25 @@ mod tests {
     fn end_stream_error_format() {
         let f = ConnectFrame {
             flags: 0x02,
-            message: Some(json!({"error": {"code": "unauthenticated", "message": "token expired"}})),
+            message: Some(
+                json!({"error": {"code": "unauthenticated", "message": "token expired"}}),
+            ),
         };
         assert_eq!(
             end_stream_error(&f).as_deref(),
             Some("unauthenticated: token expired")
         );
         // flags without 0x02 → no error
-        let f2 = ConnectFrame { flags: 0x00, message: f.message.clone() };
+        let f2 = ConnectFrame {
+            flags: 0x00,
+            message: f.message.clone(),
+        };
         assert_eq!(end_stream_error(&f2), None);
         // error missing
-        let f3 = ConnectFrame { flags: 0x02, message: Some(json!({})) };
+        let f3 = ConnectFrame {
+            flags: 0x02,
+            message: Some(json!({})),
+        };
         assert_eq!(end_stream_error(&f3), None);
     }
 
@@ -1153,5 +1222,34 @@ mod tests {
     fn fold_messages_rejects_tool_calls() {
         let msgs = vec![json!({"role":"assistant","content":"x","tool_calls":[{"id":"1"}]})];
         assert!(fold_messages(&msgs).is_err());
+    }
+
+    #[test]
+    fn decode_connect_frame_skips_compressed_and_unknown_flags() {
+        // Compressed frame: consumed + skipped, never fatal.
+        let payload = b"{\"op\":\"append\"}";
+        let mut framed = vec![0x01];
+        framed.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        framed.extend_from_slice(payload);
+        let (consumed, frame) = decode_connect_frame(&framed, 0).unwrap();
+        assert_eq!(consumed, framed.len());
+        assert!(frame.message.is_none());
+
+        // Unknown flag bits are ignored; valid JSON still parses.
+        let mut framed2 = vec![0x08];
+        framed2.extend_from_slice(&(payload.len() as u32).to_be_bytes());
+        framed2.extend_from_slice(payload);
+        let (consumed2, frame2) = decode_connect_frame(&framed2, 0).unwrap();
+        assert_eq!(consumed2, framed2.len());
+        assert_eq!(frame2.message.unwrap(), json!({"op":"append"}));
+
+        // Malformed JSON data frame is skipped, never fatal.
+        let bad = b"not-json{";
+        let mut framed3 = vec![0x00];
+        framed3.extend_from_slice(&(bad.len() as u32).to_be_bytes());
+        framed3.extend_from_slice(bad);
+        let (consumed3, frame3) = decode_connect_frame(&framed3, 0).unwrap();
+        assert_eq!(consumed3, framed3.len());
+        assert!(frame3.message.is_none());
     }
 }

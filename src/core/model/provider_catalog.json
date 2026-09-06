@@ -449,6 +449,21 @@
      "id": "command-r7b",
      "name": "Cohere Command R7B",
      "kind": "llm"
+    },
+    {
+     "id": "glm-5.3",
+     "name": "GLM 5.3",
+     "kind": "llm"
+    },
+    {
+     "id": "claude-opus-5",
+     "name": "Claude Opus 5",
+     "kind": "llm"
+    },
+    {
+     "id": "gpt-5.6-sol",
+     "name": "GPT 5.6 Sol",
+     "kind": "llm"
     }
    ]
   },
@@ -3324,95 +3339,95 @@
    ]
   },
   {
-    "alias": "kimi-web",
-    "models": [
-     {
-      "id": "k3",
-      "name": "K3",
-      "kind": "llm"
-     },
-     {
-      "id": "k2d6",
-      "name": "K2.6",
-      "kind": "llm"
-     }
-    ]
-   },
+   "alias": "kimi-web",
+   "models": [
+    {
+     "id": "k3",
+     "name": "K3",
+     "kind": "llm"
+    },
+    {
+     "id": "k2d6",
+     "name": "K2.6",
+     "kind": "llm"
+    }
+   ]
+  },
   {
-    "alias": "deepseek-web",
-    "models": [
-     {
-      "id": "deepseek-v4-pro",
-      "name": "DeepSeek V4 Pro",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-pro-think",
-      "name": "DeepSeek V4 Pro Think",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-pro-search",
-      "name": "DeepSeek V4 Pro Search",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-pro-think-search",
-      "name": "DeepSeek V4 Pro Think+Search",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-flash",
-      "name": "DeepSeek V4 Flash",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-flash-think",
-      "name": "DeepSeek V4 Flash Think",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-flash-search",
-      "name": "DeepSeek V4 Flash Search",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-v4-flash-think-search",
-      "name": "DeepSeek V4 Flash Think+Search",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-chat",
-      "name": "DeepSeek Chat",
-      "kind": "llm"
-     },
-     {
-      "id": "deepseek-reasoner",
-      "name": "DeepSeek Reasoner",
-      "kind": "llm"
-     },
-     {
-      "id": "DeepSeek-R1",
-      "name": "DeepSeek R1",
-      "kind": "llm"
-     },
-     {
-      "id": "DeepSeek-R1-Search",
-      "name": "DeepSeek R1 Search",
-      "kind": "llm"
-     },
-     {
-      "id": "DeepSeek-V3.2",
-      "name": "DeepSeek V3.2",
-      "kind": "llm"
-     },
-     {
-      "id": "DeepSeek-Search",
-      "name": "DeepSeek Search",
-      "kind": "llm"
-     }
-    ]
-   },
+   "alias": "deepseek-web",
+   "models": [
+    {
+     "id": "deepseek-v4-pro",
+     "name": "DeepSeek V4 Pro",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-pro-think",
+     "name": "DeepSeek V4 Pro Think",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-pro-search",
+     "name": "DeepSeek V4 Pro Search",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-pro-think-search",
+     "name": "DeepSeek V4 Pro Think+Search",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-flash",
+     "name": "DeepSeek V4 Flash",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-flash-think",
+     "name": "DeepSeek V4 Flash Think",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-flash-search",
+     "name": "DeepSeek V4 Flash Search",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-v4-flash-think-search",
+     "name": "DeepSeek V4 Flash Think+Search",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-chat",
+     "name": "DeepSeek Chat",
+     "kind": "llm"
+    },
+    {
+     "id": "deepseek-reasoner",
+     "name": "DeepSeek Reasoner",
+     "kind": "llm"
+    },
+    {
+     "id": "DeepSeek-R1",
+     "name": "DeepSeek R1",
+     "kind": "llm"
+    },
+    {
+     "id": "DeepSeek-R1-Search",
+     "name": "DeepSeek R1 Search",
+     "kind": "llm"
+    },
+    {
+     "id": "DeepSeek-V3.2",
+     "name": "DeepSeek V3.2",
+     "kind": "llm"
+    },
+    {
+     "id": "DeepSeek-Search",
+     "name": "DeepSeek Search",
+     "kind": "llm"
+    }
+   ]
+  },
   {
    "alias": "openai-tts-models",
    "models": [

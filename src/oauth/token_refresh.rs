@@ -1083,6 +1083,14 @@ async fn refresh_form_token(url: &str, fields: Vec<(&str, &str)>) -> Result<Refr
 /// Handles both camelCase and snake_case field names for cross-provider
 /// compatibility.
 async fn parse_json_refresh_response(resp: reqwest::Response) -> Result<RefreshResult, String> {
+    let status = resp.status();
+    if !status.is_success() {
+        let body = resp.text().await.unwrap_or_default();
+        let snippet: String = body.chars().take(300).collect();
+        return Err(format!(
+            "Refresh endpoint returned HTTP {status}: {snippet}"
+        ));
+    }
     let payload: Value = resp
         .json()
         .await

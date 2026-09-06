@@ -126,10 +126,12 @@ async fn validate_provider(
         }
         "agentrouter" => {
             match client.post("https://agentrouter.org/v1/messages")
-                .header("Authorization", format!("Bearer {}", api_key))
+                .header("x-api-key", api_key)
                 .header("anthropic-version", "2023-06-01")
                 .header("Content-Type", "application/json")
-                .json(&json!({"model": "test", "max_tokens": 1, "messages": [{"role": "user", "content": "test"}]}))
+                // AgentRouter requires whitelisted User-Agent; spoof Claude CLI UA.
+                .header("User-Agent", "claude-cli/2.0.14 (external, cli)")
+                .json(&json!({"model": "glm-5.3", "max_tokens": 1, "messages": [{"role": "user", "content": "test"}]}))
                 .send().await
             {
                 Ok(resp) => (resp.status().as_u16() != 401, None),

@@ -116,6 +116,7 @@ static ALIAS_TO_PROVIDER_ID: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
         ("windsurf", "windsurf"),
         ("ws", "windsurf"),
         ("crof", "crof"),
+        ("ar", "agentrouter"),
         // ── Media ──
         ("haiper", "haiper"),
         ("hp", "haiper"),
