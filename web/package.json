@@ -43,7 +43,7 @@
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-is": "^19.2.7",
-    "recharts": "^3.7.0",
+    "recharts": "^3.10.1",
     "selfsigned": "^5.5.0",
     "socks-proxy-agent": "^10.0.0",
     "sql.js": "^1.14.1",
