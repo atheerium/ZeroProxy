@@ -43,6 +43,361 @@ zeroproxy
 
 ZeroProxy is a **single-binary AI router** that intelligently routes requests across 40+ AI providers with **auto-fallback** capabilities. It serves as an **OpenAI-compatible endpoint** that combines the strengths of multiple routing systems while maintaining **local deployment** with zero cloud infrastructure.
 
+**Core Philosophy:** "Rather than re-inventing, we chose to curate — taking the strongest foundations from each and making them work together seamlessly."
+
+ZeroProxy solves the complexity of AI infrastructure by intelligently combining three proven systems:
+
+### 9router Core
+- **Proven routing algorithms** with intelligent fallback chains
+- **Battle-tested combo resolution** for reliable multi-provider routing
+- **Quota tracking** and error handling optimized for production use
+
+### OmniRoute Ecosystem  
+- **40+ provider support** including dedicated executors for each service type
+- **OAuth and API key authentication** with secure credential management
+- **Format translation** for seamless compatibility between providers
+- **Regional and latency-aware routing** for optimal performance
+
+### freellmapi Simplicity
+- **Zero-configuration setup** for instant usability
+- **Plug-and-play API key management** 
+- **Local-first deployment** with no cloud dependencies
+- **Developer-friendly CLI** and comprehensive documentation
+
+**Why Choose ZeroProxy:**
+- **Enterprise-Grade Reliability** - Proven routing with intelligent fallback mechanisms
+- **Local Control** - Complete deployment autonomy with zero cloud infrastructure
+- **Comprehensive Provider Support** - Access to 40+ AI providers with native integration
+- **Performance Optimized** - Native Rust implementation with RTK compression (20-40% token reduction)
+- **Developer Experience** - Simple setup, comprehensive documentation, and agent-first design
+
+### Primary Use Cases
+
+#### AI Development Tools
+Point any OpenAI-compatible tool (Claude Code, Cursor, Cline, OpenClaw, Copilot, etc.) at ZeroProxy for unified access to multiple providers:
+
+- **Model Selection** - Choose from 40+ models across different providers
+- **Smart Fallbacks** - Automatic provider switching on rate limits or errors
+- **Usage Optimization** - Token compression and quota management
+- **Local Operation** - Complete deployment privacy and control
+
+#### Multi-Provider Integration
+- **OAuth Authentication** - Secure credential management with auto-refresh
+- **API Key Rotation** - Multi-account support with intelligent load balancing
+- **Regional Routing** - Choose providers based on location and latency
+- **Cost Optimization** - Intelligent provider selection based on usage patterns
+
+#### Enterprise Deployment
+- **High Availability** - Local deployment with robust fallback mechanisms
+- **Scalable Architecture** - Single binary with minimal infrastructure requirements
+- **Security Compliance** - Encrypted communication and fine-grained access control
+- **Monitoring & Observability** - Real-time usage tracking and performance metrics
+
+### Technical Architecture
+
+ZeroProxy implements a sophisticated routing engine that:
+
+1. **Analyzes Request Requirements** - Determines provider compatibility and routing strategy
+2. **Executes Smart Translation** - Handles API compatibility between providers
+3. **Implements Intelligent Fallback** - Automatic provider switching on failures
+4. **Tracks Usage and Performance** - Comprehensive monitoring and optimization
+5. **Manages Security** - Secure credential handling and access control
+
+This architecture ensures reliable, efficient, and secure AI infrastructure management while maintaining the simplicity that developers expect.
+
+---
+
+## Quick Start
+
+### Installation
+```bash
+# Linux / macOS — x86_64 + aarch64
+curl -fsSL "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh" | bash
+
+# Windows (PowerShell 5.1+)
+irm "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1" | iex
+```
+
+### Basic Usage
+```bash
+# Start server with auto-opening dashboard
+zeroproxy
+
+# For headless operation (containers, CI, etc.)
+zeroproxy --no-open
+```
+
+### Connect Your First Tool
+Most AI coding tools use OpenAI-compatible interfaces:
+
+```bash
+# Example for Cursor/Cline
+# Set OpenAI base URL to http://127.0.0.1:4623/v1
+# Get API key from dashboard
+```
+
+### Agent Automation
+ZeroProxy supports AI agent workflows:
+```bash
+# Initialize with agent skill
+cat > ~/.agents/skills/zeroproxy/SKILL.md << 'EOF'
+You are setting up ZeroProxy (https://github.com/atheerium/ZeroProxy) on this
+machine. ZeroProxy is an intelligent AI proxy router that routes requests across
+40+ AI providers with smart fallback mechanisms.
+
+Steps:
+1. Install: curl -fsSL "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh" | bash
+2. Initialize: zeroproxy --robot server init
+3. Start: zeroproxy server start --detach --no-open
+4. Verify: curl -sS http://127.0.0.1:4623/health
+EOF
+
+# Agent can now auto-discover and utilize ZeroProxy
+```
+
+---
+
+## Core Features
+
+### 🔧 Smart Routing
+- **Intelligent Request Analysis** - Determines optimal provider for each request
+- **Dynamic Fallback** - Automatic provider switching on errors or rate limits
+- **Regional Awareness** - Latency-aware routing based on request requirements
+- **Quota Management** - Intelligent load balancing across multiple provider accounts
+
+### 🧠 Advanced Processing
+- **Format Translation** - Seamless API compatibility between different providers
+- **Response Normalization** - Consistent output handling across providers
+- **Streaming Support** - Real-time processing for interactive applications
+- **Token Compression** - RTK integration for optimized token usage (20-40% reduction)
+
+### 📊 Real-Time Monitoring
+- **Usage Analytics** - Per-model and per-provider usage tracking
+- **Performance Metrics** - Request timing and response optimization
+- **Error Classification** - Detailed error categorization and reporting
+- **Alert Systems** - Threshold-based notifications for system events
+
+### ⚡ Performance Optimizations
+- **Local Deployment** - Complete control with minimal infrastructure
+- **Native Rust Implementation** - Maximum speed and efficiency
+- **Zero Dependencies** - Self-contained, portable solution
+- **Memory Efficient** - Optimized for production workloads
+
+---
+
+## Comparison
+
+| Aspect | Direct Provider | ZeroProxy |
+|--------|----------------|-----------|
+| Setup Time | Hours/Days | Minutes |
+| Provider Diversity | 1-3 providers | 40+ providers |
+| Fallback Mechanisms | Custom code | Built-in intelligent routing |
+| Cost Optimization | Manual | Automatic |
+| Maintenance | Ongoing | Zero |
+
+---
+
+## For AI Agents
+
+ZeroProxy is designed to work seamlessly with AI coding assistants:
+
+- **Agent Skills** - Ready-to-use skill for ZeroProxy integration
+- **Automation** - Self-contained installation and initialization
+- **Verification** - Built-in health checks and status reporting
+- **Documentation** - Comprehensive guides and examples
+
+### Agent Workflow
+ZeroProxy supports end-to-end autonomous setup:
+
+```bash
+# 1. Install ZeroProxy
+curl -fsSL "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh" | bash
+
+# 2. Initialize data dir and capture admin API key
+zeroproxy --robot server init | tee /tmp/op-init.json
+APIKEY=$(jq -r '.data.admin_key.key' /tmp/op-init.json)
+export CIPHERROUTE_API_KEY="$APIKEY"
+
+# 3. Start server detached and headless
+zeroproxy server start --detach --no-open
+zeroproxy --robot doctor
+
+# 4. Configure a provider declaratively
+cat > /tmp/providers.json <<JSON
+{ "providers": [{ "name": "openai", "provider": "openai", "apiKey": "sk-...", "isActive": true }] }
+JSON
+CIPHERROUTE_API_KEY="$APIKEY" zeroproxy --robot provider apply --from-file /tmp/providers.json
+
+# 5. End-to-end smoke test
+curl -sS http://127.0.0.1:4623/health
+curl -sS http://127.0.0.1:4623/v1/models -H "Authorization: Bearer $CIPHERROUTE_API_KEY"
+```
+
+### Copy-Paste Prompt
+Paste the block below into Devin, Claude Code, Codex, Cursor, OpenClaw, or any agent chat:
+
+````text
+You are setting up ZeroProxy (https://github.com/atheerium/ZeroProxy) on this
+machine. ZeroProxy is a single-binary AI router exposing an OpenAI-compatible
+API on http://127.0.0.1:4623. Follow these steps exactly, stop on the first
+error, and report the captured admin API key back to me at the end.
+
+1. Check whether `zeroproxy` is already on PATH:
+       command -v zeroproxy && zeroproxy --version || echo "not installed"
+   If already installed, skip to step 3.
+
+2. Install the binary. Pick ONE path:
+   a) Linux / macOS, x86_64 or aarch64 (preferred):
+          curl -fsSL "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh" | bash
+          export PATH="$HOME/.local/bin:$PATH"
+   b) Windows, x86_64 (PowerShell 5.1+):
+          irm "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1" | iex
+          $env:Path = "$env:USERPROFILE\.local\bin;" + $env:Path
+
+3. Initialize a data dir and capture the admin API key. Use --robot so the
+   output is JSON; never re-run with --force without my explicit approval:
+       zeroproxy --robot server init | tee /tmp/op-init.json
+       APIKEY=$(jq -r '.data.admin_key.key' /tmp/op-init.json)
+       export CIPHERROUTE_API_KEY="$APIKEY"
+   If `server init` reports `zeroproxy.sqlite already exists`, STOP and tell me — the
+   data dir is pre-populated and I need to decide whether to overwrite.
+
+4. Start the server detached and headless, then self-test:
+       zeroproxy server start --detach --no-open
+       zeroproxy --robot server status
+       zeroproxy --robot doctor
+
+5. Verify end-to-end:
+       curl -sS http://127.0.0.1:4623/health
+       curl -sS http://127.0.0.1:4623/v1/models \
+         -H "Authorization: Bearer $CIPHERROUTE_API_KEY"
+
+6. Report back to me:
+   - The exact `zeroproxy --version` output.
+   - The admin API key (value of $CIPHERROUTE_API_KEY).
+   - Result of step 4's `server status` and `doctor`.
+   - Any non-2xx response from step 5.
+
+Do NOT run `zeroproxy server init --force`, do NOT delete ~/.zeroproxy/, and
+Do NOT add provider API keys unless I gave you values explicitly. If you hit
+the failure modes documented in
+https://github.com/atheerium/zeroproxy/blob/main/.agents/skills/zeroproxy/SKILL.md
+("Common failure modes & fixes"), apply the listed fix; otherwise stop and ask.
+````
+
+---
+
+## Technical Specifications
+
+### CLI Reference
+
+#### Core Commands
+```bash
+zeroproxy [FLAGS]                  # default: start server + open browser
+zeroproxy --port 4623 --no-open    # foreground, no browser
+zeroproxy --web-dir ./web/dist     # serve dashboard from disk (UI dev)
+zeroproxy --dashboard-sidecar-url http://127.0.0.1:4624
+                                    # reverse-proxy dashboard requests
+
+zeroproxy --version
+zeroproxy provider list
+zeroproxy provider add <name> '<json-config>'
+                                    # e.g. zeroproxy provider add openai-paid \
+                                    #        '{"provider":"openai","apiKey":"sk-..."}'
+zeroproxy combo create --name <name> --models cc/opus,glm/glm-5
+zeroproxy key list
+zeroproxy key add <name> <secret>  # provide your own secret
+zeroproxy key add <name> --auto    # let zeroproxy mint a fresh `op-…` secret
+zeroproxy quota list               # subcommands: list / get / reset / refresh
+zeroproxy usage summary            # subcommands: summary / daily / chart / history / …
+zeroproxy doctor                   # diagnose common config issues
+```
+
+#### Server Management
+```bash
+zeroproxy server start [--detach] [--no-open] [--port P]
+zeroproxy server status
+zeroproxy server stop
+zeroproxy server init              # mint the first admin API key
+```
+
+### Configuration Options
+
+#### Environment Variables
+```bash
+# Server configuration
+export PORT=4623
+export HOSTNAME=127.0.0.1
+export DATA_DIR=~/.zeroproxy
+
+# Security
+export JWT_SECRET=your-secret-key
+export REQUIRE_API_KEY=true
+export INITIAL_PASSWORD=secure-password
+
+# Performance
+export ENABLE_REQUEST_LOGS=true
+export MACHINE_ID_SALT=your-salt
+```
+
+#### TOML Configuration
+Create `~/.config/zeroproxy/config.toml`:
+
+```toml
+default_profile = "production"
+
+[profiles.production]
+data_dir = "/opt/zeroproxy/data"
+url = "https://proxy.example.com"
+api_key_env = "ZERO_PROXY_KEY"
+
+[profiles.development]
+data_dir = "/tmp/zeroproxy-test"
+```
+
+### API Reference
+
+ZeroProxy provides OpenAI-compatible chat completions API:
+
+```http
+POST /v1/chat/completions
+Authorization: Bearer <api-key>
+Content-Type: application/json
+
+{
+  "model": "cc/claude-opus-4-6",
+  "messages": [{"role": "user", "content": "Hello"}],
+  "stream": true,
+  "max_tokens": 1000,
+  "temperature": 0.7
+}
+```
+
+List available models:
+```http
+GET /v1/models
+Authorization: Bearer <api-key>
+```
+
+Health probe:
+```http
+GET /health   →   200 OK
+```
+
+### License
+
+MIT — ZeroProxy is free for both personal and commercial use. See [LICENSE](LICENSE) for details.
+
+---
+
+*Last updated: November 2024*  
+*Version: 0.1.0*  
+*Built with ❤️ for developers and AI practitioners*
+
+## About ZeroProxy
+
+ZeroProxy is a **single-binary AI router** that intelligently routes requests across 40+ AI providers with **auto-fallback** capabilities. It serves as an **OpenAI-compatible endpoint** that combines the strengths of multiple routing systems while maintaining **local deployment** with zero cloud infrastructure.
+
 **Key Benefits:**
 - **9router Core** - Proven routing algorithms and fallback chains
 - **OmniRoute Ecosystem** - Extensive provider support with dedicated executors
