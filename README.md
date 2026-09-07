@@ -1,10 +1,6 @@
 # ZeroProxy
 
 <div align="center">
-  <img src="zeroproxy-logo.png" alt="ZeroProxy AI infrastructure proxy" width="200">
-</div>
-
-<div align="center">
   <a href="https://github.com/atheerium/ZeroProxy">
     <img src="github-banner.png" alt="ZeroProxy GitHub Repository Banner" style="width:100%; max-width:800px;">
   </a>
@@ -43,21 +39,45 @@ zeroproxy
 
 ---
 
-## Why ZeroProxy is Different
+## About ZeroProxy
 
-When it comes to AI infrastructure, most solutions require complex configurations, multiple cloud services, or compromise on features. ZeroProxy solves this by intelligently combining the best approaches from three proven systems:
+ZeroProxy is a **single-binary AI router** that intelligently routes requests across 40+ AI providers with **auto-fallback** capabilities. It serves as an **OpenAI-compatible endpoint** that combines the strengths of multiple routing systems while maintaining **local deployment** with zero cloud infrastructure.
 
-| Feature | ZeroProxy Advantage |
-|---------|-------------------|
-| **Routing Logic** | Built on 9router's battle-tested fallback chains and combo resolution |
-| **Provider Support** | Powered by OmniRoute's extensive ecosystem of 40+ providers with dedicated executors |
-| **Setup Experience** | Simplified with freellmapi's plug-and-play approach - add API keys and start using immediately |
-| **Local Deployment** | Complete local operation with embedded dashboard - no cloud dependencies |
-| **Performance** | RTK compression reduces input tokens by 20-40% on tool-heavy requests |
+**Key Benefits:**
+- **9router Core** - Proven routing algorithms and fallback chains
+- **OmniRoute Ecosystem** - Extensive provider support with dedicated executors
+- **freellmapi Simplicity** - Zero-configuration setup for immediate usability
 
-ZeroProxy gives you enterprise-grade reliability without the complexity, local control without the infrastructure overhead, and comprehensive provider support without the configuration chaos.
+ZeroProxy eliminates the complexity of multi-cloud AI setups while providing enterprise-grade reliability and flexibility for both developers and AI agents.
 
-> "Rather than re-inventing, we chose to curate — taking the strongest foundations from each and making them work together seamlessly."
+**Primary Use Cases:**
+- AI coding tool integration (Claude Code, Cursor, Cline, etc.)
+- Multi-provider model routing with intelligent fallbacks
+- Local AI infrastructure management
+- Agent-first automation workflows
+
+**Why Choose ZeroProxy:**
+- **Performance Optimized** - Native Rust implementation for maximum speed
+- **Security First** - Local operation with encrypted communication
+- **Developer Experience** - Simple installation and comprehensive documentation
+- **Future Ready** - Modular architecture for continuous enhancement
+
+---
+
+## Quick Installation
+
+```bash
+# Linux / macOS — x86_64 + aarch64
+curl -fsSL "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh" | bash
+
+# Windows (PowerShell 5.1+)
+irm "https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1" | iex
+```
+
+After installation:
+```bash
+zeroproxy  # Starts server with auto-opening dashboard
+```
 
 ---
 
