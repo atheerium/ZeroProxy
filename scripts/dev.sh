@@ -81,13 +81,13 @@ if [[ "$MODE" == "release" ]]; then
   MODE="run"
 fi
 
-BIN_DEBUG="target/debug/cipherroute"
-BIN_RELEASE="target/release/cipherroute"
+BIN_DEBUG="target/debug/zeroproxy"
+BIN_RELEASE="target/release/zeroproxy"
 BIN="$BIN_DEBUG"
-CARGO_ARGS=(build --bin cipherroute)
+CARGO_ARGS=(build --bin zeroproxy)
 if [[ "$BUILD_MODE" == "release" ]]; then
   BIN="$BIN_RELEASE"
-  CARGO_ARGS=(build --release --bin cipherroute)
+  CARGO_ARGS=(build --release --bin zeroproxy)
 fi
 
 print_help() {
@@ -133,8 +133,8 @@ kill_port() {
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
   fi
-  pkill -f "cipherroute server start"; pkill -f "openproxy" 2>/dev/null || true
-  pkill -f "target/.*/cipherroute.*${PORT}" 2>/dev/null || true
+  pkill -f "zeroproxy server start"; pkill -f "openproxy" 2>/dev/null || true
+  pkill -f "target/.*/zeroproxy.*${PORT}" 2>/dev/null || true
   sleep 0.5
 }
 
@@ -182,7 +182,7 @@ run_checks() {
   if [[ -d "web" ]]; then
     pnpm --dir web exec astro check 2>&1 | tail -n 30 || echo "astro check advisory (fix new errors)"
   fi
-  cargo test -p cipherroute --lib provider_models -- --nocapture 2>&1 | tail -n 30
+  cargo test -p zeroproxy --lib provider_models -- --nocapture 2>&1 | tail -n 30
   echo "checks passed"
 }
 
@@ -285,8 +285,8 @@ case "$MODE" in
     "$BIN" server start --detach --no-open --port "$PORT"
     echo "== status =="
     "$BIN" --robot server status 2>&1 | head -n 20 || curl -sf "http://127.0.0.1:${PORT}/health" && echo "health ok"
-    echo "Logs: tail -f ~/.cipherroute/log.txt  (or journalctl --user -u cipherroute -f if using service)"
-    echo "Stop: $BIN server stop  or  pkill -f cipherroute  or  fuser -k ${PORT}/tcp"
+    echo "Logs: tail -f ~/.zeroproxy/log.txt  (or journalctl --user -u zeroproxy -f if using service)"
+    echo "Stop: $BIN server stop  or  pkill -f zeroproxy  or  fuser -k ${PORT}/tcp"
     ;;
   run|restart|"")
     check_dirty_tree || true

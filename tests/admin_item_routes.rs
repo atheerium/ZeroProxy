@@ -67,6 +67,12 @@ fn provider_connection() -> ProviderConnection {
         provider_specific_data,
         extra: BTreeMap::new(),
         runtime_transport: None,
+        ttft_ms: None,
+        client_app: None,
+        pinned: None,
+        saved_usd: None,
+        error_class: None,
+        latency_ms: None,
     }
 }
 

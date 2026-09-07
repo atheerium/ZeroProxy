@@ -392,6 +392,7 @@ async fn run_apply(db: &Db, ctx: OutputCtx, from_file: &str, prune: bool) -> any
                     created_at: Some(now.clone()),
                     updated_at: Some(now.clone()),
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 });
                 diff.created.push(item.name.clone());
             }

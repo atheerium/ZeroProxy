@@ -247,6 +247,7 @@ async fn run_alias(db: &Db, ctx: OutputCtx, cmd: AliasCmd) -> anyhow::Result<()>
                 provider: provider.clone(),
                 model: model.clone(),
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
             db.update(|app| {
                 app.model_aliases.insert(alias.clone(), target.clone());
@@ -398,6 +399,7 @@ async fn run_custom(db: &Db, ctx: OutputCtx, cmd: CustomCmd) -> anyhow::Result<(
                 r#type,
                 name,
                 extra: BTreeMap::new(),
+                ..Default::default()
             };
             db.update(|app| app.custom_models.push(entry.clone()))
                 .await?;

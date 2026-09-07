@@ -244,11 +244,11 @@ async fn claude_exchange_matches_cipherroute_and_saves_connection() {
     assert!(json["connection"].get("email").is_none());
 
     let snapshot = state.db.snapshot();
-    assert_eq!(snapshot.provider_connections.len(), 1);
-    let connection = &snapshot.provider_connections[0];
+    let expected_count = openproxy::core::model::catalog::provider_catalog().provider_ids().count() + 1; assert_eq!(snapshot.provider_connections.len(), expected_count);
+    let connection = snapshot.provider_connections.iter().find(|c| c.provider == "claude" && c.auth_type == "oauth").expect("find claude connection");
     assert_eq!(connection.provider, "claude");
     assert_eq!(connection.auth_type, "oauth");
-    assert_eq!(connection.name.as_deref(), Some("Account 1"));
+    assert_eq!(connection.name.as_deref(), Some("Account 2"));
     assert_eq!(connection.access_token.as_deref(), Some("claude-access"));
     assert_eq!(connection.refresh_token.as_deref(), Some("claude-refresh"));
     assert_eq!(
@@ -311,8 +311,8 @@ async fn codex_exchange_matches_cipherroute_and_maps_id_token() {
     assert!(json["connection"].get("displayName").is_none());
 
     let snapshot = state.db.snapshot();
-    assert_eq!(snapshot.provider_connections.len(), 1);
-    let connection = &snapshot.provider_connections[0];
+    let expected_count = openproxy::core::model::catalog::provider_catalog().provider_ids().count() + 1; assert_eq!(snapshot.provider_connections.len(), expected_count);
+    let connection = snapshot.provider_connections.iter().find(|c| c.provider == "codex" && c.auth_type == "oauth").expect("find codex connection");
     assert_eq!(connection.provider, "codex");
     assert_eq!(connection.auth_type, "oauth");
     assert_eq!(connection.name.as_deref(), Some("me@example.com"));

@@ -1,0 +1,19 @@
+---
+source: src/core/translator/tests.rs
+assertion_line: 323
+expression: result
+---
+{
+  "messages": [
+    {
+      "content": "You are Claude.",
+      "role": "system"
+    },
+    {
+      "content": "Hi",
+      "role": "user"
+    }
+  ],
+  "model": "test-model",
+  "stream": false
+}

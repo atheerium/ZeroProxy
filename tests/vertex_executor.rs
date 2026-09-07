@@ -42,6 +42,12 @@ fn connection(provider: &str) -> ProviderConnection {
         use_connection_proxy: None,
         runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
+        ttft_ms: None,
+        client_app: None,
+        pinned: None,
+        saved_usd: None,
+        error_class: None,
+        latency_ms: None,
         extra: BTreeMap::new(),
     }
 }

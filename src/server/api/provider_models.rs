@@ -1998,6 +1998,12 @@ mod tests {
             proxy_label: None,
             use_connection_proxy: None,
             runtime_transport: None,
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             provider_specific_data: BTreeMap::new(),
             extra: BTreeMap::new(),
         }

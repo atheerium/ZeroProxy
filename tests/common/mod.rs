@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::*;
+use openproxy::db::Db;
+use openproxy::server::state::AppState;
+use openproxy::types::*;
 use tempfile::tempdir;
 #[allow(unused_imports)]
 use wiremock::MockServer;
@@ -19,9 +19,10 @@ pub async fn boot_test_app() -> (axum::Router, AppState) {
     .await
     .expect("seed db");
     let state = AppState::new(db);
-    (cipherroute::build_app(state.clone()), state)
+    (openproxy::build_app(state.clone()), state)
 }
 
+#[allow(dead_code)]
 #[allow(dead_code)]
 pub fn test_api_key() -> ApiKey {
     ApiKey {
@@ -31,9 +32,12 @@ pub fn test_api_key() -> ApiKey {
         machine_id: None,
         is_active: Some(true),
         created_at: None,
-        monthly_budget_usd: None,
-        daily_budget_usd: None,
-        daily_request_limit: None,
+        ttft_ms: None,
+        client_app: None,
+        pinned: None,
+        saved_usd: None,
+        error_class: None,
+        latency_ms: None,
         extra: BTreeMap::new(),
     }
 }
@@ -75,6 +79,12 @@ pub fn test_connection(provider: &str) -> ProviderConnection {
         use_connection_proxy: None,
         runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
+        ttft_ms: None,
+        client_app: None,
+        pinned: None,
+        saved_usd: None,
+        error_class: None,
+        latency_ms: None,
         extra: BTreeMap::new(),
     }
 }

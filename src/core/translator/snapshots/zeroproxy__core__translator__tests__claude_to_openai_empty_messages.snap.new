@@ -1,0 +1,10 @@
+---
+source: src/core/translator/tests.rs
+assertion_line: 843
+expression: b
+---
+{
+  "messages": [],
+  "model": "test-model",
+  "stream": false
+}

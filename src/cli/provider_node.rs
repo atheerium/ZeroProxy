@@ -202,6 +202,7 @@ async fn run_add(
         created_at: Some(now.clone()),
         updated_at: Some(now),
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     db.update(|db| db.provider_nodes.push(node.clone())).await?;

@@ -1,0 +1,32 @@
+---
+source: src/core/translator/tests.rs
+assertion_line: 344
+expression: result
+---
+{
+  "messages": [
+    {
+      "content": "What's the time?",
+      "role": "user"
+    }
+  ],
+  "model": "test-model",
+  "stream": false,
+  "tools": [
+    {
+      "function": {
+        "description": "Get current time",
+        "name": "get_time",
+        "parameters": {
+          "properties": {
+            "timezone": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
+      },
+      "type": "function"
+    }
+  ]
+}

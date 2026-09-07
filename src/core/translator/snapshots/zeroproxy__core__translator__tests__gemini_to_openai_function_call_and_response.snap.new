@@ -1,0 +1,32 @@
+---
+source: src/core/translator/tests.rs
+assertion_line: 622
+expression: result
+---
+{
+  "messages": [
+    {
+      "content": "What's 2+2?",
+      "role": "user"
+    },
+    {
+      "role": "assistant",
+      "tool_calls": [
+        {
+          "function": {
+            "arguments": "{\"expression\":\"2+2\"}",
+            "name": "calculate"
+          },
+          "type": "function"
+        }
+      ]
+    },
+    {
+      "content": "4",
+      "role": "tool",
+      "tool_call_id": "calculate"
+    }
+  ],
+  "model": "test-model",
+  "stream": false
+}

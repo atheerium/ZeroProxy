@@ -441,6 +441,7 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
         daily_budget_usd: None,
         daily_request_limit: None,
         extra: std::collections::BTreeMap::new(),
+        ..Default::default()
     };
 
     let db = Db::load().await?;

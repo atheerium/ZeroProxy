@@ -192,6 +192,7 @@ async fn run_create(
         created_at: Some(now.clone()),
         updated_at: Some(now),
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     db.update(|db| db.combos.push(combo.clone())).await?;

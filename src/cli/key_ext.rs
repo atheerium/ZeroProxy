@@ -261,6 +261,7 @@ async fn run_apply(db: &Db, ctx: OutputCtx, from_file: &str, prune: bool) -> any
                     daily_budget_usd: None,
                     daily_request_limit: None,
                     extra: std::collections::BTreeMap::new(),
+                    ..Default::default()
                 });
                 diff.created.push(item.name.clone());
             }

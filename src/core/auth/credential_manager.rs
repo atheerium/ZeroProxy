@@ -247,6 +247,12 @@ fn build_connection_from(src: &ProviderConnection) -> ProviderConnection {
             }
         }),
         provider_specific_data: src.provider_specific_data.clone(),
+        ttft_ms: src.ttft_ms,
+        client_app: src.client_app.clone(),
+        pinned: src.pinned,
+        saved_usd: src.saved_usd,
+        error_class: src.error_class.clone(),
+        latency_ms: src.latency_ms,
         extra: src.extra.clone(),
     }
 }
@@ -462,6 +468,12 @@ mod tests {
             proxy_url: Some("http://proxy".into()),
             proxy_label: Some("proxy".into()),
             use_connection_proxy: Some(false),
+            ttft_ms: Some(100),
+            client_app: Some("test-app".into()),
+            pinned: Some(true),
+            saved_usd: Some(12.50),
+            error_class: Some("rate_limit".into()),
+            latency_ms: Some(500),
             runtime_transport: Some(crate::types::RuntimeTransport {
                 base_url: Some("https://custom.url".into()),
             }),
@@ -541,6 +553,12 @@ mod tests {
             proxy_label: None,
             use_connection_proxy: None,
             runtime_transport: None,
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             provider_specific_data: std::collections::BTreeMap::new(),
             extra: std::collections::BTreeMap::new(),
         }

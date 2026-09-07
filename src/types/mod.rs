@@ -15,8 +15,7 @@ pub struct AppDb {
     #[serde(default)]
     pub schema_version: u32,
     /// Hex-encoded SHA-256 checksum of the canonical JSON body (computed
-    /// after serialisation but before writing; verified after reading).
-    #[serde(default, skip_serializing_if = "String::is_empty")]
+    #[serde(default)]
     pub checksum: String,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub provider_connections: Vec<ProviderConnection>,
@@ -26,8 +25,6 @@ pub struct AppDb {
     pub proxy_pools: Vec<ProxyPool>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub model_aliases: BTreeMap<String, ModelAliasTarget>,
-    #[serde(default, deserialize_with = "deserialize_null_default")]
-    pub custom_models: Vec<CustomModel>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub mitm_alias: BTreeMap<String, BTreeMap<String, String>>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
@@ -39,11 +36,25 @@ pub struct AppDb {
     #[serde(default, skip)]
     pub api_key_map: HashMap<String, ApiKey>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
+    pub custom_models: Vec<CustomModel>,
+    #[serde(default, deserialize_with = "deserialize_null_default")]
     pub settings: Settings,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub pricing: PricingTable,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 impl AppDb {
@@ -101,12 +112,19 @@ impl AppDb {
             api_key_map: HashMap::new(),
             settings: extract_named_field(&mut fields, "settings"),
             pricing: extract_named_field(&mut fields, "pricing"),
+            ttft_ms: extract_named_field(&mut fields, "ttftMs"),
+            client_app: extract_named_field(&mut fields, "clientApp"),
+            pinned: extract_named_field(&mut fields, "pinned"),
+            saved_usd: extract_named_field(&mut fields, "savedUsd"),
+            error_class: extract_named_field(&mut fields, "errorClass"),
+            latency_ms: extract_named_field(&mut fields, "latencyMs"),
             extra: fields.into_iter().collect(),
         };
         db.normalize();
         db
     }
 }
+
 
 /// Runtime transport configuration that can override the static provider config's base URL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -185,9 +203,17 @@ pub struct ProviderConnection {
     #[serde(default)]
     pub proxy_label: Option<String>,
     #[serde(default)]
-    pub use_connection_proxy: Option<bool>,
+    pub ttft_ms: Option<i64>,
     #[serde(default)]
-    pub runtime_transport: Option<RuntimeTransport>,
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub provider_specific_data: BTreeMap<String, Value>,
     #[serde(flatten)]
@@ -199,8 +225,7 @@ impl ProviderConnection {
         self.is_active.unwrap_or(true)
     }
 }
-
-#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderNode {
     pub id: String,
@@ -218,6 +243,18 @@ pub struct ProviderNode {
     pub updated_at: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
@@ -257,9 +294,21 @@ pub struct ProxyPool {
     pub updated_at: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomModel {
     pub provider_alias: String,
@@ -273,6 +322,18 @@ pub struct CustomModel {
     pub name: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 /// Per-combo strategy entry — 9router `settings.comboStrategies[name]`.
@@ -351,6 +412,18 @@ pub struct ProviderStrategyConfig {
     pub proxy_pool_id: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 impl ComboStrategyEntry {
@@ -407,6 +480,18 @@ pub struct ComboStrategyConfig {
     pub fusion_tuning: Option<Value>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -437,6 +522,18 @@ pub struct Combo {
     pub updated_at: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -467,6 +564,18 @@ pub struct ApiKey {
     pub daily_request_limit: Option<u64>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 impl ApiKey {
@@ -724,6 +833,18 @@ pub struct Settings {
     pub capacity_adapter: Value,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 impl Default for Settings {
@@ -831,13 +952,25 @@ pub enum ModelAliasTarget {
     Mapping(ProviderModelRef),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderModelRef {
     pub provider: String,
     pub model: String,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 pub type PricingTable = BTreeMap<String, BTreeMap<String, Value>>;
@@ -868,6 +1001,18 @@ pub struct UsageDb {
     pub daily_summary: BTreeMap<String, DailySummary>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 impl UsageDb {
@@ -903,6 +1048,12 @@ impl UsageDb {
             total_requests_lifetime: extract_named_field(&mut fields, "totalRequestsLifetime"),
             daily_summary: extract_named_field(&mut fields, "dailySummary"),
             failed_requests: 0,
+            ttft_ms: extract_named_field(&mut fields, "ttftMs"),
+            client_app: extract_named_field(&mut fields, "clientApp"),
+            pinned: extract_named_field(&mut fields, "pinned"),
+            saved_usd: extract_named_field(&mut fields, "savedUsd"),
+            error_class: extract_named_field(&mut fields, "errorClass"),
+            latency_ms: extract_named_field(&mut fields, "latencyMs"),
             extra: fields.into_iter().collect(),
         };
         usage.normalize();
@@ -940,6 +1091,18 @@ pub struct UsageEntry {
     pub image_prompts: u64,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -965,6 +1128,18 @@ pub struct TokenUsage {
     pub cache_creation_input_tokens: Option<u64>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1006,6 +1181,18 @@ pub struct DailySummary {
     pub by_endpoint: BTreeMap<String, SummaryCounter>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -1045,6 +1232,18 @@ pub struct SummaryCounter {
     pub endpoint: Option<String>,
     #[serde(flatten)]
     pub extra: BTreeMap<String, Value>,
+    #[serde(default)]
+    pub ttft_ms: Option<i64>,
+    #[serde(default)]
+    pub client_app: Option<String>,
+    #[serde(default)]
+    pub pinned: Option<bool>,
+    #[serde(default)]
+    pub saved_usd: Option<f64>,
+    #[serde(default)]
+    pub error_class: Option<String>,
+    #[serde(default)]
+    pub latency_ms: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq, Eq)]
@@ -1232,6 +1431,12 @@ fn aggregate_usage_entry(daily_summary: &mut BTreeMap<String, DailySummary>, ent
             cache_read_input_tokens: 0,
             cache_creation_input_tokens: 0,
             cost: 0.0,
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             by_provider: BTreeMap::new(),
             by_model: BTreeMap::new(),
             by_account: BTreeMap::new(),
@@ -1469,6 +1674,12 @@ fn add_to_counter(
             cache_read_input_tokens: 0,
             cache_creation_input_tokens: 0,
             cost: 0.0,
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             raw_model: None,
             provider: None,
             api_key: None,

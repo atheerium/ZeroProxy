@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useRef, useEffect } from "react";
 import { createPortal } from "react-dom";
-import { GITHUB_CONFIG } from "@/shared/constants/config";
 
 interface DonateChannel {
   id: string;
@@ -25,36 +24,46 @@ interface DonateModalProps {
   onClose: () => void;
 }
 
+const ZERO_PROXY_DONATE: DonateData = {
+  title: "Support ZeroProxy",
+  message:
+    "If ZeroProxy helps your work, consider supporting development. Every contribution keeps the project alive and growing. Thank you! ❤️",
+  channels: [
+    {
+      id: "kofi",
+      label: "Ko-fi",
+      description: "Buy me a coffee — international friendly",
+      icon: "local_cafe",
+      color: "#FF5E5B",
+      url: "https://ko-fi.com/atheerium",
+      qr: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://ko-fi.com/atheerium",
+    },
+    {
+      id: "paypal",
+      label: "PayPal",
+      description: "Direct transfer via email",
+      icon: "payments",
+      color: "#0070BA",
+      url: "https://www.paypal.com/donate?business=anes201ham@gmail.com&currency_code=USD",
+      qr: "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=https://www.paypal.com/donate?business=anes201ham@gmail.com%26currency_code=USD",
+    },
+  ],
+};
+
 export default function DonateModal({ isOpen, onClose }: DonateModalProps) {
-  const [data, setData] = useState<DonateData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const data = ZERO_PROXY_DONATE;
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Click-outside to close
   useEffect(() => {
-    if (!isOpen || data) return;
-    setLoading(true);
-    setError("");
-    fetch(GITHUB_CONFIG.donateUrl, { cache: "no-store" })
-      .then((res) => {
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return res.json();
-      })
-      .then((json) => setData(json as DonateData))
-      .catch((err) => setError(err.message || "Failed to load"))
-      .finally(() => setLoading(false));
-  }, [isOpen, data]);
-
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    if (!isOpen || typeof document === "undefined") return;
+    const onMouseDown = (e: MouseEvent) => {
       if (modalRef.current && !modalRef.current.contains(e.target as Node)) {
         onClose();
       }
     };
-    if (isOpen) {
-      document.addEventListener("mousedown", handleClickOutside);
-      return () => document.removeEventListener("mousedown", handleClickOutside);
-    }
+    document.addEventListener("mousedown", onMouseDown);
+    return () => document.removeEventListener("mousedown", onMouseDown);
   }, [isOpen, onClose]);
 
   if (!isOpen || typeof document === "undefined") return null;
@@ -72,7 +81,7 @@ export default function DonateModal({ isOpen, onClose }: DonateModalProps) {
         <div className="flex items-center justify-between p-3 border-b border-black/5 dark:border-white/5">
           <h2 className="text-lg font-semibold text-text-main flex items-center gap-2">
             <span className="material-symbols-outlined text-pink-500">volunteer_activism</span>
-            {data?.title || "Support 9Router"}
+            {data?.title || "Support ZeroProxy"}
           </h2>
           <button
             onClick={onClose}
@@ -84,27 +93,14 @@ export default function DonateModal({ isOpen, onClose }: DonateModalProps) {
         </div>
 
         <div className="p-6 overflow-y-auto flex-1">
-          {loading && (
-            <div className="flex items-center justify-center py-10 text-text-muted">
-              <span className="material-symbols-outlined animate-spin mr-2">progress_activity</span>
-              Loading...
-            </div>
+          {data.message && (
+            <p className="text-text-muted text-sm mb-6 text-center">{data.message}</p>
           )}
-          {error && (
-            <div className="text-red-500 py-4">Failed to load donate info: {error}</div>
-          )}
-          {!loading && !error && data && (
-            <>
-              {data.message && (
-                <p className="text-text-muted text-sm mb-6 text-center">{data.message}</p>
-              )}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {data.channels?.map((ch) => (
-                  <DonateChannelCard key={ch.id} channel={ch} />
-                ))}
-              </div>
-            </>
-          )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {data.channels?.map((ch) => (
+              <DonateChannelCard key={ch.id} channel={ch} />
+            ))}
+          </div>
         </div>
       </div>
     </div>,

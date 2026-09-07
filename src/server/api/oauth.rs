@@ -1425,6 +1425,12 @@ async fn store_connection(
                 runtime_transport: None,
                 provider_specific_data: std::collections::BTreeMap::new(),
                 extra: std::collections::BTreeMap::new(),
+                ttft_ms: None,
+                client_app: None,
+                pinned: None,
+                saved_usd: None,
+                error_class: None,
+                latency_ms: None,
             };
             snapshot.provider_connections.push(connection);
         }

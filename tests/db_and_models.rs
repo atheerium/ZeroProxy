@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::model::{
+use openproxy::core::model::{
     get_model_info, parse_model, resolve_model_alias_from_map, resolve_provider_alias,
     ModelRouteKind,
 };
-use cipherroute::db::Db;
-use cipherroute::types::{
+use openproxy::db::Db;
+use openproxy::types::{
     ApiKey, AppDb, Combo, DailySummary, ModelAliasTarget, ProviderConnection, ProviderModelRef,
     ProviderNode, Settings, SummaryCounter, TokenUsage, UsageDb, UsageEntry,
 };
@@ -53,6 +53,12 @@ fn app_db_round_trips_through_serde() {
             runtime_transport: None,
             provider_specific_data: BTreeMap::new(),
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         provider_nodes: vec![ProviderNode {
             id: "node-1".into(),
@@ -64,6 +70,12 @@ fn app_db_round_trips_through_serde() {
             created_at: Some("2026-01-01T00:00:00Z".into()),
             updated_at: Some("2026-01-01T00:00:00Z".into()),
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         combos: vec![Combo {
             id: "combo-1".into(),
@@ -73,11 +85,16 @@ fn app_db_round_trips_through_serde() {
                 "anthropic/claude-sonnet-4-5".into(),
             ],
             disabled_models: Vec::new(),
-            thinking_level: None,
             kind: Some("chat".into()),
             created_at: Some("2026-01-01T00:00:00Z".into()),
             updated_at: Some("2026-01-01T00:00:00Z".into()),
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         model_aliases: BTreeMap::from([
             (
@@ -90,6 +107,12 @@ fn app_db_round_trips_through_serde() {
                     provider: "anthropic".into(),
                     model: "claude-opus-4-1".into(),
                     extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
                 }),
             ),
         ]),
@@ -101,9 +124,12 @@ fn app_db_round_trips_through_serde() {
             is_active: Some(true),
             created_at: Some("2026-01-01T00:00:00Z".into()),
             extra: BTreeMap::new(),
-            monthly_budget_usd: None,
-            daily_budget_usd: None,
-            daily_request_limit: None,
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         settings: Settings::default(),
         pricing: BTreeMap::new(),
@@ -134,28 +160,31 @@ fn usage_db_round_trips_through_serde() {
                 cache_read_input_tokens: None,
                 cache_creation_input_tokens: None,
                 extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             }),
             connection_id: Some("conn-1".into()),
             api_key: Some("local-no-key".into()),
             endpoint: Some("/v1/chat/completions".into()),
             cost: Some(0.42),
             status: Some("ok".into()),
-            bytes_before: 0,
-            bytes_after: 0,
-            bytes_saved: 0,
-            image_prompts: 0,
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         total_requests_lifetime: 1,
-        failed_requests: 0,
         daily_summary: BTreeMap::from([(
             "2026-01-01".into(),
             DailySummary {
                 requests: 1,
-                failed_requests: 0,
-                latency_total_sum: 0,
-                latency_ttft_sum: 0,
-                latency_count: 0,
                 prompt_tokens: 10,
                 completion_tokens: 20,
                 reasoning_tokens: 0,
@@ -167,10 +196,6 @@ fn usage_db_round_trips_through_serde() {
                     "openai".into(),
                     SummaryCounter {
                         requests: 1,
-                        failed_requests: 0,
-                        latency_total_sum: 0,
-                        latency_ttft_sum: 0,
-                        latency_count: 0,
                         prompt_tokens: 10,
                         completion_tokens: 20,
                         reasoning_tokens: 0,
@@ -183,6 +208,12 @@ fn usage_db_round_trips_through_serde() {
                         api_key: None,
                         endpoint: None,
                         extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
                     },
                 )]),
                 by_model: BTreeMap::new(),
@@ -190,9 +221,21 @@ fn usage_db_round_trips_through_serde() {
                 by_api_key: BTreeMap::new(),
                 by_endpoint: BTreeMap::new(),
                 extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             },
         )]),
         extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
     };
 
     let encoded = serde_json::to_value(&usage).expect("encode usage db");
@@ -260,7 +303,7 @@ async fn db_loads_normalizes_and_persists_json_files() {
     assert!(snapshot.api_keys[0].is_active());
     assert!(snapshot.settings.outbound_proxy_enabled);
     assert_eq!(usage.total_requests_lifetime, 1);
-    assert!(db.data_dir.join("cipherroute.sqlite").exists());
+    assert!(db.data_dir.join("openproxy.sqlite").exists());
 
     db.update(|state| {
         state.model_aliases.insert(
@@ -291,11 +334,16 @@ async fn db_updates_are_serialized_and_snapshots_remain_lock_free() {
                     name: format!("combo-{index}"),
                     models: vec![format!("openai/gpt-{index}")],
                     disabled_models: Vec::new(),
-                    thinking_level: None,
                     kind: None,
                     created_at: None,
                     updated_at: None,
                     extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
                 });
             })
             .await
@@ -433,17 +481,25 @@ async fn usage_updates_persist_and_migrate_daily_summary() {
                 cache_read_input_tokens: None,
                 cache_creation_input_tokens: None,
                 extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
             }),
             connection_id: Some("conn-9".into()),
             api_key: Some("key-9".into()),
             endpoint: Some("/v1/chat/completions".into()),
             cost: Some(0.21),
             status: Some("ok".into()),
-            bytes_before: 0,
-            bytes_after: 0,
-            bytes_saved: 0,
-            image_prompts: 0,
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         });
     })
     .await
@@ -492,6 +548,12 @@ fn model_resolution_supports_aliases_nodes_and_combos() {
             created_at: None,
             updated_at: None,
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         model_aliases: BTreeMap::from([(
             "draft".into(),
@@ -502,11 +564,16 @@ fn model_resolution_supports_aliases_nodes_and_combos() {
             name: "writer".into(),
             models: vec!["draft".into(), "openai/gpt-4.1".into()],
             disabled_models: Vec::new(),
-            thinking_level: None,
             kind: None,
             created_at: None,
             updated_at: None,
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }],
         ..AppDb::default()
     };

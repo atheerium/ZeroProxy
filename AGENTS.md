@@ -1,4 +1,4 @@
-# CipherRoute — Rust AI Proxy Router
+# ZeroProxy — Rust AI Proxy Router
 
 ## 7 Questions Every Agent Asks
 
@@ -21,7 +21,7 @@
 
 ## Core: What / Why / How
 
-CipherRoute is an AI proxy router written in Rust — OpenAI-compatible endpoint that routes requests to 40+ AI providers with format translation, account fallback, token refresh, usage tracking, and SSE streaming.
+Zeroproxy is an AI proxy router written in Rust — OpenAI-compatible endpoint that routes requests to 40+ AI providers with format translation, account fallback, token refresh, usage tracking, and SSE streaming.
 
 **Why**: Replace 9router (Node.js) with a faster, safer Rust implementation (235+ JS bugs avoided). Type-safe format handling, encrypted secrets, immutable data flow, thread-safe by design.
 
@@ -34,7 +34,7 @@ CipherRoute is an AI proxy router written in Rust — OpenAI-compatible endpoint
 
 ## Guiding Principle — Lightweight OmniRoute Clone
 
-CipherRoute is a stripped Rust clone of OmniRoute — **avoid OmniRoute's bloat**. When any feature's objective is unclear, **consult `~/dev/OmniRoute` (fallback `/tmp/omniroute_v3850`) first** — every feature already exists there in some form.
+Zeroproxy is a stripped Rust clone of OmniRoute — **avoid OmniRoute's bloat**. When any feature's objective is unclear, **consult `~/dev/OmniRoute` (fallback `/tmp/omniroute_v3850`) first** — every feature already exists there in some form.
 
 **Lookup order**: `~/dev/OmniRoute/src/` + `~/dev/OmniRoute/open-sse/` → `/tmp/omniroute_v3850/src/managed/`
 

@@ -1,6 +1,6 @@
-# Contributing to CipherRoute
+# Contributing to ZeroProxy
 
-**CipherRoute** is a Rust AI proxy router — single binary on `127.0.0.1:4623`, OpenAI-compatible, 40+ providers, embedded Astro dashboard. This guide makes contributions systematic, not arbitrary.
+**ZeroProxy** is a Rust AI proxy router — single binary on `127.0.0.1:4623`, OpenAI-compatible, 40+ providers, embedded Astro dashboard. This guide makes contributions systematic, not arbitrary.
 
 > **Single source of truth for daily workflow:** run `./scripts/dev.sh` — it builds backend + dashboard, runs quick tests, and starts the server detached. Everything else is a flag on that script.
 
