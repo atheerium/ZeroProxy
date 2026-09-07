@@ -1,7 +1,7 @@
 # ZeroProxy
 
 <div align="center">
-  <img src="zeroproxy_illustration.svg" alt="ZeroProxy — local AI router. 40+ providers. Auto-fallback.">
+  <img src="zeroproxy-logo.png" alt="ZeroProxy — local AI router. 40+ providers. Auto-fallback.">
 </div>
 
 <div align="center">
@@ -13,7 +13,7 @@
 
 </div>
 
-**Single-binary AI router for AI coding tools.**  
+**Intelligent AI proxy router for development tools.**  
 Routes to 40+ providers with auto-fallback combos. Embedded dashboard, OpenAI-compatible API, RTK compression. Run on `127.0.0.1:4623` — no cloud required.
 
 <p align="center">
@@ -415,7 +415,7 @@ The dashboard at `/` is the same authenticated API surface in HTML form. Admin e
 # ZeroProxy
 
 <div align="center">
-  <img src="zeroproxy_illustration.svg" alt="ZeroProxy — local AI router. 40+ providers. Auto-fallback.">
+  <img src="zeroproxy-logo.png" alt="ZeroProxy — local AI router. 40+ providers. Auto-fallback.">
 </div>
 
 <div align="center">
@@ -427,7 +427,7 @@ The dashboard at `/` is the same authenticated API surface in HTML form. Admin e
 
 </div>
 
-**Single-binary AI router for AI coding tools.**  
+**Intelligent AI proxy router for development tools.**  
 Routes to 40+ providers with auto-fallback combos. Embedded dashboard, OpenAI-compatible API, RTK compression. Run on `127.0.0.1:4623` — no cloud required.
 
 <p align="center">
