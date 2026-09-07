@@ -98,7 +98,7 @@ function UsageContent() {
           {activeTab === "providers" && <ProviderBreakdownTable period={period} />}
           {activeTab === "analytics" && <UsageAnalyticsGrid period={period} />}
           {activeTab === "compression" && <CompressionStats period={period} />}
-          {activeTab === "details" && <RequestDetailsTab />}
+          {activeTab === "details" && <RequestHistoryTable showFilters pageSize={20} />}
         </>
       )}
     </div>
