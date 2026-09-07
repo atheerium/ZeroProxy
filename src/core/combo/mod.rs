@@ -986,7 +986,7 @@ where
                 if !caps.is_empty() {
                     order = reorder_by_capabilities(&order, caps);
                     tracing::debug!(
-                        target: "cipherroute::combo",
+                        target: "zeroproxy::combo",
                         "COMBO_ORDER after_rr+caps sticky={} order={:?}",
                         sticky_limit,
                         order
@@ -1033,16 +1033,16 @@ where
     let mut consecutive_backoff_level: u32 = 0;
 
     for (idx, model) in order.iter().enumerate() {
-        tracing::debug!(target: "cipherroute::combo", "COMBO attempt {}/{} model={} ", idx + 1, order.len(), model);
+        tracing::debug!(target: "zeroproxy::combo", "COMBO attempt {}/{} model={} ", idx + 1, order.len(), model);
         match handle_single_model(model).await {
             Ok(result) => {
                 if idx > 0 {
-                    tracing::info!(target: "cipherroute::combo", "COMBO attempt {}/{} model={} succeeded after {} failures", idx + 1, order.len(), model, idx);
+                    tracing::info!(target: "zeroproxy::combo", "COMBO attempt {}/{} model={} succeeded after {} failures", idx + 1, order.len(), model, idx);
                 }
                 return Ok(result);
             }
             Err(error) => {
-                tracing::warn!(target: "cipherroute::combo", "COMBO attempt {}/{} model={} failed status={} msg={}", idx + 1, order.len(), model, error.status, error.message);
+                tracing::warn!(target: "zeroproxy::combo", "COMBO attempt {}/{} model={} failed status={} msg={}", idx + 1, order.len(), model, error.status, error.message);
                 if first_error.is_none() {
                     first_error = Some(ComboAttemptError {
                         status: error.status,
@@ -1112,7 +1112,7 @@ where
     };
 
     tracing::warn!(
-        target: "cipherroute::combo",
+        target: "zeroproxy::combo",
         "COMBO exhausted {}/{} attempts status={} msg={}",
         order.len(),
         order.len(),

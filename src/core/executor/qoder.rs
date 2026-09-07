@@ -872,13 +872,13 @@ impl QoderExecutor {
         let response = match response {
             Ok(r) => r,
             Err(e) => {
-                tracing::warn!(target: "cipherroute::executor", "qoder model/list fetch failed: {e}");
+                tracing::warn!(target: "zeroproxy::executor", "qoder model/list fetch failed: {e}");
                 return Ok((false, 32768, "system".to_string()));
             }
         };
         if !response.status().is_success() {
             tracing::warn!(
-                target: "cipherroute::executor",
+                target: "zeroproxy::executor",
                 "qoder model/list returned HTTP {}",
                 response.status().as_u16()
             );

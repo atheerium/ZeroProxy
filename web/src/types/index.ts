@@ -1,6 +1,3 @@
-// Shared TypeScript types for the CipherRoute Astro dashboard
-
-// Theme types
 export type Theme = "light" | "dark" | "system";
 
 // Dashboard API key (GET /api/keys). `monthlyBudgetUsd` is the optional

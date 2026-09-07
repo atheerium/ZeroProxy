@@ -1,4 +1,4 @@
-//! `cipherroute mitm *` — manage the embedded MITM router (PLAN v3 mục 4.10).
+//! `zeroproxy mitm *` — manage the embedded MITM router (PLAN v3 mục 4.10).
 //!
 //! All commands talk to the running server's `/api/mitm/*` and
 //! `/api/mitm-config` endpoints. The server is the source of truth for MITM
@@ -106,7 +106,7 @@ async fn run_status(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
                 .unwrap_or(Value::Null);
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.mitm.status",
+                    "zeroproxy.v1.mitm.status",
                     json!({
                         "enabled": enabled,
                         "routes": routes,
@@ -134,7 +134,7 @@ async fn run_start(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.post_empty("/api/mitm/start").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.start", payload)?;
+                emit_robot("zeroproxy.v1.mitm.start", payload)?;
             } else {
                 humanln(ctx, "MITM proxy started.");
             }
@@ -148,7 +148,7 @@ async fn run_stop(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.post_empty("/api/mitm/stop").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.stop", payload)?;
+                emit_robot("zeroproxy.v1.mitm.stop", payload)?;
             } else {
                 humanln(ctx, "MITM proxy stopped.");
             }
@@ -162,7 +162,7 @@ async fn run_cert_generate(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> 
     match rt.post_empty("/api/mitm/cert/generate").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.cert.generate", payload)?;
+                emit_robot("zeroproxy.v1.mitm.cert.generate", payload)?;
             } else {
                 let fp = payload
                     .get("fingerprint")
@@ -180,7 +180,7 @@ fn run_cert_path(cfg: &ResolvedConfig, ctx: OutputCtx) -> anyhow::Result<i32> {
     let path = local_cert_path(&cfg.data_dir);
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.mitm.cert.path",
+            "zeroproxy.v1.mitm.cert.path",
             json!({"path": path.to_string_lossy()}),
         )?;
     } else {
@@ -189,7 +189,7 @@ fn run_cert_path(cfg: &ResolvedConfig, ctx: OutputCtx) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-/// Local path where `cipherroute mitm cert` reads/writes the CA bundle copy.
+/// Local path where `zeroproxy mitm cert` reads/writes the CA bundle copy.
 /// The server owns the canonical cert; this is the agent-friendly export
 /// location.
 fn local_cert_path(data_dir: &std::path::Path) -> PathBuf {
@@ -200,7 +200,7 @@ async fn run_config_get(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/mitm-config").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.config", payload)?;
+                emit_robot("zeroproxy.v1.mitm.config", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -266,7 +266,7 @@ async fn run_config_set(
     match rt.put_json("/api/mitm-config", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.config.set", payload)?;
+                emit_robot("zeroproxy.v1.mitm.config.set", payload)?;
             } else {
                 humanln(ctx, format!("Updated `{key}`."));
             }
@@ -284,7 +284,7 @@ async fn run_config_apply(rt: &Runtime, ctx: OutputCtx, from: &str) -> anyhow::R
     match rt.put_json("/api/mitm-config", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.mitm.config.apply", payload)?;
+                emit_robot("zeroproxy.v1.mitm.config.apply", payload)?;
             } else {
                 humanln(ctx, "MITM config applied.");
             }

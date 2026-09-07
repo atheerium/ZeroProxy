@@ -1,23 +1,23 @@
 <#
-install.ps1 — one-shot installer for cipherroute on Windows.
+install.ps1 — one-shot installer for zeroproxy on Windows.
 
 Usage:
-  irm https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.ps1 | iex
-  iwr https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.ps1 -UseBasicParsing | iex
+  irm https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1 | iex
+  iwr https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1 -UseBasicParsing | iex
 
 Pinning a version or passing flags through `irm | iex` requires a small wrapper:
-  & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.ps1'))) -Version v0.1.7 -EasyMode
+  & ([scriptblock]::Create((irm 'https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1'))) -Version v0.1.7 -EasyMode
 
 Or download and run directly:
-  irm https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.ps1 -OutFile install.ps1
+  irm https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.ps1 -OutFile install.ps1
   .\install.ps1 -Version v0.1.7 -EasyMode
 
 Flags:
   -Dest <path>          Install location. Default: $env:USERPROFILE\.local\bin
-  -System               Shortcut for -Dest "$env:ProgramFiles\cipherroute" (admin)
+  -System               Shortcut for -Dest "$env:ProgramFiles\zeroproxy" (admin)
   -Version <vX.Y.Z>     Pin a specific release. Default: latest
   -EasyMode             Append the install dir to the *user* PATH if missing
-  -Verify               Run `cipherroute --version` after install
+  -Verify               Run `zeroproxy --version` after install
   -NoSkill              Skip installing the agent skill into the user profile
   -SkillDest <dir>      Override the skills root. Default: $env:USERPROFILE\.agents\skills
   -Quiet                Suppress info logs
@@ -46,10 +46,10 @@ $ProgressPreference    = 'SilentlyContinue'   # Disables the slow IE-style progr
 # Configuration
 # ════════════════════════════════════════════════════════════════════════════
 
-$BinaryName = 'cipherroute'
+$BinaryName = 'zeroproxy'
 $BinaryFile = "$BinaryName.exe"
-$Owner      = 'quangdang46'
-$Repo       = 'cipherroute'
+$Owner      = 'atheerium'
+$Repo       = 'zeroproxy'
 
 if ($System) { $Dest = "$env:ProgramFiles\$BinaryName" }
 
@@ -74,7 +74,7 @@ if ($Help) {
         $content = Get-Content -Raw $self
         if ($content -match '(?s)<#(.*?)#>') { Write-Host $matches[1].Trim() }
     } else {
-        Write-Host "cipherroute installer for Windows. Run with -Help on a downloaded copy for full text."
+        Write-Host "zeroproxy installer for Windows. Run with -Help on a downloaded copy for full text."
     }
     exit 0
 }
@@ -227,8 +227,8 @@ function Update-UserPath {
 # ════════════════════════════════════════════════════════════════════════════
 # Agent skill install
 #
-# Drop SKILL.md at $SkillDest\cipherroute\SKILL.md so agents that auto-discover
-# the skills root (Devin, Claude Code, …) can install + drive cipherroute on
+# Drop SKILL.md at $SkillDest\zeroproxy\SKILL.md so agents that auto-discover
+# the skills root (Devin, Claude Code, …) can install + drive zeroproxy on
 # the user's behalf. Idempotent: preserves user-edited files.
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -280,7 +280,7 @@ function Install-Binary-Atomic {
 # Main
 # ════════════════════════════════════════════════════════════════════════════
 
-$tempDir = Join-Path $env:TEMP "cipherroute-install-$PID"
+$tempDir = Join-Path $env:TEMP "zeroproxy-install-$PID"
 New-Item -ItemType Directory -Force -Path $tempDir | Out-Null
 
 try {
@@ -325,7 +325,7 @@ asked for ($Version) does not include $archive. Either:
     $extractDir = Join-Path $tempDir 'extract'
     Expand-Archive -LiteralPath $archivePath -DestinationPath $extractDir -Force
 
-    # Locate cipherroute.exe inside the archive (top level, but tolerate one level).
+    # Locate zeroproxy.exe inside the archive (top level, but tolerate one level).
     $bin = Get-ChildItem -LiteralPath $extractDir -Recurse -Filter $BinaryFile -File |
            Select-Object -First 1
     if (-not $bin) { Die "$BinaryFile not found inside $archive" }

@@ -347,7 +347,7 @@ async fn process_connection(
             Err(e) => {
                 mark_failure(&key);
                 warn!(
-                    target: "cipherroute::auto_ping",
+                    target: "zeroproxy::auto_ping",
                     provider = provider,
                     connection_id = %conn.id,
                     error = %e,
@@ -467,7 +467,7 @@ async fn process_connection(
                 })
                 .await;
             info!(
-                target: "cipherroute::auto_ping",
+                target: "zeroproxy::auto_ping",
                 provider = provider,
                 connection_id = %connection.id,
                 reset_at = %reset_at,
@@ -482,7 +482,7 @@ async fn process_connection(
         Err(e) => {
             mark_failure(&key);
             warn!(
-                target: "cipherroute::auto_ping",
+                target: "zeroproxy::auto_ping",
                 provider = provider,
                 connection_id = %connection.id,
                 reset_at = %reset_at,
@@ -739,7 +739,7 @@ pub fn spawn_boot_resume(state: AppState, port: u16) {
 
         if settings.tunnel_enabled {
             info!(
-                target: "cipherroute::boot",
+                target: "zeroproxy::boot",
                 "tunnel was enabled — auto-resuming cloudflared"
             );
             if let Err(err) = tunnel_mgr
@@ -747,14 +747,14 @@ pub fn spawn_boot_resume(state: AppState, port: u16) {
                 .await
             {
                 warn!(
-                    target: "cipherroute::boot",
+                    target: "zeroproxy::boot",
                     error = %err,
                     "tunnel auto-resume failed"
                 );
             }
         } else if settings.tailscale_enabled {
             info!(
-                target: "cipherroute::boot",
+                target: "zeroproxy::boot",
                 "tailscale was enabled — auto-resuming funnel"
             );
             if let Err(err) = tunnel_mgr
@@ -762,7 +762,7 @@ pub fn spawn_boot_resume(state: AppState, port: u16) {
                 .await
             {
                 warn!(
-                    target: "cipherroute::boot",
+                    target: "zeroproxy::boot",
                     error = %err,
                     "tailscale auto-resume failed"
                 );

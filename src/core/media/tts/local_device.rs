@@ -25,7 +25,7 @@ fn temp_dir() -> PathBuf {
         .duration_since(SystemTime::UNIX_EPOCH)
         .map(|d| d.as_nanos())
         .unwrap_or(0);
-    p.push(format!("cipherroute-tts-{nonce}"));
+    p.push(format!("zeroproxy-tts-{nonce}"));
     p
 }
 

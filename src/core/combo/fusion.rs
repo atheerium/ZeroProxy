@@ -506,7 +506,7 @@ where
 /// clients receive SSE. The buffered-Value callback used here cannot carry an
 /// SSE stream, so when `defer_final_dispatch` is set the judge/survivor legs
 /// are NOT dispatched; instead the caller receives a
-/// `{"__cipherroute_fusion_dispatch": {model, body}}` envelope and performs
+/// `{"__zeroproxy_fusion_dispatch": {model, body}}` envelope and performs
 /// the dispatch itself with full stream semantics.
 pub async fn handle_fusion_chat_deferred<F, Fut>(
     body: &mut Value,
@@ -553,7 +553,7 @@ where
     if panel_models.len() == 1 {
         if defer_final_dispatch {
             return Ok(json!({
-                "__cipherroute_fusion_dispatch": {
+                "__zeroproxy_fusion_dispatch": {
                     "model": panel_models[0],
                     "body": body,
                 }
@@ -659,7 +659,7 @@ where
                             hard_deadline = gd;
                         }
                         tracing::debug!(
-                            target: "cipherroute::fusion",
+                            target: "zeroproxy::fusion",
                             "FUSION quorum={} grace_ms={} remaining_panels={}",
                             ok_count,
                             grace_ms,
@@ -689,7 +689,7 @@ where
         };
         if defer_final_dispatch {
             return Ok(json!({
-                "__cipherroute_fusion_dispatch": {
+                "__zeroproxy_fusion_dispatch": {
                     "model": survivor.result.model,
                     "body": body,
                 }
@@ -795,7 +795,7 @@ where
 
     if defer_final_dispatch {
         return Ok(json!({
-            "__cipherroute_fusion_dispatch": {
+            "__zeroproxy_fusion_dispatch": {
                 "model": judge_model_id,
                 "body": judge_body,
             }
@@ -1029,7 +1029,7 @@ mod tests {
 
         let resp = result.expect("deferred fusion should succeed");
         let dispatch = resp
-            .get("__cipherroute_fusion_dispatch")
+            .get("__zeroproxy_fusion_dispatch")
             .expect("envelope present");
         assert_eq!(dispatch["model"], "model-a");
         // The deferred body preserves the client stream flag.

@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# install.sh — one-shot installer for cipherroute
+# install.sh — one-shot installer for zeroproxy
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.sh | bash
-#   curl -fsSL https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.sh | bash -s -- --easy-mode
-#   curl -fsSL https://raw.githubusercontent.com/quangdang46/cipherroute/main/install.sh | bash -s -- --version v0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh | bash -s -- --easy-mode
+#   curl -fsSL https://raw.githubusercontent.com/atheerium/zeroproxy/main/install.sh | bash -s -- --version v0.1.0
 #
 # Flags:
 #   --dest <path>          Install location. Default: ~/.local/bin
 #   --system               Shortcut for --dest /usr/local/bin (may need sudo)
 #   --version <vX.Y.Z>     Pin a specific release. Default: latest
 #   --easy-mode            Append PATH export to ~/.bashrc / ~/.zshrc if needed
-#   --verify               Run `cipherroute --version` after install
+#   --verify               Run `zeroproxy --version` after install
 #   --from-source          Skip release download, build from source via cargo
-#   --no-skill             Skip installing the agent skill into ~/.agents/skills/cipherroute/SKILL.md
+#   --no-skill             Skip installing the agent skill into ~/.agents/skills/zeroproxy/SKILL.md
 #   --skill-dest <dir>     Override the skills root. Default: ~/.agents/skills
 #   --with-completions     Install shell completions for bash/zsh/fish
 #   --quiet, -q            Suppress info logs
@@ -27,9 +27,9 @@ umask 022
 # Configuration
 # ════════════════════════════════════════════════════════════════════════════
 
-BINARY_NAME="cipherroute"
-OWNER="quangdang46"
-REPO="cipherroute"
+BINARY_NAME="zeroproxy"
+OWNER="atheerium"
+REPO="zeroproxy"
 
 DEST="${DEST:-$HOME/.local/bin}"
 VERSION="${VERSION:-}"
@@ -162,7 +162,7 @@ do_uninstall() {
 # ════════════════════════════════════════════════════════════════════════════
 
 # Output asset suffix exactly as it appears in release filenames:
-#   cipherroute-vX.Y.Z-<suffix>.tar.gz
+#   zeroproxy-vX.Y.Z-<suffix>.tar.gz
 detect_platform() {
     local os arch
     case "$(uname -s)" in
@@ -292,12 +292,12 @@ maybe_add_path() {
 }
 
 # ════════════════════════════════════════════════════════════════════════════
-# Agent skill install — drops SKILL.md into ~/.agents/skills/cipherroute/ so
+# Agent skill install — drops SKILL.md into ~/.agents/skills/zeroproxy/ so
 # agents that auto-discover .agents/skills/ (Devin, Claude Code, ...) can
-# install + operate cipherroute on the user's behalf.
+# install + operate zeroproxy on the user's behalf.
 #
 # Idempotent: if the destination file already exists and was NOT written by
-# this installer (i.e. doesn't start with our "name: cipherroute" frontmatter),
+# this installer (i.e. doesn't start with our "name: zeroproxy" frontmatter),
 # we leave it alone to preserve user edits.
 # ════════════════════════════════════════════════════════════════════════════
 
@@ -360,8 +360,8 @@ install_completions() {
         local bash_dir="$HOME/.local/share/bash-completion/completions"
     fi
     mkdir -p "$bash_dir" 2>/dev/null || true
-    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$bash_dir/cipherroute" "$completions_url/cipherroute.bash" 2>/dev/null; then
-        log_success "bash completions → $bash_dir/cipherroute"
+    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$bash_dir/zeroproxy" "$completions_url/zeroproxy.bash" 2>/dev/null; then
+        log_success "bash completions → $bash_dir/zeroproxy"
     else
         log_warn "could not install bash completions (continuing)"
     fi
@@ -376,8 +376,8 @@ install_completions() {
         zsh_dir="/usr/local/share/zsh/site-functions"
     fi
     mkdir -p "$zsh_dir" 2>/dev/null || true
-    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$zsh_dir/_cipherroute" "$completions_url/cipherroute.zsh" 2>/dev/null; then
-        log_success "zsh completions → $zsh_dir/_cipherroute"
+    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$zsh_dir/_zeroproxy" "$completions_url/zeroproxy.zsh" 2>/dev/null; then
+        log_success "zsh completions → $zsh_dir/_zeroproxy"
     else
         log_warn "could not install zsh completions (continuing)"
     fi
@@ -385,8 +385,8 @@ install_completions() {
     # fish
     local fish_dir="$HOME/.config/fish/completions"
     mkdir -p "$fish_dir" 2>/dev/null || true
-    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$fish_dir/cipherroute.fish" "$completions_url/cipherroute.fish" 2>/dev/null; then
-        log_success "fish completions → $fish_dir/cipherroute.fish"
+    if curl -fsSL --connect-timeout 10 --max-time 15 -o "$fish_dir/zeroproxy.fish" "$completions_url/zeroproxy.fish" 2>/dev/null; then
+        log_success "fish completions → $fish_dir/zeroproxy.fish"
     else
         log_warn "could not install fish completions (continuing)"
     fi

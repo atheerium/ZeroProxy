@@ -1,4 +1,4 @@
-//! `cipherroute schema list/show/example` — agent introspection.
+//! `zeroproxy schema list/show/example` — agent introspection.
 //!
 //! Lets agents discover what resources the CLI accepts and what shape they
 //! take. This makes the CLI self-documenting — an agent can read these schemas
@@ -31,14 +31,14 @@ const RESOURCES: &[&str] = &[
 
 /// Schema namespace covered by the v1 stability contract (M6).
 ///
-/// Once a CLI release ships with `cipherroute.v1.*` envelopes, the shape of
+/// Once a CLI release ships with `zeroproxy.v1.*` envelopes, the shape of
 /// each successful envelope is frozen: existing fields keep their names,
 /// types, and meanings. New fields are additive only, and new schemas may
-/// be introduced but never renamed. A new `cipherroute.v2.*` namespace will
+/// be introduced but never renamed. A new `zeroproxy.v2.*` namespace will
 /// be opened before any breaking change.
-pub const SCHEMA_NAMESPACE: &str = "cipherroute.v1";
+pub const SCHEMA_NAMESPACE: &str = "zeroproxy.v1";
 
-/// Human-readable stability statement returned by `cipherroute schema
+/// Human-readable stability statement returned by `zeroproxy schema
 /// stability`. Bumping the version string here counts as a compatibility
 /// promise — keep it in sync with `docs/cli-schema.md` (if/when added).
 pub const SCHEMA_STABILITY: &str = "stable";
@@ -50,7 +50,7 @@ pub fn run_list(ctx: OutputCtx) -> anyhow::Result<()> {
         "resources": RESOURCES,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.schema.list", data)?;
+        emit_robot("zeroproxy.v1.schema.list", data)?;
     } else {
         humanln(
             ctx,
@@ -67,10 +67,10 @@ pub fn run_stability(ctx: OutputCtx) -> anyhow::Result<()> {
     let data = json!({
         "namespace": SCHEMA_NAMESPACE,
         "stability": SCHEMA_STABILITY,
-        "policy": "Existing field names, types, and semantics in cipherroute.v1.* envelopes are frozen. New fields are additive only. A new cipherroute.v2.* namespace will be opened before any breaking change.",
+        "policy": "Existing field names, types, and semantics in zeroproxy.v1.* envelopes are frozen. New fields are additive only. A new zeroproxy.v2.* namespace will be opened before any breaking change.",
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.schema.stability", data)?;
+        emit_robot("zeroproxy.v1.schema.stability", data)?;
     } else {
         humanln(
             ctx,
@@ -85,13 +85,13 @@ pub fn run_show(ctx: OutputCtx, resource: &str) -> anyhow::Result<i32> {
         let exit = crate::cli::output::emit_error(
             ctx,
             "not_found",
-            &format!("unknown resource '{resource}'. Try: cipherroute schema list"),
+            &format!("unknown resource '{resource}'. Try: zeroproxy schema list"),
         )?;
         return Ok(exit);
     };
     if ctx.is_robot() {
         emit_robot(
-            &format!("cipherroute.v1.schema.{}", normalize(resource)),
+            &format!("zeroproxy.v1.schema.{}", normalize(resource)),
             schema,
         )?;
     } else {
@@ -106,13 +106,13 @@ pub fn run_example(ctx: OutputCtx, resource: &str) -> anyhow::Result<i32> {
         let exit = crate::cli::output::emit_error(
             ctx,
             "not_found",
-            &format!("unknown resource '{resource}'. Try: cipherroute schema list"),
+            &format!("unknown resource '{resource}'. Try: zeroproxy schema list"),
         )?;
         return Ok(exit);
     };
     if ctx.is_robot() {
         emit_robot(
-            &format!("cipherroute.v1.example.{}", normalize(resource)),
+            &format!("zeroproxy.v1.example.{}", normalize(resource)),
             example,
         )?;
     } else {
@@ -248,7 +248,7 @@ fn schema_for(resource: &str) -> Option<Value> {
             "type": "object",
             "description": "NDJSON envelope emitted by `usage stream`.",
             "properties": {
-                "schema": {"const": "cipherroute.v1.usage.event"},
+                "schema": {"const": "zeroproxy.v1.usage.event"},
                 "ok": {"const": true},
                 "data": {"type": ["object", "array", "string", "number", "null"]}
             }
@@ -259,7 +259,7 @@ fn schema_for(resource: &str) -> Option<Value> {
             "type": "object",
             "description": "NDJSON envelope emitted by `logs tail` / `logs export`.",
             "properties": {
-                "schema": {"const": "cipherroute.v1.log.event"},
+                "schema": {"const": "zeroproxy.v1.log.event"},
                 "ok": {"const": true},
                 "data": {"type": ["object", "string"]}
             }
@@ -270,7 +270,7 @@ fn schema_for(resource: &str) -> Option<Value> {
             "type": "object",
             "description": "NDJSON envelope emitted by `chat stream`.",
             "properties": {
-                "schema": {"const": "cipherroute.v1.chat.event"},
+                "schema": {"const": "zeroproxy.v1.chat.event"},
                 "ok": {"const": true},
                 "data": {"type": ["object", "string"]}
             }
@@ -352,19 +352,19 @@ fn example_for(resource: &str) -> Option<Value> {
             }
         }),
         "usage-event" => json!({
-            "schema": "cipherroute.v1.usage.event",
+            "schema": "zeroproxy.v1.usage.event",
             "ok": true,
             "data": {"totals": {"requests": 17, "tokens": 4321, "cost": 0.0123}},
             "meta": {}
         }),
         "log-event" => json!({
-            "schema": "cipherroute.v1.log.event",
+            "schema": "zeroproxy.v1.log.event",
             "ok": true,
             "data": {"line": "2025-01-01T00:00:00Z INFO  proxy: routed gpt-4o"},
             "meta": {}
         }),
         "chat-event" => json!({
-            "schema": "cipherroute.v1.chat.event",
+            "schema": "zeroproxy.v1.chat.event",
             "ok": true,
             "data": {"choices": [{"delta": {"content": "Hello"}}]},
             "meta": {}

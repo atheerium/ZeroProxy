@@ -114,7 +114,7 @@ pub fn ag_platform_user_agent() -> String {
 // ─── Anti-loop / cloaking ────────────────────────────────────────────────
 
 /// Internal anti-loop header: tagged on every outbound request so an
-/// cipherroute fronted by another cipherroute can short-circuit the second hop.
+/// zeroproxy fronted by another zeroproxy can short-circuit the second hop.
 pub const INTERNAL_REQUEST_HEADER_NAME: &str = "x-request-source";
 pub const INTERNAL_REQUEST_HEADER_VALUE: &str = "local";
 
@@ -309,7 +309,7 @@ pub fn build_kimi_headers(device_id: Option<&str>) -> serde_json::Value {
         other => format!("{other} {}", std::env::consts::ARCH),
     };
     json!({
-        "X-Msh-Platform": "cipherroute",
+        "X-Msh-Platform": "zeroproxy",
         "X-Msh-Version": "2.1.2",
         "X-Msh-Device-Name": hostname(),
         "X-Msh-Device-Model": device_model,

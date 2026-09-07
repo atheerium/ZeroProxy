@@ -159,7 +159,7 @@ fn export_filename(scopes: &[String]) -> String {
         scopes.join("-")
     };
     let stamp = chrono::Utc::now().format("%Y-%m-%dT%H-%M-%SZ").to_string();
-    format!("cipherroute-data-{tag}-{stamp}.json")
+    format!("zeroproxy-data-{tag}-{stamp}.json")
 }
 
 // ---------------------------------------------------------------------------
@@ -313,7 +313,7 @@ async fn import_handler(
     let (pre_json, _) = match state.db.export_db() {
         Ok(m) => m,
         Err(e) => {
-            tracing::warn!(target: "cipherroute::db::backups", error = %e, "pre-import export failed; aborting scoped import");
+            tracing::warn!(target: "zeroproxy::db::backups", error = %e, "pre-import export failed; aborting scoped import");
             return (
                 StatusCode::INTERNAL_SERVER_ERROR,
                 Json(json!({ "error": e.to_string() })),
@@ -326,7 +326,7 @@ async fn import_handler(
         .create_from_json(BackupReason::PreImport, &pre_json)
         .await
     {
-        tracing::warn!(target: "cipherroute::db::backups", error = %e, "pre-import backup failed; aborting scoped import");
+        tracing::warn!(target: "zeroproxy::db::backups", error = %e, "pre-import backup failed; aborting scoped import");
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
             Json(json!({ "error": e.to_string() })),
@@ -534,7 +534,7 @@ async fn reset_handler(
         .create_from_json(BackupReason::PreRestore, &pre_json)
         .await
     {
-        tracing::warn!(target: "cipherroute::data_management", error = %e, "pre-reset backup failed; proceeding anyway");
+        tracing::warn!(target: "zeroproxy::data_management", error = %e, "pre-reset backup failed; proceeding anyway");
     }
     // Also snapshot usage for scoped wipe observability.
     let went_usage = includes(&scopes, "usage");
@@ -852,7 +852,7 @@ async fn import_env_handler(
         .create_from_json(BackupReason::PreImport, &pre_json)
         .await
     {
-        tracing::warn!(target: "cipherroute::db::backups", error = %e, "pre-import-env backup failed; proceeding");
+        tracing::warn!(target: "zeroproxy::db::backups", error = %e, "pre-import-env backup failed; proceeding");
     }
 
     let pairs = parse_env_file(&text);

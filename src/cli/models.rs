@@ -1,4 +1,4 @@
-//! `cipherroute models *` — top-level model registry view.
+//! `zeroproxy models *` — top-level model registry view.
 //!
 //! Reads the built-in provider catalog merged with the user's custom
 //! models, aliases, and disabled lists from `db.json`. Exposes a
@@ -83,7 +83,7 @@ async fn run_list(db: &Db, ctx: OutputCtx, provider: Option<&str>) -> anyhow::Re
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.models.list",
+            "zeroproxy.v1.models.list",
             json!({ "providers": groups, "count": groups.len() }),
         )?;
     } else {
@@ -136,7 +136,7 @@ async fn run_info(db: &Db, ctx: OutputCtx, model: &str) -> anyhow::Result<()> {
         "pricing": pricing,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.models.info", payload)?;
+        emit_robot("zeroproxy.v1.models.info", payload)?;
     } else {
         humanln(ctx, format!("Model: {model}"));
         humanln(
@@ -197,7 +197,7 @@ async fn run_test(db: &Db, ctx: OutputCtx, model: &str) -> anyhow::Result<()> {
         "error": error,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.models.test", payload)?;
+        emit_robot("zeroproxy.v1.models.test", payload)?;
     } else if valid {
         humanln(
             ctx,
@@ -229,7 +229,7 @@ async fn run_pricing(db: &Db, ctx: OutputCtx, model: Option<&str>) -> anyhow::Re
         serde_json::to_value(&snapshot.pricing)?
     };
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.models.pricing", pricing)?;
+        emit_robot("zeroproxy.v1.models.pricing", pricing)?;
     } else {
         let pretty = serde_json::to_string_pretty(&pricing).unwrap_or_default();
         println!("{pretty}");

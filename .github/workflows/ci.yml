@@ -86,7 +86,7 @@ jobs:
 
   # ──────────────────────────────────────────────────────────────────────
   # NOTE: tests/unit/ previously held 17 legacy JS test files imported
-  # from upstream decolua/9router.  The JS source (open-sse/) has been
+  # from upstream atheerium/9router.  The JS source (open-sse/) has been
   # rewritten in Rust and all test files have been removed.  Translator
   # coverage is now provided by Rust golden-snapshot tests in
   # src/core/translator/tests.rs.  Provider-model regression coverage is

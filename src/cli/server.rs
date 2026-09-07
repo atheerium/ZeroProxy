@@ -1,9 +1,9 @@
-//! `cipherroute server` — manage the local server daemon lifecycle.
+//! `zeroproxy server` — manage the local server daemon lifecycle.
 //!
 //! Subcommands:
 //! - `server start [--detach] [--host H] [--port P]`: start the API server.
 //!   Without `--detach` we just run the server in the foreground (same as
-//!   invoking `cipherroute` with no subcommand). With `--detach` we re-exec
+//!   invoking `zeroproxy` with no subcommand). With `--detach` we re-exec
 //!   ourselves as a fully detached child, write a PID file under `$DATA_DIR`,
 //!   and probe the health endpoint before returning.
 //! - `server stop`: read the PID file and send SIGTERM (Unix) or `kill` the
@@ -27,11 +27,11 @@ use crate::db::Db;
 use crate::types::ApiKey;
 
 /// File name of the PID file written into `$DATA_DIR`.
-pub const PID_FILE: &str = "cipherroute.pid";
+pub const PID_FILE: &str = "zeroproxy.pid";
 /// Sidecar file recording `<host>:<port>` of the running server so that
 /// `server status` and `server stop` can probe the right endpoint without
 /// asking the user.
-const PORT_FILE: &str = "cipherroute.endpoint";
+const PORT_FILE: &str = "zeroproxy.endpoint";
 
 #[derive(Debug)]
 pub struct StartOptions {
@@ -101,7 +101,7 @@ fn remove_pid(data_dir: &Path) {
     let _ = std::fs::remove_file(data_dir.join(PORT_FILE));
 }
 
-/// `cipherroute server start`.
+/// `zeroproxy server start`.
 ///
 /// In foreground mode, returns `Ok(None)` to signal the caller (main.rs) to
 /// continue with the in-process server boot. In detach mode, spawns a child
@@ -116,7 +116,7 @@ pub async fn run_start(
     if let Some(existing) = read_pid(&cfg.data_dir) {
         if process_alive(existing) {
             let msg = format!(
-                "cipherroute already running (pid {existing}) for data dir {}",
+                "zeroproxy already running (pid {existing}) for data dir {}",
                 cfg.data_dir.display()
             );
             let exit = emit_error(ctx, "conflict", &msg)?;
@@ -133,7 +133,7 @@ pub async fn run_start(
         write_endpoint(&cfg.data_dir, &opts.host, opts.port)?;
         if ctx.is_robot() {
             emit_robot(
-                "cipherroute.v1.server.start",
+                "zeroproxy.v1.server.start",
                 json!({
                     "pid": std::process::id(),
                     "host": opts.host,
@@ -146,7 +146,7 @@ pub async fn run_start(
             humanln(
                 ctx,
                 format!(
-                    "Starting cipherroute on {}:{} (pid {})",
+                    "Starting zeroproxy on {}:{} (pid {})",
                     opts.host,
                     opts.port,
                     std::process::id()
@@ -159,7 +159,7 @@ pub async fn run_start(
     // Detached: re-exec ourselves with the server defaults but no subcommand,
     // detach stdio, and probe the health endpoint to confirm it came up.
     let me = std::env::current_exe().context("locate current executable")?;
-    let log_path = cfg.data_dir.join("cipherroute.log");
+    let log_path = cfg.data_dir.join("zeroproxy.log");
     std::fs::create_dir_all(&cfg.data_dir).ok();
     let stdout = std::fs::OpenOptions::new()
         .create(true)
@@ -212,7 +212,7 @@ pub async fn run_start(
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.server.start",
+            "zeroproxy.v1.server.start",
             json!({
                 "pid": child_pid,
                 "host": opts.host,
@@ -227,7 +227,7 @@ pub async fn run_start(
         humanln(
             ctx,
             format!(
-                "Started cipherroute (pid {child_pid}) on {}:{} — logs: {}",
+                "Started zeroproxy (pid {child_pid}) on {}:{} — logs: {}",
                 opts.host,
                 opts.port,
                 log_path.display()
@@ -245,11 +245,11 @@ pub async fn run_start(
     Ok(Some(0))
 }
 
-/// `cipherroute server stop`.
+/// `zeroproxy server stop`.
 pub async fn run_stop(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i32> {
     let Some(pid) = read_pid(&cfg.data_dir) else {
         let msg = format!(
-            "no cipherroute.pid found in {} (server not started by this CLI?)",
+            "no zeroproxy.pid found in {} (server not started by this CLI?)",
             cfg.data_dir.display()
         );
         return Ok(emit_error(ctx, "not_found", &msg)?);
@@ -259,11 +259,11 @@ pub async fn run_stop(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i3
         remove_pid(&cfg.data_dir);
         if ctx.is_robot() {
             emit_robot(
-                "cipherroute.v1.server.stop",
+                "zeroproxy.v1.server.stop",
                 json!({"pid": pid, "result": "already_dead"}),
             )?;
         } else {
-            humanln(ctx, format!("cipherroute (pid {pid}) was not running"));
+            humanln(ctx, format!("zeroproxy (pid {pid}) was not running"));
         }
         return Ok(0);
     }
@@ -296,14 +296,14 @@ pub async fn run_stop(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i3
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.server.stop",
+            "zeroproxy.v1.server.stop",
             json!({
                 "pid": pid,
                 "result": if stopped { "stopped" } else { "timeout" },
             }),
         )?;
     } else if stopped {
-        humanln(ctx, format!("Stopped cipherroute (pid {pid})"));
+        humanln(ctx, format!("Stopped zeroproxy (pid {pid})"));
     } else {
         humanln(
             ctx,
@@ -313,7 +313,7 @@ pub async fn run_stop(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i3
     Ok(if stopped { 0 } else { 1 })
 }
 
-/// `cipherroute server status`.
+/// `zeroproxy server status`.
 pub async fn run_status(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i32> {
     let pid = read_pid(&cfg.data_dir);
     let alive = pid.map(process_alive).unwrap_or(false);
@@ -350,7 +350,7 @@ pub async fn run_status(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.server.status",
+            "zeroproxy.v1.server.status",
             json!({
                 "pid": pid,
                 "process_alive": alive,
@@ -361,7 +361,7 @@ pub async fn run_status(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<
             }),
         )?;
     } else {
-        humanln(ctx, "cipherroute server:");
+        humanln(ctx, "zeroproxy server:");
         match pid {
             Some(p) if alive => humanln(ctx, format!("  pid: {p} (alive)")),
             Some(p) => humanln(ctx, format!("  pid: {p} (stale)")),
@@ -381,14 +381,14 @@ pub async fn run_status(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<
     Ok(if alive || reachable { 0 } else { 1 })
 }
 
-/// `cipherroute server init`. Initializes an empty runtime store and prints one
-/// fresh admin API key. If an `cipherroute.sqlite` already exists, behaviour
+/// `zeroproxy server init`. Initializes an empty runtime store and prints one
+/// fresh admin API key. If an `zeroproxy.sqlite` already exists, behaviour
 /// depends on what's inside it:
 ///
 /// - apiKeys empty *and* providerConnections empty *and* combos empty: we
 ///   treat the data dir as effectively unprovisioned and append a fresh
 ///   admin key idempotently. This avoids the deadlock described in bug #4
-///   where `cipherroute doctor` (or just running the server once) creates an
+///   where `zeroproxy doctor` (or just running the server once) creates an
 ///   empty store, after which `server init` refused to mint a key
 ///   without `--force` (which would also wipe future state).
 /// - any of those is non-empty: we refuse to overwrite without `--force`.
@@ -396,7 +396,7 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
     std::fs::create_dir_all(&cfg.data_dir)
         .with_context(|| format!("create data dir {}", cfg.data_dir.display()))?;
 
-    let sqlite_path = cfg.data_dir.join("cipherroute.sqlite");
+    let sqlite_path = cfg.data_dir.join("zeroproxy.sqlite");
     let db_existed = sqlite_path.exists();
 
     if db_existed && !force {
@@ -412,7 +412,7 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
                     && snap.proxy_pools.is_empty();
                 if !truly_empty {
                     let msg = format!(
-                        "cipherroute.sqlite already exists at {} (use --force to overwrite)",
+                        "zeroproxy.sqlite already exists at {} (use --force to overwrite)",
                         sqlite_path.display()
                     );
                     return Ok(emit_error(ctx, "conflict", &msg)?);
@@ -420,7 +420,7 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
             }
             Err(_) => {
                 let msg = format!(
-                    "cipherroute.sqlite at {} is unreadable (use --force to overwrite)",
+                    "zeroproxy.sqlite at {} is unreadable (use --force to overwrite)",
                     sqlite_path.display()
                 );
                 return Ok(emit_error(ctx, "conflict", &msg)?);
@@ -448,7 +448,7 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.server.init",
+            "zeroproxy.v1.server.init",
             json!({
                 "data_dir": cfg.data_dir.display().to_string(),
                 "sqlite_path": sqlite_path.display().to_string(),
@@ -463,16 +463,16 @@ pub async fn run_init(ctx: OutputCtx, cfg: &ResolvedConfig, force: bool) -> anyh
     } else {
         humanln(
             ctx,
-            format!("Initialized cipherroute at {}", cfg.data_dir.display()),
+            format!("Initialized zeroproxy at {}", cfg.data_dir.display()),
         );
-        humanln(ctx, "  Runtime store: SQLite (cipherroute.sqlite)");
+        humanln(ctx, "  Runtime store: SQLite (zeroproxy.sqlite)");
         humanln(ctx, "");
         humanln(ctx, "Admin API key (save it now — shown only once):");
         humanln(ctx, format!("  {key_secret}"));
         humanln(ctx, "");
         humanln(
             ctx,
-            "Start the server with: cipherroute server start --detach",
+            "Start the server with: zeroproxy server start --detach",
         );
     }
     Ok(0)

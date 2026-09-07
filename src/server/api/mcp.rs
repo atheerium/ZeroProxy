@@ -48,7 +48,7 @@ async fn sse_handler(State(state): State<AppState>, Path(plugin): Path<String>) 
         Ok(e) => e,
         Err(err) => {
             tracing::error!(
-                target: "cipherroute::mcp",
+                target: "zeroproxy::mcp",
                 plugin = %plugin,
                 error = %err,
                 "failed to spawn MCP bridge"
@@ -77,7 +77,7 @@ async fn sse_handler(State(state): State<AppState>, Path(plugin): Path<String>) 
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
                     tracing::warn!(
-                        target: "cipherroute::mcp",
+                        target: "zeroproxy::mcp",
                         plugin = %plugin_for_log,
                         skipped,
                         "SSE session lagged; some frames were dropped"
@@ -99,7 +99,7 @@ async fn sse_handler(State(state): State<AppState>, Path(plugin): Path<String>) 
         .header("X-Accel-Buffering", "no")
         .body(Body::from_stream(body_stream))
         .unwrap_or_else(|err| {
-            tracing::error!(target: "cipherroute::mcp", error = %err, "build SSE response");
+            tracing::error!(target: "zeroproxy::mcp", error = %err, "build SSE response");
             (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response()
         })
 }

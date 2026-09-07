@@ -42,16 +42,16 @@ Optional: `fuser`, `ss`, `gh` CLI.
 ## Getting Started
 
 ```bash
-git clone https://github.com/quangdang46/cipherroute.git
-cd cipherroute
+git clone https://github.com/atheerium/zeroproxy.git
+cd zeroproxy
 
 # quick is the default: cargo build + web build + quick tests + start detached on :4623
 ./scripts/dev.sh
 
 # verify
 curl -sf http://127.0.0.1:4623/health
-cipherroute --robot server status
-cipherroute --robot doctor
+zeroproxy --robot server status
+zeroproxy --robot doctor
 ```
 
 Common variants (see `AGENTS.md` and `scripts/dev.sh --help`):
@@ -76,7 +76,7 @@ cargo run -- --dashboard-sidecar-url http://127.0.0.1:4624
 ## Project Layout
 
 ```
-cipherroute/
+zeroproxy/
 ├── src/                 # Rust — axum, hyper, SQLite WAL, encrypted columns
 │   ├── core/            # model parsing, format translation, executor trait
 │   ├── server/api/      # /v1, /api, provider_models, chat
@@ -104,7 +104,7 @@ The Rust binary embeds `web/dist` via `rust-embed` at compile time — if you ch
    ./scripts/dev.sh --no-run   # fast feedback before starting server
    ./scripts/dev.sh            # full quick cycle + detached server
    ```
-4. **Verify** — `curl /health`, `cipherroute --robot doctor`, smoke `cargo test -p cipherroute --lib parity_tests`.
+4. **Verify** — `curl /health`, `zeroproxy --robot doctor`, smoke `cargo test -p zeroproxy --lib parity_tests`.
 5. **Push & open PR** — use the PR template; CI must be green (`web` → `rust` with `cargo fmt --check` + `cargo clippy --all-targets --all-features` + tests).
 
 If dashboard changes appear "missing" at runtime, you forgot `pnpm --dir web run build` — `scripts/dev.sh` does it for you.
@@ -134,10 +134,10 @@ If dashboard changes appear "missing" at runtime, you forgot `pnpm --dir web run
 
 | Command | What it runs |
 |---------|--------------|
-| `cargo test -p cipherroute --lib provider_models -- --nocapture` | 13 provider-model parsing + discovery tests |
+| `cargo test -p zeroproxy --lib provider_models -- --nocapture` | 13 provider-model parsing + discovery tests |
 | `cargo test --test providers_api import_catalog -- --nocapture` | 4 import catalog tests |
-| `cargo test -p cipherroute --lib parity_tests -- --nocapture` | stream_flags smoke |
-| `cargo test -p cipherroute --lib -- --test-threads=1` (`--full`) | full 1690-test lib suite |
+| `cargo test -p zeroproxy --lib parity_tests -- --nocapture` | stream_flags smoke |
+| `cargo test -p zeroproxy --lib -- --test-threads=1` (`--full`) | full 1690-test lib suite |
 | `cargo test --test providers_api -- --test-threads=1 --skip provider_test_models_route_fetches_live_compatible_models_and_warms_first_request` | providers API (full) |
 | `pnpm --dir web exec astro check` | dashboard typecheck |
 
@@ -151,7 +151,7 @@ Golden-snapshot translator coverage lives in `src/core/translator/tests.rs`.
 
 Parity work is tracked via **beads** (not just GitHub issues):
 
-- Epic `cipherroute-9router-parity-v0550-pnc` — 9router v0.5.50 → cipherroute, 122 specs + children. Prior `cipherroute-9router-parity-mj1` (v0.5.30) is closed.
+- Epic `zeroproxy-9router-parity-v0550-pnc` — 9router v0.5.50 → zeroproxy, 122 specs + children. Prior `zeroproxy-9router-parity-mj1` (v0.5.30) is closed.
 - `br ready` / `bv --robot-next` to find next work.
 - Reference implementations: `/tmp/9router` (legacy JS, do NOT copy its bugs) and **OmniRoute v3.8.50** (`/tmp/omniroute_v3850`, SHA `6cd4d38`) — authoritative for provider parity (`src/managed/`: `credentialHealth.ts`, `healthCheck.ts`, `modelDiscovery.ts`, `managedModelImport.ts`).
 
@@ -182,17 +182,17 @@ PRs use `.github/pull_request_template.md` — fill in summary, test plan, and r
 
 This is a hard rule (also in `AGENTS.md`):
 
-- **Never commit:** `opencode.json`, `opencode.jsonc`, `.env`, `.env.*`, `*.pem`, `~/.cipherroute/db.json`, `~/.cipherroute/admin.key`, any file containing `sk-`, `Bearer`, `refresh_token`, or live `provider_specific_data`.
-- `opencode.json` is **machine-local agent config** — keep untracked. Real secrets live in SQLite (`cipherroute.sqlite`, encrypted) + `CIPHERROUTE_API_KEY` env.
+- **Never commit:** `opencode.json`, `opencode.jsonc`, `.env`, `.env.*`, `*.pem`, `~/.zeroproxy/db.json`, `~/.zeroproxy/admin.key`, any file containing `sk-`, `Bearer`, `refresh_token`, or live `provider_specific_data`.
+- `opencode.json` is **machine-local agent config** — keep untracked. Real secrets live in SQLite (`zeroproxy.sqlite`, encrypted) + `CIPHERROUTE_API_KEY` env.
 - Before `git add`/`commit`: `git status` → `git diff --cached` → `git restore --staged <file>` if it contains secrets → add to `.gitignore` → `git check-ignore -v <file>` to verify.
 - If a secret is accidentally committed: **rotate immediately** and purge history (`git filter-repo` or BFG) — don't just revert.
 
-`.gitignore` already excludes `opencode.json`, `.env*`, `*.pem`, `.cipherroute/`, `admin.key`.
+`.gitignore` already excludes `opencode.json`, `.env*`, `*.pem`, `.zeroproxy/`, `admin.key`.
 
 ## Reporting Bugs & Requesting Features
 
 - **Search first:** `gh issue list` / `gh search issues` to avoid duplicates.
-- **Use the issue templates** (`.github/ISSUE_TEMPLATE/`): Bug Report / Feature Request. Fill in repro steps, expected vs actual, `cipherroute --version`, and whether you can reproduce after `./scripts/dev.sh --full`.
+- **Use the issue templates** (`.github/ISSUE_TEMPLATE/`): Bug Report / Feature Request. Fill in repro steps, expected vs actual, `zeroproxy --version`, and whether you can reproduce after `./scripts/dev.sh --full`.
 - **For provider parity bugs:** mention the provider, model, and whether OmniRoute behaves differently — link to the relevant `src/managed/` file if you checked.
 
 ## Release Process

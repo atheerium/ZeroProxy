@@ -1,4 +1,4 @@
-//! `cipherroute logs *` — tail/export/clear the in-memory log buffer.
+//! `zeroproxy logs *` — tail/export/clear the in-memory log buffer.
 //!
 //! Backed by `/api/observability/*` on the running server.
 
@@ -69,7 +69,7 @@ async fn run_tail(
         let line_text = line.as_str().unwrap_or("");
         if ctx.is_robot() {
             let envelope = json!({
-                "schema": "cipherroute.v1.log.event",
+                "schema": "zeroproxy.v1.log.event",
                 "ok": true,
                 "data": {"kind": "line", "line": line_text},
                 "error": null,
@@ -99,7 +99,7 @@ async fn run_tail(
             .unwrap_or_else(|_| json!({"kind": "raw", "raw": String::from_utf8_lossy(&bytes)}));
         if ctx.is_robot() {
             let envelope = json!({
-                "schema": "cipherroute.v1.log.event",
+                "schema": "zeroproxy.v1.log.event",
                 "ok": true,
                 "data": body,
                 "error": null,
@@ -120,7 +120,7 @@ async fn run_export(rt: &Runtime, ctx: OutputCtx, out: &str) -> anyhow::Result<i
         Err(e) => return rt_error_to_exit(ctx, e),
     };
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.log.export", snapshot)?;
+        emit_robot("zeroproxy.v1.log.export", snapshot)?;
         return Ok(0);
     }
     let logs = snapshot
@@ -150,7 +150,7 @@ async fn run_clear(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.post_empty("/api/observability/clear").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.log.clear", payload)?;
+                emit_robot("zeroproxy.v1.log.clear", payload)?;
             } else {
                 humanln(ctx, "Cleared log buffer.");
             }
@@ -164,7 +164,7 @@ async fn run_stats(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/observability/stats").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.log.stats", payload)?;
+                emit_robot("zeroproxy.v1.log.stats", payload)?;
             } else {
                 humanln(
                     ctx,

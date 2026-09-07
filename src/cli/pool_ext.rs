@@ -1,4 +1,4 @@
-//! `cipherroute pool *` — extended proxy pool commands (M3).
+//! `zeroproxy pool *` — extended proxy pool commands (M3).
 //!
 //! Complements the existing `pool list/status/create/delete` with
 //! get/edit/enable/disable/test/stats/apply.
@@ -97,7 +97,7 @@ async fn run_get(db: &Db, ctx: OutputCtx, name: &str) -> anyhow::Result<()> {
         std::process::exit(exit);
     };
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.pool.get", serde_json::to_value(&pool)?)?;
+        emit_robot("zeroproxy.v1.pool.get", serde_json::to_value(&pool)?)?;
     } else {
         humanln(ctx, format!("Pool: {} ({})", pool.name, pool.id));
         humanln(ctx, format!("  proxyUrl: {}", pool.proxy_url));
@@ -145,7 +145,7 @@ async fn run_edit(
     .await?;
     let pool = updated.expect("pool existed");
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.pool.edit", serde_json::to_value(&pool)?)?;
+        emit_robot("zeroproxy.v1.pool.edit", serde_json::to_value(&pool)?)?;
     } else {
         humanln(ctx, format!("updated pool '{}'", pool.name));
     }
@@ -169,9 +169,9 @@ async fn run_set_active(db: &Db, ctx: OutputCtx, name: &str, active: bool) -> an
     })
     .await?;
     let schema = if active {
-        "cipherroute.v1.pool.enable"
+        "zeroproxy.v1.pool.enable"
     } else {
-        "cipherroute.v1.pool.disable"
+        "zeroproxy.v1.pool.disable"
     };
     if ctx.is_robot() {
         emit_robot(schema, json!({ "name": name, "active": active }))?;
@@ -250,7 +250,7 @@ async fn run_test(db: &Db, ctx: OutputCtx, name: &str, target: &str) -> anyhow::
         "error": error,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.pool.test", payload)?;
+        emit_robot("zeroproxy.v1.pool.test", payload)?;
     } else if valid {
         humanln(ctx, format!("OK   {name} ({rtt_ms}ms) — {target}"));
     } else {
@@ -282,7 +282,7 @@ async fn run_stats(db: &Db, ctx: OutputCtx, name: &str) -> anyhow::Result<()> {
         "lastError": pool.last_error,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.pool.stats", payload)?;
+        emit_robot("zeroproxy.v1.pool.stats", payload)?;
     } else {
         humanln(ctx, format!("Pool stats: {}", pool.name));
         humanln(
@@ -414,7 +414,7 @@ async fn run_apply(db: &Db, ctx: OutputCtx, from_file: &str, prune: bool) -> any
     let summary = diff.summary();
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.pool.apply",
+            "zeroproxy.v1.pool.apply",
             json!({ "diff": diff, "summary": summary, "prune": prune }),
         )?;
     } else {

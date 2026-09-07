@@ -57,7 +57,7 @@ static COMBO_ATTEMPTS_TOTAL: OnceLock<IntCounterVec> = OnceLock::new();
 /// Number of upstream requests currently in flight.
 static ACTIVE_UPSTREAM: OnceLock<IntGauge> = OnceLock::new();
 /// Service start time (unix seconds), exposed as a constant gauge so
-/// Prometheus can compute uptime from `time() - cipherroute_started`.
+/// Prometheus can compute uptime from `time() - zeroproxy_started`.
 static STARTED_AT: OnceLock<GaugeVec> = OnceLock::new();
 
 fn registry() -> &'static Registry {
@@ -68,8 +68,8 @@ fn http_requests_total() -> &'static IntCounterVec {
     HTTP_REQUESTS_TOTAL.get_or_init(|| {
         let m = IntCounterVec::new(
             Opts::new(
-                "cipherroute_http_requests_total",
-                "Total HTTP requests handled by cipherroute",
+                "zeroproxy_http_requests_total",
+                "Total HTTP requests handled by zeroproxy",
             ),
             &["method", "path", "status"],
         )
@@ -85,7 +85,7 @@ fn http_request_duration() -> &'static HistogramVec {
     HTTP_REQUEST_DURATION.get_or_init(|| {
         let m = HistogramVec::new(
             HistogramOpts::new(
-                "cipherroute_http_request_duration_seconds",
+                "zeroproxy_http_request_duration_seconds",
                 "Wall-clock HTTP request latency in seconds",
             )
             .buckets(vec![
@@ -105,7 +105,7 @@ fn provider_requests_total() -> &'static IntCounterVec {
     PROVIDER_REQUESTS_TOTAL.get_or_init(|| {
         let m = IntCounterVec::new(
             Opts::new(
-                "cipherroute_provider_requests_total",
+                "zeroproxy_provider_requests_total",
                 "Provider dispatch attempts",
             ),
             &["provider", "model", "status", "streaming"],
@@ -122,7 +122,7 @@ fn provider_ttft_seconds() -> &'static HistogramVec {
     PROVIDER_TTFT_SECONDS.get_or_init(|| {
         let m = HistogramVec::new(
             HistogramOpts::new(
-                "cipherroute_provider_ttft_seconds",
+                "zeroproxy_provider_ttft_seconds",
                 "Time to first SSE byte for streaming provider responses",
             )
             .buckets(vec![0.05, 0.1, 0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0]),
@@ -140,7 +140,7 @@ fn provider_tokens_total() -> &'static IntCounterVec {
     PROVIDER_TOKENS_TOTAL.get_or_init(|| {
         let m = IntCounterVec::new(
             Opts::new(
-                "cipherroute_provider_tokens_total",
+                "zeroproxy_provider_tokens_total",
                 "Tokens processed per provider/model",
             ),
             &["provider", "model", "type"],
@@ -157,7 +157,7 @@ fn circuit_breaker_state() -> &'static IntGaugeVec {
     CIRCUIT_BREAKER_STATE.get_or_init(|| {
         let m = IntGaugeVec::new(
             Opts::new(
-                "cipherroute_circuit_breaker_state",
+                "zeroproxy_circuit_breaker_state",
                 "Circuit breaker state (0=closed, 1=open, 2=half_open)",
             ),
             &["provider", "connection", "endpoint"],
@@ -174,7 +174,7 @@ fn combo_attempts_total() -> &'static IntCounterVec {
     COMBO_ATTEMPTS_TOTAL.get_or_init(|| {
         let m = IntCounterVec::new(
             Opts::new(
-                "cipherroute_combo_attempts_total",
+                "zeroproxy_combo_attempts_total",
                 "Combo member dispatch attempts",
             ),
             &["combo", "model", "result"],
@@ -190,7 +190,7 @@ fn combo_attempts_total() -> &'static IntCounterVec {
 fn active_upstream() -> &'static IntGauge {
     ACTIVE_UPSTREAM.get_or_init(|| {
         let m = IntGauge::new(
-            "cipherroute_active_upstream_requests",
+            "zeroproxy_active_upstream_requests",
             "Currently in-flight upstream provider requests",
         )
         .expect("gauge definition");
@@ -205,8 +205,8 @@ fn started_at_gauge() -> &'static GaugeVec {
     STARTED_AT.get_or_init(|| {
         let m = GaugeVec::new(
             Opts::new(
-                "cipherroute_started_at_seconds",
-                "Unix-epoch seconds when this cipherroute instance started",
+                "zeroproxy_started_at_seconds",
+                "Unix-epoch seconds when this zeroproxy instance started",
             ),
             &["pid"],
         )
@@ -420,7 +420,7 @@ mod tests {
         let metrics = registry().gather();
         let total: u64 = metrics
             .iter()
-            .find(|m| m.get_name() == "cipherroute_provider_requests_total")
+            .find(|m| m.get_name() == "zeroproxy_provider_requests_total")
             .map(|m| {
                 m.get_metric()
                     .iter()
@@ -438,7 +438,7 @@ mod tests {
         let metrics = registry().gather();
         let found = metrics
             .iter()
-            .find(|m| m.get_name() == "cipherroute_circuit_breaker_state")
+            .find(|m| m.get_name() == "zeroproxy_circuit_breaker_state")
             .and_then(|m| {
                 m.get_metric().iter().find(|g| {
                     let labels: Vec<(&str, &str)> = g

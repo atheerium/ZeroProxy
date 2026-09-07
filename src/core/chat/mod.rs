@@ -290,7 +290,7 @@ pub async fn apply_guardrails_pre_call(body: &mut Value) -> bool {
         Ok(()) => false,
         Err(errors) => {
             for e in &errors {
-                tracing::warn!(target: "cipherroute::guardrails", "pre_call guardrail: {e}");
+                tracing::warn!(target: "zeroproxy::guardrails", "pre_call guardrail: {e}");
             }
             // Guardrails that return errors (like injection detection) do not
             // block the request in this release — they only log a warning.
@@ -312,7 +312,7 @@ pub async fn apply_guardrails_post_call(response: &mut Value) -> bool {
         Ok(()) => false,
         Err(errors) => {
             for e in &errors {
-                tracing::warn!(target: "cipherroute::guardrails", "post_call guardrail: {e}");
+                tracing::warn!(target: "zeroproxy::guardrails", "post_call guardrail: {e}");
             }
             true
         }

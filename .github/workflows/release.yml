@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          BIN="target/${{ matrix.target }}/release/cipherroute"
+          BIN="target/${{ matrix.target }}/release/zeroproxy"
           if [ "${{ runner.os }}" = "Linux" ]; then
             # cross images already include strip; skip if missing.
             command -v strip >/dev/null && strip "$BIN" || true
@@ -118,12 +118,12 @@ jobs:
           set -euo pipefail
           VERSION="${GITHUB_REF_NAME}"  # e.g. v0.1.0
           STAGE="$(mktemp -d)"
-          cp "target/${{ matrix.target }}/release/cipherroute" "$STAGE/cipherroute"
+          cp "target/${{ matrix.target }}/release/zeroproxy" "$STAGE/zeroproxy"
           # Optional ride-alongs that explain what the user just downloaded.
           [ -f LICENSE ] && cp LICENSE "$STAGE/LICENSE" || true
           [ -f README.md ] && cp README.md "$STAGE/README.md" || true
 
-          ARCHIVE="cipherroute-${VERSION}-${{ matrix.suffix }}.tar.gz"
+          ARCHIVE="zeroproxy-${VERSION}-${{ matrix.suffix }}.tar.gz"
           tar -czf "$ARCHIVE" -C "$STAGE" .
 
           # Sidecar checksum file. Use sha256sum where available; macOS uses shasum.
@@ -134,9 +134,9 @@ jobs:
           fi
           ls -lh "$ARCHIVE" "$ARCHIVE.sha256"
 
-      # Windows: .zip with cipherroute.exe + LICENSE + README at the top level.
+      # Windows: .zip with zeroproxy.exe + LICENSE + README at the top level.
       # install.ps1 expects this exact layout (`Expand-Archive` + walk to find
-      # cipherroute.exe).
+      # zeroproxy.exe).
       - name: Package (zip)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -144,11 +144,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $Version = $env:GITHUB_REF_NAME
           $Stage   = New-Item -ItemType Directory -Path (Join-Path $env:RUNNER_TEMP "stage-$Version") -Force
-          Copy-Item "target/${{ matrix.target }}/release/cipherroute.exe" (Join-Path $Stage "cipherroute.exe")
+          Copy-Item "target/${{ matrix.target }}/release/zeroproxy.exe" (Join-Path $Stage "zeroproxy.exe")
           if (Test-Path LICENSE)   { Copy-Item LICENSE   (Join-Path $Stage "LICENSE") }
           if (Test-Path README.md) { Copy-Item README.md (Join-Path $Stage "README.md") }
 
-          $Archive = "cipherroute-$Version-${{ matrix.suffix }}.zip"
+          $Archive = "zeroproxy-$Version-${{ matrix.suffix }}.zip"
           # Compress-Archive across the staged contents, not the dir itself,
           # so the archive root matches the tar.gz layout on the other targets.
           Compress-Archive -Path (Join-Path $Stage '*') -DestinationPath $Archive -Force
@@ -160,12 +160,12 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: cipherroute-${{ matrix.suffix }}
+          name: zeroproxy-${{ matrix.suffix }}
           path: |
-            cipherroute-*.tar.gz
-            cipherroute-*.tar.gz.sha256
-            cipherroute-*.zip
-            cipherroute-*.zip.sha256
+            zeroproxy-*.tar.gz
+            zeroproxy-*.tar.gz.sha256
+            zeroproxy-*.zip
+            zeroproxy-*.zip.sha256
           if-no-files-found: error
           retention-days: 7
 
@@ -193,7 +193,7 @@ jobs:
           # Globs that match nothing are pruned by shopt -s nullglob; without
           # that, sha256sum would error if a target type wasn't built.
           shopt -s nullglob
-          archives=( cipherroute-*.tar.gz cipherroute-*.zip )
+          archives=( zeroproxy-*.tar.gz zeroproxy-*.zip )
           sha256sum "${archives[@]}" > SHA256SUMS
           cat SHA256SUMS
 
@@ -201,10 +201,10 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
-            dist/cipherroute-*.tar.gz
-            dist/cipherroute-*.tar.gz.sha256
-            dist/cipherroute-*.zip
-            dist/cipherroute-*.zip.sha256
+            dist/zeroproxy-*.tar.gz
+            dist/zeroproxy-*.tar.gz.sha256
+            dist/zeroproxy-*.zip
+            dist/zeroproxy-*.zip.sha256
             dist/SHA256SUMS
           generate_release_notes: true
           draft: false

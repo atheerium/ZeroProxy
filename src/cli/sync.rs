@@ -1,4 +1,4 @@
-//! `cipherroute sync <9router|omniroute>` — pull provider/model catalogs
+//! `zeroproxy sync <9router|omniroute>` — pull provider/model catalogs
 //! from upstream open-source AI routers into the local `db.json`.
 //!
 //! The actual upstream JS/TS modules are normalised into JSON snapshots by
@@ -134,7 +134,7 @@ fn default_model_kind() -> String {
     "llm".to_string()
 }
 
-/// Translation from upstream "kind" to cipherroute's CustomModel `type` field.
+/// Translation from upstream "kind" to zeroproxy's CustomModel `type` field.
 fn kind_to_type(kind: &str) -> &'static str {
     match kind {
         "llm" => "llm",
@@ -517,7 +517,7 @@ async fn run_one(
     });
 
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.sync.apply", envelope)?;
+        emit_robot("zeroproxy.v1.sync.apply", envelope)?;
     } else {
         humanln(
             ctx,

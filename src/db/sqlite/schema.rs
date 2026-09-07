@@ -1,7 +1,7 @@
 //! SQLite schema for CipherRoute persistence.
 //!
 //! Mirrors the upstream 9router schema (see `9router/src/lib/db/schema.js`)
-//! with cipherroute-specific columns added for encrypted secrets and snapshots.
+//! with zeroproxy-specific columns added for encrypted secrets and snapshots.
 //!
 //! All tables use TEXT primary keys (UUIDs or human-readable slugs) except
 //! for `usageHistory` (AUTOINCREMENT id) and `usageDaily` (date string PK).

@@ -1,4 +1,4 @@
-//! `cipherroute doctor` — agent self-test.
+//! `zeroproxy doctor` — agent self-test.
 //!
 //! Runs a fixed set of checks and reports them in `--robot` JSON or a human
 //! summary. Designed to be the first command an agent runs to figure out
@@ -59,9 +59,9 @@ pub async fn run(ctx: OutputCtx, cfg: &ResolvedConfig) -> anyhow::Result<i32> {
                 .map(|c| json!({"name": c.name, "ok": c.ok, "detail": c.detail}))
                 .collect::<Vec<_>>(),
         });
-        emit_robot("cipherroute.v1.doctor", payload)?;
+        emit_robot("zeroproxy.v1.doctor", payload)?;
     } else {
-        humanln(ctx, "cipherroute doctor:");
+        humanln(ctx, "zeroproxy doctor:");
         for c in &checks {
             let mark = if c.ok { "ok  " } else { "FAIL" };
             humanln(ctx, format!("  [{mark}] {} — {}", c.name, c.detail));
@@ -95,14 +95,14 @@ fn check_data_dir(dir: &Path) -> Check {
 
 fn check_db_file(dir: &Path) -> Check {
     // SQLite is now the sole runtime store.
-    let db = dir.join("cipherroute.sqlite");
+    let db = dir.join("zeroproxy.sqlite");
     if db.exists() {
         Check::ok("db_file", format!("{} present", db.display()))
     } else {
         Check::fail(
             "db_file",
             format!(
-                "{} not found (run 'cipherroute server start' once to initialize)",
+                "{} not found (run 'zeroproxy server start' once to initialize)",
                 db.display()
             ),
         )
@@ -113,12 +113,12 @@ async fn check_db_loadable(dir: &Path) -> Check {
     // Use a non-side-effecting probe: open SQLite read-only and export
     // the snapshot, instead of `Db::load()` which would *create* the file
     // (causing a misleading FAIL/ok flip on the very first run — bug #5).
-    let db_path = dir.join("cipherroute.sqlite");
+    let db_path = dir.join("zeroproxy.sqlite");
     if !db_path.exists() {
         return Check::fail(
             "db_loadable",
             format!(
-                "{} not present; run 'cipherroute server init' to create it",
+                "{} not present; run 'zeroproxy server init' to create it",
                 db_path.display()
             ),
         );
@@ -179,7 +179,7 @@ async fn probe(url: &str, name: &'static str) -> Check {
         Err(_) => Check::fail(
             name,
             format!(
-                "{url} unreachable (server not running? start: cipherroute server start --detach)"
+                "{url} unreachable (server not running? start: zeroproxy server start --detach)"
             ),
         ),
     }

@@ -670,7 +670,7 @@ fn handle_initialize(id: Value) -> Value {
                 resources: [("listChanged".to_string(), json!(false))].into(),
             },
             server_info: McpServerInfo {
-                name: "cipherroute",
+                name: "zeroproxy",
                 version: env!("CARGO_PKG_VERSION"),
             },
         })
@@ -795,43 +795,43 @@ fn handle_tools_call(state: &AppState, id: Value, params: &Value) -> Value {
 fn handle_resources_list(id: Value) -> Value {
     let resources = vec![
         McpResource {
-            uri: "cipherroute://health".to_string(),
+            uri: "zeroproxy://health".to_string(),
             name: "Server Health".to_string(),
             description: "Server health status and version info".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://models".to_string(),
+            uri: "zeroproxy://models".to_string(),
             name: "Available Models".to_string(),
             description: "List of available model aliases".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://providers".to_string(),
+            uri: "zeroproxy://providers".to_string(),
             name: "Provider Connections".to_string(),
             description: "List of configured provider connections".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://combos".to_string(),
+            uri: "zeroproxy://combos".to_string(),
             name: "Model Combos".to_string(),
             description: "List of model combos".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://pools".to_string(),
+            uri: "zeroproxy://pools".to_string(),
             name: "Proxy Pools".to_string(),
             description: "List of proxy pools".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://keys".to_string(),
+            uri: "zeroproxy://keys".to_string(),
             name: "API Keys".to_string(),
             description: "List of API keys (without secrets)".to_string(),
             mime_type: Some("application/json".to_string()),
         },
         McpResource {
-            uri: "cipherroute://nodes".to_string(),
+            uri: "zeroproxy://nodes".to_string(),
             name: "Provider Nodes".to_string(),
             description: "List of provider nodes".to_string(),
             mime_type: Some("application/json".to_string()),
@@ -861,27 +861,27 @@ fn handle_resources_read(state: &AppState, id: Value, params: &Value) -> Value {
     };
 
     let text = match uri {
-        "cipherroute://health" => serde_json::to_string_pretty(&json!({
+        "zeroproxy://health" => serde_json::to_string_pretty(&json!({
             "status": "ok",
             "version": env!("CARGO_PKG_VERSION"),
         })),
-        "cipherroute://models" => {
+        "zeroproxy://models" => {
             let snap = state.db.snapshot();
             serde_json::to_string_pretty(&snap.model_aliases)
         }
-        "cipherroute://providers" => {
+        "zeroproxy://providers" => {
             let snap = state.db.snapshot();
             serde_json::to_string_pretty(&snap.provider_connections)
         }
-        "cipherroute://combos" => {
+        "zeroproxy://combos" => {
             let snap = state.db.snapshot();
             serde_json::to_string_pretty(&snap.combos)
         }
-        "cipherroute://pools" => {
+        "zeroproxy://pools" => {
             let snap = state.db.snapshot();
             serde_json::to_string_pretty(&snap.proxy_pools)
         }
-        "cipherroute://keys" => {
+        "zeroproxy://keys" => {
             let snap = state.db.snapshot();
             let sanitised: Vec<Value> = snap
                 .api_keys
@@ -897,7 +897,7 @@ fn handle_resources_read(state: &AppState, id: Value, params: &Value) -> Value {
                 .collect();
             serde_json::to_string_pretty(&sanitised)
         }
-        "cipherroute://nodes" => {
+        "zeroproxy://nodes" => {
             let snap = state.db.snapshot();
             serde_json::to_string_pretty(&snap.provider_nodes)
         }

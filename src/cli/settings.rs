@@ -1,7 +1,7 @@
-//! `cipherroute settings *` — manage server settings, locale, version, and self-update.
+//! `zeroproxy settings *` — manage server settings, locale, version, and self-update.
 //!
 //! These commands all run against the live server and emit the
-//! `cipherroute.v1.settings.*` envelopes in `--robot` mode. They are the M6
+//! `zeroproxy.v1.settings.*` envelopes in `--robot` mode. They are the M6
 //! follow-on to the M5 tooling integration commands.
 //!
 //! Endpoints exercised here:
@@ -139,7 +139,7 @@ async fn run_get(rt: &Runtime, ctx: OutputCtx, key: Option<&str>) -> anyhow::Res
                 let value = value.unwrap().clone();
                 if ctx.is_robot() {
                     emit_robot(
-                        "cipherroute.v1.settings.get",
+                        "zeroproxy.v1.settings.get",
                         json!({"key": path, "value": value}),
                     )?;
                 } else {
@@ -150,7 +150,7 @@ async fn run_get(rt: &Runtime, ctx: OutputCtx, key: Option<&str>) -> anyhow::Res
                     println!("{pretty}");
                 }
             } else if ctx.is_robot() {
-                emit_robot("cipherroute.v1.settings.get", payload)?;
+                emit_robot("zeroproxy.v1.settings.get", payload)?;
             } else {
                 println!(
                     "{}",
@@ -206,7 +206,7 @@ async fn run_set(
         Ok(payload) => {
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.settings.set",
+                    "zeroproxy.v1.settings.set",
                     json!({"updated": [key], "settings": payload}),
                 )?;
             } else {
@@ -252,10 +252,7 @@ async fn run_apply(rt: &Runtime, ctx: OutputCtx, from_file: &str) -> anyhow::Res
     match rt.patch_json("/api/settings", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot(
-                    "cipherroute.v1.settings.apply",
-                    json!({"settings": payload}),
-                )?;
+                emit_robot("zeroproxy.v1.settings.apply", json!({"settings": payload}))?;
             } else {
                 humanln(ctx, "settings applied");
             }
@@ -288,7 +285,7 @@ async fn run_proxy_test(
         Ok(payload) => {
             let ok = payload.get("ok").and_then(Value::as_bool).unwrap_or(false);
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.settings.proxy_test", payload.clone())?;
+                emit_robot("zeroproxy.v1.settings.proxy_test", payload.clone())?;
             } else {
                 let elapsed = payload
                     .get("elapsedMs")
@@ -319,7 +316,7 @@ async fn run_locale_set(rt: &Runtime, ctx: OutputCtx, lang: String) -> anyhow::R
     match rt.post_json("/api/locale", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.settings.locale.set", payload)?;
+                emit_robot("zeroproxy.v1.settings.locale.set", payload)?;
             } else {
                 let locale = payload
                     .get("locale")
@@ -337,7 +334,7 @@ async fn run_version(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/version").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.settings.version", payload)?;
+                emit_robot("zeroproxy.v1.settings.version", payload)?;
             } else {
                 let cur = payload
                     .get("currentVersion")
@@ -354,7 +351,7 @@ async fn run_version(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
                 humanln(
                     ctx,
                     format!(
-                        "cipherroute {cur} (latest: {latest}){}",
+                        "zeroproxy {cur} (latest: {latest}){}",
                         if has { " — update available" } else { "" }
                     ),
                 );
@@ -375,7 +372,7 @@ async fn run_update(
         match rt.post_empty("/api/version/update").await {
             Ok(payload) => {
                 if ctx.is_robot() {
-                    emit_robot("cipherroute.v1.settings.update.apply", payload)?;
+                    emit_robot("zeroproxy.v1.settings.update.apply", payload)?;
                 } else {
                     let msg = payload
                         .get("message")
@@ -392,7 +389,7 @@ async fn run_update(
         match rt.get_json("/api/version").await {
             Ok(payload) => {
                 if ctx.is_robot() {
-                    emit_robot("cipherroute.v1.settings.update.check", payload)?;
+                    emit_robot("zeroproxy.v1.settings.update.check", payload)?;
                 } else {
                     let has = payload
                         .get("hasUpdate")

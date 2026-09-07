@@ -54,7 +54,7 @@ pub(super) async fn get_jcode_settings(
     let config = read_config()
         .await
         .unwrap_or_else(|_| Value::Object(Default::default()));
-    let has_cipherroute = has_cipherroute_config(&config);
+    let has_zeroproxy = has_zeroproxy_config(&config);
     let env_api_key = read_provider_env()
         .await
         .and_then(|env| env.get("JCODE_CIPHERROUTE_API_KEY").cloned())
@@ -63,7 +63,7 @@ pub(super) async fn get_jcode_settings(
     Json(json!({
         "installed": true,
         "config": config,
-        "hasCipherRoute": has_cipherroute,
+        "hasCipherRoute": has_zeroproxy,
         "configPath": config_path().to_string_lossy().to_string(),
         "envApiKey": env_api_key,
     }))
@@ -90,7 +90,7 @@ async fn save_jcode_settings(
     match write_jcode_config(&body).await {
         Ok(()) => Json(json!({
             "success": true,
-            "message": "jcode configured successfully. Use: jcode --provider-profile cipherroute",
+            "message": "jcode configured successfully. Use: jcode --provider-profile zeroproxy",
             "configPath": config_path().to_string_lossy().to_string(),
         }))
         .into_response(),
@@ -153,13 +153,13 @@ async fn read_config() -> AnyhowResult<Value> {
     Ok(json_value)
 }
 
-/// Detect whether the config has an cipherroute-compatible provider entry.
-fn has_cipherroute_config(config: &Value) -> bool {
+/// Detect whether the config has an zeroproxy-compatible provider entry.
+fn has_zeroproxy_config(config: &Value) -> bool {
     let Some(providers) = config.get("providers").and_then(|v| v.as_object()) else {
         return false;
     };
 
-    if providers.contains_key("cipherroute") {
+    if providers.contains_key("zeroproxy") {
         return true;
     }
 
@@ -169,7 +169,7 @@ fn has_cipherroute_config(config: &Value) -> bool {
             if base_url.contains("localhost")
                 || base_url.contains("127.0.0.1")
                 || base_url.contains("0.0.0.0")
-                || base_url.contains("cipherroute")
+                || base_url.contains("zeroproxy")
             {
                 return true;
             }
@@ -226,7 +226,7 @@ async fn write_provider_env(api_key: &str) -> AnyhowResult<()> {
     Ok(())
 }
 
-/// Remove the cipherroute API key from the provider env file.
+/// Remove the zeroproxy API key from the provider env file.
 async fn clear_provider_env() -> AnyhowResult<()> {
     let env_path = provider_env_path();
     let mut env = match fs::read_to_string(&env_path).await {
@@ -269,7 +269,7 @@ async fn clear_provider_env() -> AnyhowResult<()> {
     Ok(())
 }
 
-/// Write the jcode config.toml with an cipherroute provider entry.
+/// Write the jcode config.toml with an zeroproxy provider entry.
 async fn write_jcode_config(body: &SaveJcodeSettingsRequest) -> AnyhowResult<()> {
     let config_path = config_path();
     if let Some(parent) = config_path.parent() {
@@ -313,7 +313,7 @@ async fn write_jcode_config(body: &SaveJcodeSettingsRequest) -> AnyhowResult<()>
         ),
         (
             "env_file".to_string(),
-            TomlValue::String("provider-cipherroute.env".to_string()),
+            TomlValue::String("provider-zeroproxy.env".to_string()),
         ),
         (
             "default_model".to_string(),
@@ -331,7 +331,7 @@ async fn write_jcode_config(body: &SaveJcodeSettingsRequest) -> AnyhowResult<()>
             *providers = TomlValue::Table(TomlMap::new());
         }
         if let TomlValue::Table(ref mut providers_table) = providers {
-            providers_table.insert("cipherroute".to_string(), provider_entry);
+            providers_table.insert("zeroproxy".to_string(), provider_entry);
         }
     }
 
@@ -345,7 +345,7 @@ async fn write_jcode_config(body: &SaveJcodeSettingsRequest) -> AnyhowResult<()>
     Ok(())
 }
 
-/// Remove the cipherroute provider entry from jcode config.
+/// Remove the zeroproxy provider entry from jcode config.
 async fn reset_jcode_config() -> AnyhowResult<Value> {
     let config_path = config_path();
     let content = match fs::read_to_string(&config_path).await {
@@ -362,7 +362,7 @@ async fn reset_jcode_config() -> AnyhowResult<Value> {
     let mut root: TomlValue = toml::from_str(&content)?;
     if let TomlValue::Table(ref mut table) = root {
         if let Some(TomlValue::Table(providers)) = table.get_mut("providers") {
-            providers.remove("cipherroute");
+            providers.remove("zeroproxy");
             if providers.is_empty() {
                 table.remove("providers");
             }
@@ -418,7 +418,7 @@ fn provider_env_path() -> PathBuf {
     let config_dir = env::var("XDG_CONFIG_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|_| home_dir().join(".config"));
-    config_dir.join("jcode").join("provider-cipherroute.env")
+    config_dir.join("jcode").join("provider-zeroproxy.env")
 }
 
 fn home_dir() -> PathBuf {

@@ -1,4 +1,4 @@
-//! `cipherroute provider node *` — register custom provider instances.
+//! `zeroproxy provider node *` — register custom provider instances.
 //!
 //! A `ProviderNode` is the "what is this server's API shape?" half. It
 //! pairs with one or more `ProviderConnection` entries that hold actual
@@ -113,7 +113,7 @@ async fn run_list(db: &Db, ctx: OutputCtx, node_type: Option<&str>) -> anyhow::R
     let nodes = db.provider_nodes(node_type);
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider-node.list",
+            "zeroproxy.v1.provider-node.list",
             json!({ "nodes": nodes, "count": nodes.len() }),
         )?;
     } else {
@@ -145,7 +145,7 @@ async fn run_get(db: &Db, ctx: OutputCtx, id_or_name: &str) -> anyhow::Result<()
     };
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider-node.get",
+            "zeroproxy.v1.provider-node.get",
             serde_json::to_value(&node)?,
         )?;
     } else {
@@ -208,7 +208,7 @@ async fn run_add(
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider-node.add",
+            "zeroproxy.v1.provider-node.add",
             serde_json::to_value(&node)?,
         )?;
     } else {
@@ -265,7 +265,7 @@ async fn run_edit(
     let node = updated.expect("node existed");
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider-node.edit",
+            "zeroproxy.v1.provider-node.edit",
             serde_json::to_value(&node)?,
         )?;
     } else {
@@ -286,7 +286,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
         }
         if ctx.is_robot() {
             emit_robot(
-                "cipherroute.v1.provider-node.delete",
+                "zeroproxy.v1.provider-node.delete",
                 json!({ "key": id_or_name, "deleted": false }),
             )?;
         } else {
@@ -306,7 +306,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider-node.delete",
+            "zeroproxy.v1.provider-node.delete",
             json!({ "key": id_or_name, "deleted": true }),
         )?;
     } else {
@@ -387,7 +387,7 @@ async fn run_validate(
     });
 
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider-node.validate", payload)?;
+        emit_robot("zeroproxy.v1.provider-node.validate", payload)?;
     } else if valid {
         humanln(
             ctx,

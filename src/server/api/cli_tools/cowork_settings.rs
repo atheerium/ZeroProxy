@@ -505,7 +505,7 @@ async fn load_cowork_status() -> AnyhowResult<Value> {
         .and_then(|value| value.get("inferenceProvider"))
         .and_then(Value::as_str)
         .map(str::to_string);
-    let has_cipherroute = provider.as_deref() == Some(PROVIDER)
+    let has_zeroproxy = provider.as_deref() == Some(PROVIDER)
         && base_url.as_deref().is_some_and(|value| !value.is_empty());
 
     let managed_mcp: Vec<Value> = config
@@ -595,7 +595,7 @@ async fn load_cowork_status() -> AnyhowResult<Value> {
     Ok(json!({
         "installed": true,
         "config": config,
-        "hasCipherRoute": has_cipherroute,
+        "hasCipherRoute": has_zeroproxy,
         "configPath": config_path.map(|path| path.to_string_lossy().to_string()),
         "cowork": {
             "appliedId": applied_id,

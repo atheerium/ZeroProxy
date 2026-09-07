@@ -737,7 +737,7 @@ pub async fn refresh_kilocode_token(refresh_token: &str) -> Result<RefreshResult
         .form(&[
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
-            ("client_id", "kilocode-cipherroute"),
+            ("client_id", "kilocode-zeroproxy"),
         ])
         .send()
         .await
@@ -797,7 +797,7 @@ pub async fn refresh_gitlab_token(refresh_token: &str) -> Result<RefreshResult, 
         vec![
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
-            ("client_id", "cipherroute"),
+            ("client_id", "zeroproxy"),
         ],
     )
     .await
@@ -813,7 +813,7 @@ pub async fn refresh_codebuddy_token(refresh_token: &str) -> Result<RefreshResul
         .form(&[
             ("grant_type", "refresh_token"),
             ("refresh_token", refresh_token),
-            ("client_id", "codebuddy-cipherroute"),
+            ("client_id", "codebuddy-zeroproxy"),
         ])
         .send()
         .await

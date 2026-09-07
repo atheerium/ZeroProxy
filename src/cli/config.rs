@@ -1,18 +1,18 @@
 //! CLI configuration and profile resolution.
 //!
-//! Most users never need this — by default the CLI uses `DATA_DIR` (or `~/.cipherroute`)
+//! Most users never need this — by default the CLI uses `DATA_DIR` (or `~/.zeroproxy`)
 //! and writes the local DB directly. Config profiles are only useful when:
 //!
-//! - You manage multiple CipherRoute instances at different `DATA_DIR`s.
+//! - You manage multiple ZeroProxy instances at different `DATA_DIR`s.
 //! - You remote-manage a server at another host (`--url https://...`).
 //!
 //! The config file lives at:
-//! - Linux/macOS: `~/.config/cipherroute/config.toml`
-//! - Windows:     `%APPDATA%\cipherroute\config.toml`
+//! - Linux/macOS: `~/.config/zeroproxy/config.toml`
+//! - Windows:     `%APPDATA%\zeroproxy\config.toml`
 //!
 //! Resolution precedence (highest first):
 //! 1. Explicit CLI flags (`--data-dir`, `--url`, `--api-key`)
-//! 2. `CIPHERROUTE_*` environment variables
+//! 2. `ZEROPROXY_*` environment variables
 //! 3. Selected profile (`--profile <name>` or `default_profile`)
 //! 4. Built-in defaults
 
@@ -27,7 +27,7 @@ use serde::{Deserialize, Serialize};
 pub struct ResolvedConfig {
     pub data_dir: PathBuf,
     /// `Some(url)` enables remote management mode (CLI talks HTTPS to a remote
-    /// `cipherroute` server). `None` means local DB-direct mode.
+    /// `zeroproxy` server). `None` means local DB-direct mode.
     pub remote_url: Option<String>,
     /// API key for the remote server (read once at resolve time so we never
     /// touch the env again later).
@@ -74,7 +74,7 @@ impl ResolvedConfig {
         let profile_name = overrides
             .profile
             .clone()
-            .or_else(|| std::env::var("CIPHERROUTE_PROFILE").ok())
+            .or_else(|| std::env::var("ZEROPROXY_PROFILE").ok())
             .or_else(|| file.default_profile.clone());
 
         let profile = profile_name
@@ -85,18 +85,18 @@ impl ResolvedConfig {
         let data_dir = overrides
             .data_dir
             .or_else(|| std::env::var_os("DATA_DIR").map(PathBuf::from))
-            .or_else(|| std::env::var_os("CIPHERROUTE_DATA_DIR").map(PathBuf::from))
+            .or_else(|| std::env::var_os("ZEROPROXY_DATA_DIR").map(PathBuf::from))
             .or_else(|| profile.data_dir.as_deref().map(PathBuf::from))
             .unwrap_or_else(default_data_dir);
 
         let remote_url = overrides
             .url
-            .or_else(|| std::env::var("CIPHERROUTE_URL").ok())
+            .or_else(|| std::env::var("ZEROPROXY_URL").ok())
             .or(profile.url);
 
         let api_key = overrides
             .api_key
-            .or_else(|| std::env::var("CIPHERROUTE_API_KEY").ok())
+            .or_else(|| std::env::var("ZEROPROXY_API_KEY").ok())
             .or_else(|| {
                 profile
                     .api_key_env
@@ -127,18 +127,18 @@ impl ResolvedConfig {
 fn default_data_dir() -> PathBuf {
     std::env::var_os("HOME")
         .map(PathBuf::from)
-        .map(|home| home.join(".cipherroute"))
-        .unwrap_or_else(|| PathBuf::from(".cipherroute"))
+        .map(|home| home.join(".zeroproxy"))
+        .unwrap_or_else(|| PathBuf::from(".zeroproxy"))
 }
 
-/// Resolve the path of the CLI config file. Honors `$CIPHERROUTE_CONFIG` so
+/// Resolve the path of the CLI config file. Honors `$ZEROPROXY_CONFIG` so
 /// `auth login` / tests can point at a temporary file without touching the
-/// real `~/.config/cipherroute/config.toml`.
+/// real `~/.config/zeroproxy/config.toml`.
 pub fn config_file_path() -> Option<PathBuf> {
-    if let Ok(custom) = std::env::var("CIPHERROUTE_CONFIG") {
+    if let Ok(custom) = std::env::var("ZEROPROXY_CONFIG") {
         return Some(PathBuf::from(custom));
     }
-    let dirs = directories::ProjectDirs::from("", "", "cipherroute")?;
+    let dirs = directories::ProjectDirs::from("", "", "zeroproxy")?;
     Some(dirs.config_dir().join("config.toml"))
 }
 
@@ -181,11 +181,11 @@ mod tests {
 
     fn clear_env() {
         std::env::remove_var("DATA_DIR");
-        std::env::remove_var("CIPHERROUTE_DATA_DIR");
-        std::env::remove_var("CIPHERROUTE_URL");
-        std::env::remove_var("CIPHERROUTE_API_KEY");
-        std::env::remove_var("CIPHERROUTE_PROFILE");
-        std::env::remove_var("CIPHERROUTE_CONFIG");
+        std::env::remove_var("ZEROPROXY_DATA_DIR");
+        std::env::remove_var("ZEROPROXY_URL");
+        std::env::remove_var("ZEROPROXY_API_KEY");
+        std::env::remove_var("ZEROPROXY_PROFILE");
+        std::env::remove_var("ZEROPROXY_CONFIG");
     }
 
     #[test]
@@ -224,7 +224,7 @@ mod tests {
         let _g = ENV_LOCK.lock().unwrap();
         clear_env();
         let resolved = ResolvedConfig::resolve(CliOverrides::default()).unwrap();
-        assert!(resolved.data_dir.ends_with(".cipherroute"));
+        assert!(resolved.data_dir.ends_with(".zeroproxy"));
         clear_env();
     }
 }

@@ -7,14 +7,14 @@
 #   2. rust   — cargo build --release with embedded web/dist via rust-embed
 #   3. runtime — debian:bookworm-slim + the binary + ca-certificates
 #
-# Final image is ~80 MB (debian-slim base + the openproxy binary, which
+# Final image is ~80 MB (debian-slim base + the zeroproxy binary, which
 # already contains the dashboard via rust-embed).
 #
-# Build:    docker build -t openproxy .
-# Run:      docker run -d --name openproxy -p 4623:4623 \
-#               -v openproxy-data:/app/data \
+# Build:    docker build -t zeroproxy .
+# Run:      docker run -d --name zeroproxy -p 4623:4623 \
+#               -v zeroproxy-data:/app/data \
 #               -e TRUST_PROXY=false \
-#               openproxy
+#               zeroproxy
 #
 # ──────────────────────────────────────────────────────────────────────────
 # Reverse-proxy deployment notes
@@ -39,7 +39,7 @@
 #       reverse_proxy 127.0.0.1:4623
 #
 #   Traefik:
-#       - "traefik.http.services.openproxy.loadbalancer.server.port=4623"
+#       - "traefik.http.services.zeroproxy.loadbalancer.server.port=4623"
 #
 # CORS: the embedded Axum server already sets permissive
 # Access-Control-Allow-Origin:* headers on all API responses. When the
@@ -92,8 +92,8 @@ COPY --from=web /web/package.json ./web/package.json
 
 # Build with the default `embed-web` feature on. build.rs verifies
 # web/dist/index.html exists before invoking rust-embed.
-RUN cargo build --release --locked --bin openproxy
-RUN strip /src/target/release/openproxy
+RUN cargo build --release --locked --bin zeroproxy
+RUN strip /src/target/release/zeroproxy
 
 # ──────────────────────────────────────────────────────────────────────────
 # Stage 3: minimal runtime
@@ -107,7 +107,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tini curl \
     && rm -rf /var/lib/apt/lists/*
 
-COPY --from=rust /src/target/release/openproxy /usr/local/bin/openproxy
+COPY --from=rust /src/target/release/zeroproxy /usr/local/bin/zeroproxy
 
 # Container-friendly defaults: bind 0.0.0.0 (so port-forward works) and
 # keep state under /app/data which is mounted as a volume.
@@ -125,5 +125,5 @@ EXPOSE 4623
 
 # tini reaps zombies and forwards signals; --no-open avoids any browser
 # launch attempt inside the container.
-ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/openproxy"]
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/zeroproxy"]
 CMD ["--no-open"]

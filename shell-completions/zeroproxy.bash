@@ -1,4 +1,4 @@
-_cipherroute() {
+_zeroproxy() {
     local i cur prev opts cmd
     COMPREPLY=()
     if [[ "${BASH_VERSINFO[0]}" -ge 4 ]]; then
@@ -14,172 +14,172 @@ _cipherroute() {
     do
         case "${cmd},${i}" in
             ",$1")
-                cmd="cipherroute"
+                cmd="zeroproxy"
                 ;;
-            cipherroute,completion)
-                cmd="cipherroute__subcmd__completion"
+            zeroproxy,completion)
+                cmd="zeroproxy__subcmd__completion"
                 ;;
-            cipherroute,help)
-                cmd="cipherroute__subcmd__help"
+            zeroproxy,help)
+                cmd="zeroproxy__subcmd__help"
                 ;;
-            cipherroute,key)
-                cmd="cipherroute__subcmd__key"
+            zeroproxy,key)
+                cmd="zeroproxy__subcmd__key"
                 ;;
-            cipherroute,pool)
-                cmd="cipherroute__subcmd__pool"
+            zeroproxy,pool)
+                cmd="zeroproxy__subcmd__pool"
                 ;;
-            cipherroute,provider)
-                cmd="cipherroute__subcmd__provider"
+            zeroproxy,provider)
+                cmd="zeroproxy__subcmd__provider"
                 ;;
-            cipherroute,route)
-                cmd="cipherroute__subcmd__route"
+            zeroproxy,route)
+                cmd="zeroproxy__subcmd__route"
                 ;;
-            cipherroute,tunnel)
-                cmd="cipherroute__subcmd__tunnel"
+            zeroproxy,tunnel)
+                cmd="zeroproxy__subcmd__tunnel"
                 ;;
-            cipherroute__subcmd__help,completion)
-                cmd="cipherroute__subcmd__help__subcmd__completion"
+            zeroproxy__subcmd__help,completion)
+                cmd="zeroproxy__subcmd__help__subcmd__completion"
                 ;;
-            cipherroute__subcmd__help,help)
-                cmd="cipherroute__subcmd__help__subcmd__help"
+            zeroproxy__subcmd__help,help)
+                cmd="zeroproxy__subcmd__help__subcmd__help"
                 ;;
-            cipherroute__subcmd__help,key)
-                cmd="cipherroute__subcmd__help__subcmd__key"
+            zeroproxy__subcmd__help,key)
+                cmd="zeroproxy__subcmd__help__subcmd__key"
                 ;;
-            cipherroute__subcmd__help,pool)
-                cmd="cipherroute__subcmd__help__subcmd__pool"
+            zeroproxy__subcmd__help,pool)
+                cmd="zeroproxy__subcmd__help__subcmd__pool"
                 ;;
-            cipherroute__subcmd__help,provider)
-                cmd="cipherroute__subcmd__help__subcmd__provider"
+            zeroproxy__subcmd__help,provider)
+                cmd="zeroproxy__subcmd__help__subcmd__provider"
                 ;;
-            cipherroute__subcmd__help,route)
-                cmd="cipherroute__subcmd__help__subcmd__route"
+            zeroproxy__subcmd__help,route)
+                cmd="zeroproxy__subcmd__help__subcmd__route"
                 ;;
-            cipherroute__subcmd__help,tunnel)
-                cmd="cipherroute__subcmd__help__subcmd__tunnel"
+            zeroproxy__subcmd__help,tunnel)
+                cmd="zeroproxy__subcmd__help__subcmd__tunnel"
                 ;;
-            cipherroute__subcmd__help__subcmd__key,add)
-                cmd="cipherroute__subcmd__help__subcmd__key__subcmd__add"
+            zeroproxy__subcmd__help__subcmd__key,add)
+                cmd="zeroproxy__subcmd__help__subcmd__key__subcmd__add"
                 ;;
-            cipherroute__subcmd__help__subcmd__key,list)
-                cmd="cipherroute__subcmd__help__subcmd__key__subcmd__list"
+            zeroproxy__subcmd__help__subcmd__key,list)
+                cmd="zeroproxy__subcmd__help__subcmd__key__subcmd__list"
                 ;;
-            cipherroute__subcmd__help__subcmd__pool,create)
-                cmd="cipherroute__subcmd__help__subcmd__pool__subcmd__create"
+            zeroproxy__subcmd__help__subcmd__pool,create)
+                cmd="zeroproxy__subcmd__help__subcmd__pool__subcmd__create"
                 ;;
-            cipherroute__subcmd__help__subcmd__pool,delete)
-                cmd="cipherroute__subcmd__help__subcmd__pool__subcmd__delete"
+            zeroproxy__subcmd__help__subcmd__pool,delete)
+                cmd="zeroproxy__subcmd__help__subcmd__pool__subcmd__delete"
                 ;;
-            cipherroute__subcmd__help__subcmd__pool,list)
-                cmd="cipherroute__subcmd__help__subcmd__pool__subcmd__list"
+            zeroproxy__subcmd__help__subcmd__pool,list)
+                cmd="zeroproxy__subcmd__help__subcmd__pool__subcmd__list"
                 ;;
-            cipherroute__subcmd__help__subcmd__pool,status)
-                cmd="cipherroute__subcmd__help__subcmd__pool__subcmd__status"
+            zeroproxy__subcmd__help__subcmd__pool,status)
+                cmd="zeroproxy__subcmd__help__subcmd__pool__subcmd__status"
                 ;;
-            cipherroute__subcmd__help__subcmd__provider,add)
-                cmd="cipherroute__subcmd__help__subcmd__provider__subcmd__add"
+            zeroproxy__subcmd__help__subcmd__provider,add)
+                cmd="zeroproxy__subcmd__help__subcmd__provider__subcmd__add"
                 ;;
-            cipherroute__subcmd__help__subcmd__provider,list)
-                cmd="cipherroute__subcmd__help__subcmd__provider__subcmd__list"
+            zeroproxy__subcmd__help__subcmd__provider,list)
+                cmd="zeroproxy__subcmd__help__subcmd__provider__subcmd__list"
                 ;;
-            cipherroute__subcmd__help__subcmd__tunnel,start)
-                cmd="cipherroute__subcmd__help__subcmd__tunnel__subcmd__start"
+            zeroproxy__subcmd__help__subcmd__tunnel,start)
+                cmd="zeroproxy__subcmd__help__subcmd__tunnel__subcmd__start"
                 ;;
-            cipherroute__subcmd__help__subcmd__tunnel,status)
-                cmd="cipherroute__subcmd__help__subcmd__tunnel__subcmd__status"
+            zeroproxy__subcmd__help__subcmd__tunnel,status)
+                cmd="zeroproxy__subcmd__help__subcmd__tunnel__subcmd__status"
                 ;;
-            cipherroute__subcmd__help__subcmd__tunnel,stop)
-                cmd="cipherroute__subcmd__help__subcmd__tunnel__subcmd__stop"
+            zeroproxy__subcmd__help__subcmd__tunnel,stop)
+                cmd="zeroproxy__subcmd__help__subcmd__tunnel__subcmd__stop"
                 ;;
-            cipherroute__subcmd__key,add)
-                cmd="cipherroute__subcmd__key__subcmd__add"
+            zeroproxy__subcmd__key,add)
+                cmd="zeroproxy__subcmd__key__subcmd__add"
                 ;;
-            cipherroute__subcmd__key,help)
-                cmd="cipherroute__subcmd__key__subcmd__help"
+            zeroproxy__subcmd__key,help)
+                cmd="zeroproxy__subcmd__key__subcmd__help"
                 ;;
-            cipherroute__subcmd__key,list)
-                cmd="cipherroute__subcmd__key__subcmd__list"
+            zeroproxy__subcmd__key,list)
+                cmd="zeroproxy__subcmd__key__subcmd__list"
                 ;;
-            cipherroute__subcmd__key__subcmd__help,add)
-                cmd="cipherroute__subcmd__key__subcmd__help__subcmd__add"
+            zeroproxy__subcmd__key__subcmd__help,add)
+                cmd="zeroproxy__subcmd__key__subcmd__help__subcmd__add"
                 ;;
-            cipherroute__subcmd__key__subcmd__help,help)
-                cmd="cipherroute__subcmd__key__subcmd__help__subcmd__help"
+            zeroproxy__subcmd__key__subcmd__help,help)
+                cmd="zeroproxy__subcmd__key__subcmd__help__subcmd__help"
                 ;;
-            cipherroute__subcmd__key__subcmd__help,list)
-                cmd="cipherroute__subcmd__key__subcmd__help__subcmd__list"
+            zeroproxy__subcmd__key__subcmd__help,list)
+                cmd="zeroproxy__subcmd__key__subcmd__help__subcmd__list"
                 ;;
-            cipherroute__subcmd__pool,create)
-                cmd="cipherroute__subcmd__pool__subcmd__create"
+            zeroproxy__subcmd__pool,create)
+                cmd="zeroproxy__subcmd__pool__subcmd__create"
                 ;;
-            cipherroute__subcmd__pool,delete)
-                cmd="cipherroute__subcmd__pool__subcmd__delete"
+            zeroproxy__subcmd__pool,delete)
+                cmd="zeroproxy__subcmd__pool__subcmd__delete"
                 ;;
-            cipherroute__subcmd__pool,help)
-                cmd="cipherroute__subcmd__pool__subcmd__help"
+            zeroproxy__subcmd__pool,help)
+                cmd="zeroproxy__subcmd__pool__subcmd__help"
                 ;;
-            cipherroute__subcmd__pool,list)
-                cmd="cipherroute__subcmd__pool__subcmd__list"
+            zeroproxy__subcmd__pool,list)
+                cmd="zeroproxy__subcmd__pool__subcmd__list"
                 ;;
-            cipherroute__subcmd__pool,status)
-                cmd="cipherroute__subcmd__pool__subcmd__status"
+            zeroproxy__subcmd__pool,status)
+                cmd="zeroproxy__subcmd__pool__subcmd__status"
                 ;;
-            cipherroute__subcmd__pool__subcmd__help,create)
-                cmd="cipherroute__subcmd__pool__subcmd__help__subcmd__create"
+            zeroproxy__subcmd__pool__subcmd__help,create)
+                cmd="zeroproxy__subcmd__pool__subcmd__help__subcmd__create"
                 ;;
-            cipherroute__subcmd__pool__subcmd__help,delete)
-                cmd="cipherroute__subcmd__pool__subcmd__help__subcmd__delete"
+            zeroproxy__subcmd__pool__subcmd__help,delete)
+                cmd="zeroproxy__subcmd__pool__subcmd__help__subcmd__delete"
                 ;;
-            cipherroute__subcmd__pool__subcmd__help,help)
-                cmd="cipherroute__subcmd__pool__subcmd__help__subcmd__help"
+            zeroproxy__subcmd__pool__subcmd__help,help)
+                cmd="zeroproxy__subcmd__pool__subcmd__help__subcmd__help"
                 ;;
-            cipherroute__subcmd__pool__subcmd__help,list)
-                cmd="cipherroute__subcmd__pool__subcmd__help__subcmd__list"
+            zeroproxy__subcmd__pool__subcmd__help,list)
+                cmd="zeroproxy__subcmd__pool__subcmd__help__subcmd__list"
                 ;;
-            cipherroute__subcmd__pool__subcmd__help,status)
-                cmd="cipherroute__subcmd__pool__subcmd__help__subcmd__status"
+            zeroproxy__subcmd__pool__subcmd__help,status)
+                cmd="zeroproxy__subcmd__pool__subcmd__help__subcmd__status"
                 ;;
-            cipherroute__subcmd__provider,add)
-                cmd="cipherroute__subcmd__provider__subcmd__add"
+            zeroproxy__subcmd__provider,add)
+                cmd="zeroproxy__subcmd__provider__subcmd__add"
                 ;;
-            cipherroute__subcmd__provider,help)
-                cmd="cipherroute__subcmd__provider__subcmd__help"
+            zeroproxy__subcmd__provider,help)
+                cmd="zeroproxy__subcmd__provider__subcmd__help"
                 ;;
-            cipherroute__subcmd__provider,list)
-                cmd="cipherroute__subcmd__provider__subcmd__list"
+            zeroproxy__subcmd__provider,list)
+                cmd="zeroproxy__subcmd__provider__subcmd__list"
                 ;;
-            cipherroute__subcmd__provider__subcmd__help,add)
-                cmd="cipherroute__subcmd__provider__subcmd__help__subcmd__add"
+            zeroproxy__subcmd__provider__subcmd__help,add)
+                cmd="zeroproxy__subcmd__provider__subcmd__help__subcmd__add"
                 ;;
-            cipherroute__subcmd__provider__subcmd__help,help)
-                cmd="cipherroute__subcmd__provider__subcmd__help__subcmd__help"
+            zeroproxy__subcmd__provider__subcmd__help,help)
+                cmd="zeroproxy__subcmd__provider__subcmd__help__subcmd__help"
                 ;;
-            cipherroute__subcmd__provider__subcmd__help,list)
-                cmd="cipherroute__subcmd__provider__subcmd__help__subcmd__list"
+            zeroproxy__subcmd__provider__subcmd__help,list)
+                cmd="zeroproxy__subcmd__provider__subcmd__help__subcmd__list"
                 ;;
-            cipherroute__subcmd__tunnel,help)
-                cmd="cipherroute__subcmd__tunnel__subcmd__help"
+            zeroproxy__subcmd__tunnel,help)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__help"
                 ;;
-            cipherroute__subcmd__tunnel,start)
-                cmd="cipherroute__subcmd__tunnel__subcmd__start"
+            zeroproxy__subcmd__tunnel,start)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__start"
                 ;;
-            cipherroute__subcmd__tunnel,status)
-                cmd="cipherroute__subcmd__tunnel__subcmd__status"
+            zeroproxy__subcmd__tunnel,status)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__status"
                 ;;
-            cipherroute__subcmd__tunnel,stop)
-                cmd="cipherroute__subcmd__tunnel__subcmd__stop"
+            zeroproxy__subcmd__tunnel,stop)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__stop"
                 ;;
-            cipherroute__subcmd__tunnel__subcmd__help,help)
-                cmd="cipherroute__subcmd__tunnel__subcmd__help__subcmd__help"
+            zeroproxy__subcmd__tunnel__subcmd__help,help)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__help__subcmd__help"
                 ;;
-            cipherroute__subcmd__tunnel__subcmd__help,start)
-                cmd="cipherroute__subcmd__tunnel__subcmd__help__subcmd__start"
+            zeroproxy__subcmd__tunnel__subcmd__help,start)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__help__subcmd__start"
                 ;;
-            cipherroute__subcmd__tunnel__subcmd__help,status)
-                cmd="cipherroute__subcmd__tunnel__subcmd__help__subcmd__status"
+            zeroproxy__subcmd__tunnel__subcmd__help,status)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__help__subcmd__status"
                 ;;
-            cipherroute__subcmd__tunnel__subcmd__help,stop)
-                cmd="cipherroute__subcmd__tunnel__subcmd__help__subcmd__stop"
+            zeroproxy__subcmd__tunnel__subcmd__help,stop)
+                cmd="zeroproxy__subcmd__tunnel__subcmd__help__subcmd__stop"
                 ;;
             *)
                 ;;
@@ -187,7 +187,7 @@ _cipherroute() {
     done
 
     case "${cmd}" in
-        cipherroute)
+        zeroproxy)
             opts="-h --host --port --log-filter --data-dir --help provider key pool tunnel route completion help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 1 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -217,7 +217,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__completion)
+        zeroproxy__subcmd__completion)
             opts="-h --help bash elvish fish powershell zsh"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -231,7 +231,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help)
+        zeroproxy__subcmd__help)
             opts="provider key pool tunnel route completion help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -245,7 +245,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__completion)
+        zeroproxy__subcmd__help__subcmd__completion)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -259,7 +259,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__help)
+        zeroproxy__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -273,7 +273,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__key)
+        zeroproxy__subcmd__help__subcmd__key)
             opts="list add"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -287,7 +287,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__key__subcmd__add)
+        zeroproxy__subcmd__help__subcmd__key__subcmd__add)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -301,7 +301,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__key__subcmd__list)
+        zeroproxy__subcmd__help__subcmd__key__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -315,7 +315,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__pool)
+        zeroproxy__subcmd__help__subcmd__pool)
             opts="list status create delete"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -329,7 +329,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__pool__subcmd__create)
+        zeroproxy__subcmd__help__subcmd__pool__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -343,7 +343,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__pool__subcmd__delete)
+        zeroproxy__subcmd__help__subcmd__pool__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -357,7 +357,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__pool__subcmd__list)
+        zeroproxy__subcmd__help__subcmd__pool__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -371,7 +371,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__pool__subcmd__status)
+        zeroproxy__subcmd__help__subcmd__pool__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -385,7 +385,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__provider)
+        zeroproxy__subcmd__help__subcmd__provider)
             opts="list add"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -399,7 +399,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__provider__subcmd__add)
+        zeroproxy__subcmd__help__subcmd__provider__subcmd__add)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -413,7 +413,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__provider__subcmd__list)
+        zeroproxy__subcmd__help__subcmd__provider__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -427,7 +427,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__route)
+        zeroproxy__subcmd__help__subcmd__route)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -441,7 +441,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__tunnel)
+        zeroproxy__subcmd__help__subcmd__tunnel)
             opts="start stop status"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -455,7 +455,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__tunnel__subcmd__start)
+        zeroproxy__subcmd__help__subcmd__tunnel__subcmd__start)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -469,7 +469,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__tunnel__subcmd__status)
+        zeroproxy__subcmd__help__subcmd__tunnel__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -483,7 +483,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__help__subcmd__tunnel__subcmd__stop)
+        zeroproxy__subcmd__help__subcmd__tunnel__subcmd__stop)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -497,7 +497,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key)
+        zeroproxy__subcmd__key)
             opts="-h --help list add help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -511,7 +511,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__add)
+        zeroproxy__subcmd__key__subcmd__add)
             opts="-h --json --help <NAME> <KEY>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -525,7 +525,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__help)
+        zeroproxy__subcmd__key__subcmd__help)
             opts="list add help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -539,7 +539,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__help__subcmd__add)
+        zeroproxy__subcmd__key__subcmd__help__subcmd__add)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -553,7 +553,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__help__subcmd__help)
+        zeroproxy__subcmd__key__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -567,7 +567,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__help__subcmd__list)
+        zeroproxy__subcmd__key__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -581,7 +581,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__key__subcmd__list)
+        zeroproxy__subcmd__key__subcmd__list)
             opts="-h --json --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -595,7 +595,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool)
+        zeroproxy__subcmd__pool)
             opts="-h --help list status create delete help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -609,7 +609,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__create)
+        zeroproxy__subcmd__pool__subcmd__create)
             opts="-h --json --help <NAME> <PROXY_URL>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -623,7 +623,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__delete)
+        zeroproxy__subcmd__pool__subcmd__delete)
             opts="-h --json --help <NAME>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -637,7 +637,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help)
+        zeroproxy__subcmd__pool__subcmd__help)
             opts="list status create delete help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -651,7 +651,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help__subcmd__create)
+        zeroproxy__subcmd__pool__subcmd__help__subcmd__create)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -665,7 +665,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help__subcmd__delete)
+        zeroproxy__subcmd__pool__subcmd__help__subcmd__delete)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -679,7 +679,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help__subcmd__help)
+        zeroproxy__subcmd__pool__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -693,7 +693,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help__subcmd__list)
+        zeroproxy__subcmd__pool__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -707,7 +707,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__help__subcmd__status)
+        zeroproxy__subcmd__pool__subcmd__help__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -721,7 +721,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__list)
+        zeroproxy__subcmd__pool__subcmd__list)
             opts="-h --json --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -735,7 +735,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__pool__subcmd__status)
+        zeroproxy__subcmd__pool__subcmd__status)
             opts="-h --json --help <NAME>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -749,7 +749,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider)
+        zeroproxy__subcmd__provider)
             opts="-h --help list add help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -763,7 +763,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__add)
+        zeroproxy__subcmd__provider__subcmd__add)
             opts="-h --json --help <NAME> <CONFIG>"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -777,7 +777,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__help)
+        zeroproxy__subcmd__provider__subcmd__help)
             opts="list add help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -791,7 +791,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__help__subcmd__add)
+        zeroproxy__subcmd__provider__subcmd__help__subcmd__add)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -805,7 +805,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__help__subcmd__help)
+        zeroproxy__subcmd__provider__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -819,7 +819,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__help__subcmd__list)
+        zeroproxy__subcmd__provider__subcmd__help__subcmd__list)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -833,7 +833,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__provider__subcmd__list)
+        zeroproxy__subcmd__provider__subcmd__list)
             opts="-h --json --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -847,7 +847,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__route)
+        zeroproxy__subcmd__route)
             opts="-h --model --combo --prompt --stream --json --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -873,7 +873,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel)
+        zeroproxy__subcmd__tunnel)
             opts="-h --help start stop status help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 2 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -887,7 +887,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__help)
+        zeroproxy__subcmd__tunnel__subcmd__help)
             opts="start stop status help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -901,7 +901,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__help__subcmd__help)
+        zeroproxy__subcmd__tunnel__subcmd__help__subcmd__help)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -915,7 +915,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__help__subcmd__start)
+        zeroproxy__subcmd__tunnel__subcmd__help__subcmd__start)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -929,7 +929,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__help__subcmd__status)
+        zeroproxy__subcmd__tunnel__subcmd__help__subcmd__status)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -943,7 +943,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__help__subcmd__stop)
+        zeroproxy__subcmd__tunnel__subcmd__help__subcmd__stop)
             opts=""
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 4 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -957,7 +957,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__start)
+        zeroproxy__subcmd__tunnel__subcmd__start)
             opts="-h --provider --port --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -979,7 +979,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__status)
+        zeroproxy__subcmd__tunnel__subcmd__status)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -993,7 +993,7 @@ _cipherroute() {
             COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
             return 0
             ;;
-        cipherroute__subcmd__tunnel__subcmd__stop)
+        zeroproxy__subcmd__tunnel__subcmd__stop)
             opts="-h --help"
             if [[ ${cur} == -* || ${COMP_CWORD} -eq 3 ]] ; then
                 COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
@@ -1011,7 +1011,7 @@ _cipherroute() {
 }
 
 if [[ "${BASH_VERSINFO[0]}" -eq 4 && "${BASH_VERSINFO[1]}" -ge 4 || "${BASH_VERSINFO[0]}" -gt 4 ]]; then
-    complete -F _cipherroute -o nosort -o bashdefault -o default cipherroute
+    complete -F _zeroproxy -o nosort -o bashdefault -o default zeroproxy
 else
-    complete -F _cipherroute -o bashdefault -o default cipherroute
+    complete -F _zeroproxy -o bashdefault -o default zeroproxy
 fi

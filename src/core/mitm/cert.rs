@@ -45,7 +45,7 @@ pub fn generate_ca() -> Result<CaMaterial, Box<dyn std::error::Error>> {
     // 9router rootCA.js uses RSA-2048; rcgen's ring backend generates ECDSA
     // by default. The client-trust contract is CN+SAN (validated by IDEs and
     // install scripts) — key type is not validated, so ECDSA is kept and the
-    // divergence documented. See beads cipherroute-9router-parity-v0550-pnc.106.
+    // divergence documented. See beads zeroproxy-9router-parity-v0550-pnc.106.
     let key_pair = KeyPair::generate()?;
     let cert = params.self_signed(&key_pair)?;
 
@@ -200,7 +200,7 @@ pub fn install_ca_cert(cert_path: &Path) -> Result<(), Box<dyn std::error::Error
     } else if cfg!(target_os = "linux") {
         let dest = PathBuf::from("/usr/local/share/ca-certificates");
         std::fs::create_dir_all(&dest)?;
-        let dest_path = dest.join("cipherroute-mitm-ca.crt");
+        let dest_path = dest.join("zeroproxy-mitm-ca.crt");
         std::fs::copy(cert_path, &dest_path)?;
         let status = std::process::Command::new("sudo")
             .args(["update-ca-certificates"])
@@ -228,7 +228,7 @@ pub fn uninstall_ca_cert(cert_path: &Path) -> Result<(), Box<dyn std::error::Err
             return Err("Failed to uninstall CA cert on macOS".into());
         }
     } else if cfg!(target_os = "linux") {
-        let dest_path = PathBuf::from("/usr/local/share/ca-certificates/cipherroute-mitm-ca.crt");
+        let dest_path = PathBuf::from("/usr/local/share/ca-certificates/zeroproxy-mitm-ca.crt");
         let _ = std::fs::remove_file(&dest_path);
         let status = std::process::Command::new("sudo")
             .args(["update-ca-certificates", "--fresh"])

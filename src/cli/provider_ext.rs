@@ -1,4 +1,4 @@
-//! `cipherroute provider *` — extended provider-connection commands (M3).
+//! `zeroproxy provider *` — extended provider-connection commands (M3).
 //!
 //! Complements the existing `provider list/add`. Adds the full CRUD
 //! lifecycle, connection test/validate, client-info, and idempotent
@@ -172,7 +172,7 @@ async fn run_get(db: &Db, ctx: OutputCtx, id_or_name: &str) -> anyhow::Result<()
     }
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider.get",
+            "zeroproxy.v1.provider.get",
             serde_json::to_value(&conn_masked)?,
         )?;
     } else {
@@ -249,7 +249,7 @@ async fn run_edit(
         conn.api_key = Some(crate::cli::output::mask_secret(key));
     }
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider.edit", serde_json::to_value(&conn)?)?;
+        emit_robot("zeroproxy.v1.provider.edit", serde_json::to_value(&conn)?)?;
     } else {
         humanln(ctx, format!("updated provider '{id_or_name}'"));
     }
@@ -268,7 +268,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
         }
         if ctx.is_robot() {
             emit_robot(
-                "cipherroute.v1.provider.delete",
+                "zeroproxy.v1.provider.delete",
                 json!({ "key": id_or_name, "deleted": false }),
             )?;
         } else {
@@ -284,7 +284,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
     .await?;
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider.delete",
+            "zeroproxy.v1.provider.delete",
             json!({ "key": id_or_name, "deleted": true }),
         )?;
     } else {
@@ -317,9 +317,9 @@ async fn run_set_active(
     })
     .await?;
     let schema = if active {
-        "cipherroute.v1.provider.enable"
+        "zeroproxy.v1.provider.enable"
     } else {
-        "cipherroute.v1.provider.disable"
+        "zeroproxy.v1.provider.disable"
     };
     if ctx.is_robot() {
         emit_robot(schema, json!({ "provider": id_or_name, "active": active }))?;
@@ -387,7 +387,7 @@ async fn run_test(db: &Db, ctx: OutputCtx, id_or_name: &str) -> anyhow::Result<(
         "error": error,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider.test", payload)?;
+        emit_robot("zeroproxy.v1.provider.test", payload)?;
     } else if valid {
         humanln(ctx, format!("OK   {} ({}ms)", conn.provider, latency_ms));
     } else {
@@ -428,7 +428,7 @@ async fn run_validate(
         "error": error,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider.validate", payload)?;
+        emit_robot("zeroproxy.v1.provider.validate", payload)?;
     } else if valid {
         humanln(ctx, format!("OK   {provider} ({latency_ms}ms)"));
     } else {
@@ -453,7 +453,7 @@ async fn run_client_info(ctx: OutputCtx) -> anyhow::Result<()> {
         "version": env!("CARGO_PKG_VERSION"),
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider.client-info", payload)?;
+        emit_robot("zeroproxy.v1.provider.client-info", payload)?;
     } else {
         humanln(ctx, format!("Client ID:   {client_id}"));
         humanln(ctx, format!("Client name: {client_name}"));
@@ -506,7 +506,7 @@ async fn run_apply(
     let summary = diff.summary();
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.provider.apply",
+            "zeroproxy.v1.provider.apply",
             json!({ "diff": diff, "summary": summary, "prune": prune, "dry_run": dry_run }),
         )?;
     } else {

@@ -1,5 +1,5 @@
 [package]
-name = "cipherroute"
+name = "zeroproxy"
 version = "0.3.0"
 edition = "2021"
 
@@ -151,7 +151,7 @@ insta = { version = "1", features = ["json", "yaml"] }
 mockito = "1"
 
 [[bin]]
-name = "cipherroute"
+name = "zeroproxy"
 path = "src/main.rs"
 
 [features]

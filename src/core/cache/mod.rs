@@ -199,7 +199,7 @@ impl ResponseCache {
 
     /// Like [`ResponseCache::get`] but also returns the remaining TTL (seconds)
     /// of the served entry. Used by the HIT path to report `ttl_remaining` in
-    /// the `cipherroute.v1.cache.hit` robot envelope.
+    /// the `zeroproxy.v1.cache.hit` robot envelope.
     pub fn get_with_ttl(&self, body: &Value) -> Option<(Vec<u8>, u64)> {
         // Honor explicit Cache-Control: no-cache from the client request
         if has_no_cache_directive(body) {

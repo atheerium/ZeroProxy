@@ -1001,7 +1001,7 @@ mod tests {
 
     #[test]
     fn empty_tool_calls_array_does_not_trigger_tool_call_processing() {
-        // Regression test for cipherroute-mfs3.4 (9router v0.5.55 parity).
+        // Regression test for zeroproxy-mfs3.4 (9router v0.5.55 parity).
         // Some providers attach an empty tool_calls: [] to every SSE chunk.
         // Without the guard, this would enter the tool_calls block and could
         // cause the message to close prematurely on the first content token.

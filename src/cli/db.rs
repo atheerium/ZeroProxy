@@ -1,4 +1,4 @@
-//! `cipherroute db *` — database lifecycle + cloud sync (PLAN v3 mục 4.17, 4.18).
+//! `zeroproxy db *` — database lifecycle + cloud sync (PLAN v3 mục 4.17, 4.18).
 //!
 //! These commands manage the on-disk `db.json` snapshot the server reads:
 //! - `db init` / `db export` / `db import` operate on the snapshot itself.
@@ -8,7 +8,7 @@
 //! - `db cloud *` talks to `/api/cloud/*` for the bearer-authenticated
 //!   cloud-sync surface (auth, credentials update, alias list/set, resolve).
 //!
-//! Every command emits an `cipherroute.v1.db.*` envelope in `--robot` mode and
+//! Every command emits an `zeroproxy.v1.db.*` envelope in `--robot` mode and
 //! exits with code 6 if the server is unreachable.
 
 use std::path::PathBuf;
@@ -207,7 +207,7 @@ async fn run_init(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
             let body = r.text().await.unwrap_or_default();
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.db.init",
+                    "zeroproxy.v1.db.init",
                     json!({"initialized": true, "message": body}),
                 )?;
             } else {
@@ -253,14 +253,14 @@ async fn run_export(
                 let bytes = pretty.len();
                 if ctx.is_robot() {
                     emit_robot(
-                        "cipherroute.v1.db.export",
+                        "zeroproxy.v1.db.export",
                         json!({"written": path.to_string_lossy(), "bytes": bytes}),
                     )?;
                 } else {
                     humanln(ctx, format!("exported {bytes} bytes to {}", path.display()));
                 }
             } else if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.export", payload)?;
+                emit_robot("zeroproxy.v1.db.export", payload)?;
             } else {
                 println!(
                     "{}",
@@ -338,7 +338,7 @@ async fn run_import(
         Ok(payload) => {
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.db.import",
+                    "zeroproxy.v1.db.import",
                     json!({"mode": "merge", "endpoint": endpoint, "result": payload}),
                 )?;
             } else {
@@ -372,7 +372,7 @@ async fn run_reset(
     match rt.post_json("/api/data/reset", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.reset", payload)?;
+                emit_robot("zeroproxy.v1.db.reset", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -394,7 +394,7 @@ async fn run_dump(rt: &Runtime, ctx: OutputCtx, resource: DumpResource) -> anyho
             let slice = payload.get(resource.key()).cloned().unwrap_or(Value::Null);
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.db.dump",
+                    "zeroproxy.v1.db.dump",
                     json!({"resource": resource.slug(), "data": slice}),
                 )?;
             } else {
@@ -415,7 +415,7 @@ fn run_migrate(ctx: OutputCtx) -> anyhow::Result<i32> {
     // command existing and exiting 0.
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.db.migrate",
+            "zeroproxy.v1.db.migrate",
             json!({"applied": 0, "note": "server normalizes on load; no CLI migrations registered"}),
         )?;
     } else {
@@ -446,7 +446,7 @@ async fn run_cloud_auth(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.post_json("/api/cloud/auth", &json!({})).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.cloud.auth", payload)?;
+                emit_robot("zeroproxy.v1.db.cloud.auth", payload)?;
             } else {
                 let conns = payload
                     .get("connections")
@@ -496,7 +496,7 @@ async fn run_cloud_sync(
         Ok(payload) => {
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.db.cloud.sync",
+                    "zeroproxy.v1.db.cloud.sync",
                     json!({"provider": provider, "result": payload}),
                 )?;
             } else {
@@ -513,7 +513,7 @@ async fn run_cloud_resolve(rt: &Runtime, ctx: OutputCtx, alias: String) -> anyho
     match rt.post_json("/api/cloud/model/resolve", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.cloud.resolve", payload)?;
+                emit_robot("zeroproxy.v1.db.cloud.resolve", payload)?;
             } else {
                 let provider = payload
                     .get("provider")
@@ -532,7 +532,7 @@ async fn run_alias_list(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/cloud/models/alias").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.cloud.alias.list", payload)?;
+                emit_robot("zeroproxy.v1.db.cloud.alias.list", payload)?;
             } else {
                 let aliases = payload.get("aliases").cloned().unwrap_or(Value::Null);
                 println!(
@@ -556,7 +556,7 @@ async fn run_alias_set(
     match rt.put_json("/api/cloud/models/alias", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.db.cloud.alias.set", payload)?;
+                emit_robot("zeroproxy.v1.db.cloud.alias.set", payload)?;
             } else {
                 humanln(ctx, format!("alias set: {alias} -> {model}"));
             }

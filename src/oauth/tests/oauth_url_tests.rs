@@ -172,12 +172,12 @@ fn test_gitlab_auth_url() {
     assert_scopes_match(&cfg, expected_scopes("gitlab"));
     assert!(cfg.uses_pkce);
     let url = cfg.build_auth_url(
-        "cipherroute",
+        "zeroproxy",
         "http://localhost:4623/oauth/callback",
         "st",
         "ch",
     );
-    assert_auth_url_shape(&url, expected_auth_url_prefix("gitlab"), "cipherroute");
+    assert_auth_url_shape(&url, expected_auth_url_prefix("gitlab"), "zeroproxy");
     assert_scopes_in_url(&url, expected_scopes("gitlab"));
     assert!(url.contains("code_challenge=ch"));
 }

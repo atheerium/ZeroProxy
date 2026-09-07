@@ -377,7 +377,7 @@ async fn video_forward_raw(
     if let Ok(val) = HeaderValue::from_str(&connection.id) {
         proxied
             .headers_mut()
-            .insert("x-cipherroute-connection-id", val);
+            .insert("x-zeroproxy-connection-id", val);
     }
     proxied
 }
@@ -1322,7 +1322,7 @@ async fn video_create_handler(
                             if let Ok(val) = HeaderValue::from_str(&connection.id) {
                                 proxied
                                     .headers_mut()
-                                    .insert("x-cipherroute-connection-id", val);
+                                    .insert("x-zeroproxy-connection-id", val);
                             }
                             return proxied;
                         }
@@ -1347,7 +1347,7 @@ async fn video_create_handler(
         if let Ok(val) = HeaderValue::from_str(&connection.id) {
             proxied
                 .headers_mut()
-                .insert("x-cipherroute-connection-id", val);
+                .insert("x-zeroproxy-connection-id", val);
         }
         return proxied;
     }
@@ -1360,7 +1360,7 @@ async fn video_create_handler(
 
 /// Poll async video job status. Jobs are account-bound upstream, so no
 /// cross-account rotation: the caller pins the creating account via
-/// `x-connection-id` (returned on create as `x-cipherroute-connection-id`).
+/// `x-connection-id` (returned on create as `x-zeroproxy-connection-id`).
 async fn video_get_handler(state: AppState, headers: HeaderMap, request_id: String) -> Response {
     if state.db.snapshot().settings.require_login {
         if let Err(error) = require_api_key(&headers, &state.db) {
@@ -1471,7 +1471,7 @@ async fn video_get_handler(state: AppState, headers: HeaderMap, request_id: Stri
     if let Ok(val) = HeaderValue::from_str(&connection.id) {
         proxied
             .headers_mut()
-            .insert("x-cipherroute-connection-id", val);
+            .insert("x-zeroproxy-connection-id", val);
     }
     proxied
 }
@@ -1549,7 +1549,7 @@ fn select_video_connection(
     // connection id returned on create.
     let preferred = headers
         .get("x-connection-id")
-        .or_else(|| headers.get("x-cipherroute-connection-id"))
+        .or_else(|| headers.get("x-zeroproxy-connection-id"))
         .and_then(|v| v.to_str().ok())
         .map(str::trim)
         .filter(|v| !v.is_empty());

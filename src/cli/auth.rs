@@ -1,11 +1,11 @@
-//! `cipherroute auth` — manage credentials for remote server management.
+//! `zeroproxy auth` — manage credentials for remote server management.
 //!
 //! By default the CLI works against the local DB and needs no auth. The auth
 //! subcommands only matter when you want to point this CLI at a *different*
-//! `cipherroute` server (e.g. on a teammate's box or a VPS):
+//! `zeroproxy` server (e.g. on a teammate's box or a VPS):
 //!
 //! - `auth login --url <url> --api-key <key> [--profile <name>]`: saves the
-//!   credentials as a profile in `~/.config/cipherroute/config.toml`. The key
+//!   credentials as a profile in `~/.config/zeroproxy/config.toml`. The key
 //!   is stored as plaintext TOML — see SECURITY note below. The CLI then
 //!   activates the profile by setting `default_profile`.
 //! - `auth logout [--profile <name>]`: deletes the named profile (or the
@@ -49,7 +49,7 @@ pub struct ResetPasswordOptions {
     pub show: bool,
 }
 
-/// `cipherroute auth login` — persist credentials and (optionally) verify them.
+/// `zeroproxy auth login` — persist credentials and (optionally) verify them.
 pub async fn run_login(ctx: OutputCtx, opts: LoginOptions) -> anyhow::Result<i32> {
     let url = normalize_url(&opts.url);
     if !is_http_url(&url) {
@@ -98,7 +98,7 @@ pub async fn run_login(ctx: OutputCtx, opts: LoginOptions) -> anyhow::Result<i32
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.auth.login",
+            "zeroproxy.v1.auth.login",
             json!({
                 "profile": profile_name,
                 "url": url,
@@ -129,7 +129,7 @@ pub async fn run_login(ctx: OutputCtx, opts: LoginOptions) -> anyhow::Result<i32
     Ok(0)
 }
 
-/// `cipherroute auth logout` — remove a saved profile.
+/// `zeroproxy auth logout` — remove a saved profile.
 pub fn run_logout(ctx: OutputCtx, opts: LogoutOptions) -> anyhow::Result<i32> {
     let mut file = load_config_file().unwrap_or_default();
     let target = opts
@@ -160,7 +160,7 @@ pub fn run_logout(ctx: OutputCtx, opts: LogoutOptions) -> anyhow::Result<i32> {
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.auth.logout",
+            "zeroproxy.v1.auth.logout",
             json!({
                 "profile": name,
                 "config_file": path.display().to_string(),
@@ -172,7 +172,7 @@ pub fn run_logout(ctx: OutputCtx, opts: LogoutOptions) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-/// `cipherroute auth whoami` — describe the currently-resolved identity.
+/// `zeroproxy auth whoami` — describe the currently-resolved identity.
 pub async fn run_whoami(ctx: OutputCtx, cfg: &ResolvedConfig, verify: bool) -> anyhow::Result<i32> {
     let file = load_config_file().unwrap_or_default();
     let profile = cfg.profile.clone().or(file.default_profile.clone());
@@ -193,7 +193,7 @@ pub async fn run_whoami(ctx: OutputCtx, cfg: &ResolvedConfig, verify: bool) -> a
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.auth.whoami",
+            "zeroproxy.v1.auth.whoami",
             json!({
                 "profile": profile,
                 "url": probe_target,
@@ -205,7 +205,7 @@ pub async fn run_whoami(ctx: OutputCtx, cfg: &ResolvedConfig, verify: bool) -> a
             }),
         )?;
     } else {
-        humanln(ctx, "cipherroute auth whoami:");
+        humanln(ctx, "zeroproxy auth whoami:");
         humanln(
             ctx,
             format!("  profile: {}", profile.as_deref().unwrap_or("<none>")),
@@ -238,7 +238,7 @@ pub async fn run_whoami(ctx: OutputCtx, cfg: &ResolvedConfig, verify: bool) -> a
     })
 }
 
-/// `cipherroute auth list` — show all configured profiles. Useful for agents
+/// `zeroproxy auth list` — show all configured profiles. Useful for agents
 /// to discover what's available before picking one with `--profile`.
 pub fn run_list(ctx: OutputCtx) -> anyhow::Result<i32> {
     let file = load_config_file().unwrap_or_default();
@@ -257,7 +257,7 @@ pub fn run_list(ctx: OutputCtx) -> anyhow::Result<i32> {
 
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.auth.list",
+            "zeroproxy.v1.auth.list",
             json!({
                 "default_profile": file.default_profile,
                 "profiles": entries,
@@ -283,7 +283,7 @@ pub fn run_list(ctx: OutputCtx) -> anyhow::Result<i32> {
     Ok(0)
 }
 
-/// `cipherroute auth reset-password` — reset the dashboard password back to a
+/// `zeroproxy auth reset-password` — reset the dashboard password back to a
 /// freshly generated random one.
 ///
 /// Works offline against the local data dir: clears the stored bcrypt hash
@@ -324,7 +324,7 @@ pub async fn run_reset_password(
         if let Some(obj) = body.as_object_mut() {
             obj.insert("passwordReset".into(), json!(true));
         }
-        emit_robot("cipherroute.v1.auth.reset-password", body)?;
+        emit_robot("zeroproxy.v1.auth.reset-password", body)?;
     } else {
         humanln(ctx, "Dashboard password reset.");
         humanln(ctx, format!("  data dir: {}", cfg.data_dir.display()));

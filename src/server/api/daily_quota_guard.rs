@@ -23,7 +23,7 @@ pub const DAILY_BUDGET_REMAINING_HEADER: &str = "x-daily-budget-remaining";
 pub const DAILY_REQUESTS_REMAINING_HEADER: &str = "x-daily-requests-remaining";
 
 /// Robot-envelope schema stamped on the 429 body when the daily quota is exceeded.
-pub const DAILY_QUOTA_EXCEEDED_SCHEMA: &str = "cipherroute.v1.daily-quota.exceeded";
+pub const DAILY_QUOTA_EXCEEDED_SCHEMA: &str = "zeroproxy.v1.daily-quota.exceeded";
 
 /// Enforce the per-key daily budget and request-count limits.
 ///

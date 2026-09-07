@@ -52,11 +52,11 @@ async fn get_codex_settings(State(state): State<AppState>, headers: HeaderMap) -
 
     match read_codex_config().await {
         Ok(settings) => {
-            let has_cipherroute = has_cipherroute_config(&settings);
+            let has_zeroproxy = has_zeroproxy_config(&settings);
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "settingsPath": codex_config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -143,7 +143,7 @@ async fn read_codex_config() -> AnyhowResult<Option<Value>> {
     read_json_optional(&codex_config_path()).await
 }
 
-fn has_cipherroute_config(settings: &Option<Value>) -> bool {
+fn has_zeroproxy_config(settings: &Option<Value>) -> bool {
     let Some(settings) = settings else {
         return false;
     };
@@ -153,7 +153,7 @@ fn has_cipherroute_config(settings: &Option<Value>) -> bool {
         .unwrap_or("");
     base_url.contains("localhost")
         || base_url.contains("127.0.0.1")
-        || base_url.contains("cipherroute")
+        || base_url.contains("zeroproxy")
         || base_url.contains("0.0.0.0")
 }
 
@@ -363,32 +363,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_has_cipherroute_config_none() {
-        assert!(!has_cipherroute_config(&None));
+    fn test_has_zeroproxy_config_none() {
+        assert!(!has_zeroproxy_config(&None));
     }
 
     #[test]
-    fn test_has_cipherroute_config_localhost() {
+    fn test_has_zeroproxy_config_localhost() {
         let settings = json!({
             "baseUrl": "http://localhost:4623",
         });
-        assert!(has_cipherroute_config(&Some(settings)));
+        assert!(has_zeroproxy_config(&Some(settings)));
     }
 
     #[test]
-    fn test_has_cipherroute_config_cipherroute() {
+    fn test_has_zeroproxy_config_zeroproxy() {
         let settings = json!({
-            "baseUrl": "http://cipherroute.example.com",
+            "baseUrl": "http://zeroproxy.example.com",
         });
-        assert!(has_cipherroute_config(&Some(settings)));
+        assert!(has_zeroproxy_config(&Some(settings)));
     }
 
     #[test]
-    fn test_has_cipherroute_config_other() {
+    fn test_has_zeroproxy_config_other() {
         let settings = json!({
             "baseUrl": "https://api.openai.com",
         });
-        assert!(!has_cipherroute_config(&Some(settings)));
+        assert!(!has_zeroproxy_config(&Some(settings)));
     }
 
     #[test]

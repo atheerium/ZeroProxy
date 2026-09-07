@@ -3,16 +3,16 @@ use sha2::{Digest, Sha256};
 use std::path::PathBuf;
 
 /// Directory where the persisted machine ID file is stored.
-fn cipherroute_dir() -> PathBuf {
+fn zeroproxy_dir() -> PathBuf {
     let home = std::env::var("HOME")
         .or_else(|_| std::env::var("USERPROFILE"))
         .unwrap_or_else(|_| ".".into());
-    PathBuf::from(home).join(".cipherroute")
+    PathBuf::from(home).join(".zeroproxy")
 }
 
 /// Path to the persisted machine ID file.
 fn machine_id_path() -> PathBuf {
-    cipherroute_dir().join("machine_id")
+    zeroproxy_dir().join("machine_id")
 }
 
 /// Read the OS UUID (macOS IOPlatformUUID) or the `/etc/machine-id` file.
@@ -77,15 +77,15 @@ fn generate_machine_id() -> String {
     hex::encode(hasher.finalize())
 }
 
-/// Ensures the `~/.cipherroute` directory exists.
-fn ensure_cipherroute_dir() {
-    let dir = cipherroute_dir();
+/// Ensures the `~/.zeroproxy` directory exists.
+fn ensure_zeroproxy_dir() {
+    let dir = zeroproxy_dir();
     let _ = std::fs::create_dir_all(&dir);
 }
 
 /// Write a machine ID string to the persistence file.
 fn persist_machine_id(id: &str) {
-    ensure_cipherroute_dir();
+    ensure_zeroproxy_dir();
     let path = machine_id_path();
     let _ = std::fs::write(&path, id);
 }
@@ -127,7 +127,7 @@ fn resolve_machine_id() -> String {
 /// Returns the machine ID for this device.
 ///
 /// On first call, reads hostname + OS UUID + `/etc/machine-id`, hashes them
-/// with SHA-256, and persists the result to `~/.cipherroute/machine_id`.
+/// with SHA-256, and persists the result to `~/.zeroproxy/machine_id`.
 /// Subsequent calls return the cached value from a thread-safe in-memory
 /// cache.
 pub fn get_machine_id() -> String {

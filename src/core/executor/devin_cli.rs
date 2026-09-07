@@ -347,7 +347,7 @@ impl DevinCliExecutor {
             "initialize",
             json!({
                 "protocolVersion": "0.3",
-                "clientInfo": {"name": "cipherroute", "version": "1.0"},
+                "clientInfo": {"name": "zeroproxy", "version": "1.0"},
                 "capabilities": {},
             }),
         );

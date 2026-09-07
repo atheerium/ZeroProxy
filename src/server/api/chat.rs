@@ -412,7 +412,7 @@ async fn chat_completions_impl(
             // TTL without parsing the body. Carried as a header so the OpenAI-
             // compatible JSON body stays untouched.
             let envelope = json!({
-                "schema": "cipherroute.v1.cache.hit",
+                "schema": "zeroproxy.v1.cache.hit",
                 "ok": true,
                 "data": {
                     "cache_hit": true,
@@ -623,7 +623,7 @@ async fn chat_completions_impl(
                         // model runs the final leg (judge or single survivor) —
                         // run it with full stream semantics so SSE clients see
                         // a live stream (COMBO-1 / 9router combo.js parity).
-                        if let Some(dispatch) = value.get("__cipherroute_fusion_dispatch") {
+                        if let Some(dispatch) = value.get("__zeroproxy_fusion_dispatch") {
                             let model = dispatch
                                 .get("model")
                                 .and_then(Value::as_str)
@@ -1050,7 +1050,7 @@ fn apply_stream_plan(
     plan.stream = sp.stream;
     plan.sse_to_json = sp.sse_to_json;
     tracing::debug!(
-        target: "cipherroute::chat",
+        target: "zeroproxy::chat",
         "STREAM provider={} stream={} client_requested={} force={} sse_to_json={}",
         plan.provider,
         sp.stream,
@@ -1170,7 +1170,7 @@ async fn execute_single_model(
     // 3. Translate or native passthrough normalize
     if plan.passthrough {
         tracing::debug!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "PASSTHROUGH client={:?} provider={}",
             client_tool,
             plan.provider
@@ -1321,7 +1321,7 @@ async fn execute_single_model(
     }
 
     tracing::debug!(
-        target: "cipherroute::chat",
+        target: "zeroproxy::chat",
         "PLAN provider={} model={} upstream={} source={:?} target={:?} stream={} translate={} transport={:?} strip={:?}",
         plan.provider,
         plan.model,
@@ -1476,7 +1476,7 @@ async fn forward_with_provider_fallback(
         );
         if !state.circuit_breaker.allow_request(&breaker_key) {
             tracing::debug!(
-                target: "cipherroute::chat",
+                target: "zeroproxy::chat",
                 "circuit_open provider={} connection={} endpoint={}",
                 provider,
                 connection.id,
@@ -2415,7 +2415,7 @@ async fn forward_with_provider_fallback(
                     // forceStream + client non-stream → collect SSE → JSON (9router)
                     if plan.sse_to_json {
                         tracing::debug!(
-                            target: "cipherroute::chat",
+                            target: "zeroproxy::chat",
                             "FORCE_STREAM sse_to_json provider={} model={}",
                             provider,
                             model
@@ -2698,7 +2698,7 @@ async fn proxy_dashboard_sse_with_usage_tracking(
             body_snip.to_string()
         };
         tracing::warn!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "upstream_error status={} provider={} model={} body={}",
             status.as_u16(),
             provider,
@@ -3258,7 +3258,7 @@ async fn proxy_sse_to_json_response(
             body_snip.to_string()
         };
         tracing::warn!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "upstream_error status={} provider={} model={} body={}",
             status.as_u16(),
             provider,
@@ -3357,7 +3357,7 @@ async fn proxy_response_with_usage_tracking(
             body_snip.to_string()
         };
         tracing::warn!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "upstream_error status={} provider={} model={} body={}",
             status.as_u16(),
             provider,
@@ -3598,7 +3598,7 @@ async fn proxy_response_with_pending_tracking(
             msg.to_string()
         };
         tracing::warn!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "STREAM_GUARD non-SSE content-type={} status={} body_snip={}",
             ct,
             status.as_u16(),
@@ -3624,7 +3624,7 @@ async fn proxy_response_with_pending_tracking(
     // 500 diagnostics: log upstream error status + body snippet for debugging.
     if !status.is_success() {
         tracing::warn!(
-            target: "cipherroute::chat",
+            target: "zeroproxy::chat",
             "upstream_error status={} provider={} model={}",
             status.as_u16(),
             provider,
@@ -3671,7 +3671,7 @@ async fn proxy_response_with_pending_tracking(
                             // Upstream went silent past stall timeout; treat
                             // as an error so the client can retry.
                             tracing::warn!(
-                                target: "cipherroute::chat::stream",
+                                target: "zeroproxy::chat::stream",
                                 provider = %provider,
                                 model = %model,
                                 "SSE stalled, closing stream"
@@ -3811,7 +3811,7 @@ async fn proxy_response_with_pending_tracking(
                     let frame_result = match next {
                         Err(_elapsed) => {
                             tracing::warn!(
-                                target: "cipherroute::chat::stream",
+                                target: "zeroproxy::chat::stream",
                                 provider = %provider,
                                 model = %model,
                                 "SSE stalled, closing stream"
@@ -4199,7 +4199,7 @@ fn flush_dashboard_sse_chunk(
     let output = transform_sse_stream(&Bytes::from(line), transformer);
     if output.is_empty() {
         tracing::trace!(
-            target: "cipherroute::chat::stream",
+            target: "zeroproxy::chat::stream",
             "flush_dashboard_sse_chunk: {} bytes of partial/invalid buffer content yielded no output lines",
             pending_len,
         );

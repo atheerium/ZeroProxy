@@ -184,7 +184,7 @@ impl KiroSseAssembler {
                             Some("Kiro tool call input is null".to_string());
                     }
                     tracing::warn!(
-                        target: "cipherroute::executor::kiro",
+                        target: "zeroproxy::executor::kiro",
                         "dropping unusable tool call {} ({}): input is null",
                         tool.id,
                         tool.name
@@ -198,7 +198,7 @@ impl KiroSseAssembler {
                             Some("Kiro tool call input is an array, not object".to_string());
                     }
                     tracing::warn!(
-                        target: "cipherroute::executor::kiro",
+                        target: "zeroproxy::executor::kiro",
                         "dropping unusable tool call {} ({}): input is array",
                         tool.id,
                         tool.name
@@ -225,7 +225,7 @@ impl KiroSseAssembler {
                             );
                         }
                         tracing::warn!(
-                            target: "cipherroute::executor::kiro",
+                            target: "zeroproxy::executor::kiro",
                             "dropping unusable tool_call wrapper {} ({}): missing nested name/arguments",
                             tool.id,
                             tool.name

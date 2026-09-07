@@ -118,7 +118,7 @@ pub async fn login(
             StatusCode::UNAUTHORIZED,
             Json(json!({
                 "error": "Invalid password",
-                "resetHint": "Forgot password? Run `cipherroute auth reset-password` on the host to restore the generated initial password.",
+                "resetHint": "Forgot password? Run `zeroproxy auth reset-password` on the host to restore the generated initial password.",
             })),
         )
             .into_response();
@@ -1152,7 +1152,7 @@ fn client_ip_from_headers(headers: &HeaderMap) -> std::net::IpAddr {
 /// HTTP 429 response for a rate-limited login attempt. Includes a
 /// `Retry-After` header (seconds) and a JSON body the dashboard can render.
 fn lockout_response(retry_after_secs: u64) -> Response {
-    let reset_hint = "Forgot password? Run `cipherroute auth reset-password` on the host to restore the generated initial password.";
+    let reset_hint = "Forgot password? Run `zeroproxy auth reset-password` on the host to restore the generated initial password.";
     let mut response = (
         StatusCode::TOO_MANY_REQUESTS,
         Json(json!({

@@ -1,4 +1,4 @@
-//! `cipherroute media *` — media provider + media endpoint helpers (PLAN v3 mục
+//! `zeroproxy media *` — media provider + media endpoint helpers (PLAN v3 mục
 //! 4.15). Wraps `/api/media-providers/*` for CRUD on TTS/STT/embed/image/web
 //! providers and the synchronous `/v1/audio/*`, `/v1/embeddings`,
 //! `/v1/images/generations`, `/v1/search`, `/v1/web/fetch` endpoints.
@@ -284,7 +284,7 @@ async fn run_providers_list(
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.providers.list", payload)?;
+                emit_robot("zeroproxy.v1.media.providers.list", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -319,7 +319,7 @@ async fn run_providers_add(
     match rt.post_json("/api/media-providers", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.providers.add", payload)?;
+                emit_robot("zeroproxy.v1.media.providers.add", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -348,7 +348,7 @@ async fn run_providers_edit(
     match rt.put_json(&path, &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.providers.edit", payload)?;
+                emit_robot("zeroproxy.v1.media.providers.edit", payload)?;
             } else {
                 humanln(ctx, format!("Edited media provider id={id}"));
             }
@@ -375,7 +375,7 @@ async fn run_providers_delete(
     match rt.delete_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.providers.delete", payload)?;
+                emit_robot("zeroproxy.v1.media.providers.delete", payload)?;
             } else {
                 humanln(ctx, format!("Deleted media provider id={id}"));
             }
@@ -390,7 +390,7 @@ async fn run_combo_list(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/combos").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.combo.list", payload)?;
+                emit_robot("zeroproxy.v1.media.combo.list", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -419,7 +419,7 @@ async fn run_combo_create(
     match rt.post_json("/api/combos", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.combo.create", payload)?;
+                emit_robot("zeroproxy.v1.media.combo.create", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -455,7 +455,7 @@ async fn run_tts_voices(
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.tts.voices", payload)?;
+                emit_robot("zeroproxy.v1.media.tts.voices", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -489,7 +489,7 @@ async fn run_tts_speak(
         Ok((bytes, content_type)) => {
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.media.tts.speak",
+                    "zeroproxy.v1.media.tts.speak",
                     json!({
                         "bytes": bytes.len(),
                         "content_type": content_type,
@@ -530,7 +530,7 @@ async fn run_stt_transcribe(
     match rt.post_json("/v1/audio/transcriptions", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.stt.transcribe", payload)?;
+                emit_robot("zeroproxy.v1.media.stt.transcribe", payload)?;
             } else {
                 let text = payload.get("text").and_then(Value::as_str).unwrap_or("");
                 println!("{text}");
@@ -557,7 +557,7 @@ async fn run_embed(
     match rt.post_json("/v1/embeddings", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.embed", payload)?;
+                emit_robot("zeroproxy.v1.media.embed", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -588,7 +588,7 @@ async fn run_image_generate(
     match rt.post_json("/v1/images/generations", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.image.generate", payload)?;
+                emit_robot("zeroproxy.v1.media.image.generate", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -615,7 +615,7 @@ async fn run_search(
     match rt.post_json("/v1/search", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.search", payload)?;
+                emit_robot("zeroproxy.v1.media.search", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -649,7 +649,7 @@ async fn run_web_fetch(
     match rt.post_json("/v1/web/fetch", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.media.web.fetch", payload)?;
+                emit_robot("zeroproxy.v1.media.web.fetch", payload)?;
             } else {
                 let content = payload.get("content").and_then(Value::as_str).unwrap_or("");
                 println!("{content}");

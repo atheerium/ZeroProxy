@@ -224,12 +224,12 @@ mod gitlab_extended_tests {
     fn test_gitlab_auth_url_pkce() {
         let config = crate::oauth::providers::gitlab();
         let url = config.build_auth_url(
-            "cipherroute",
+            "zeroproxy",
             "http://localhost:4623/oauth/callback",
             "state123",
             "challenge456",
         );
-        assert!(url.contains("client_id=cipherroute"));
+        assert!(url.contains("client_id=zeroproxy"));
         assert!(url.contains("code_challenge=challenge456"));
         assert!(url.contains("code_challenge_method=S256"));
         assert!(url.contains("response_type=code"));
@@ -250,7 +250,7 @@ mod gitlab_extended_tests {
     fn test_gitlab_self_hosted_auth_url() {
         let config = crate::oauth::providers::gitlab_with_baseurl("https://gitlab.example.com/");
         let url = config.build_auth_url(
-            "cipherroute",
+            "zeroproxy",
             "http://localhost:4623/oauth/callback",
             "state",
             "challenge",

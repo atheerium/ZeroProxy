@@ -58,7 +58,7 @@ async fn run_tick(state: &AppState) {
         return;
     }
 
-    info!(target: "cipherroute::model_sync", "starting daily model sync for {} connections", connections.len());
+    info!(target: "zeroproxy::model_sync", "starting daily model sync for {} connections", connections.len());
 
     let mut total_added: usize = 0;
     let mut total_updated: usize = 0;
@@ -78,7 +78,7 @@ async fn run_tick(state: &AppState) {
                     total_updated += updated;
                     total_pruned += pruned;
                     info!(
-                        target: "cipherroute::model_sync",
+                        target: "zeroproxy::model_sync",
                         provider = %provider,
                         added, updated, pruned,
                         "synced models"
@@ -86,7 +86,7 @@ async fn run_tick(state: &AppState) {
                 }
                 Err(e) => {
                     warn!(
-                        target: "cipherroute::model_sync",
+                        target: "zeroproxy::model_sync",
                         provider = %provider,
                         "db update failed: {e}"
                     );
@@ -95,7 +95,7 @@ async fn run_tick(state: &AppState) {
             },
             Err((status, msg)) => {
                 warn!(
-                    target: "cipherroute::model_sync",
+                    target: "zeroproxy::model_sync",
                     provider = %provider,
                     status = status.as_u16(),
                     "fetch failed: {msg}"
@@ -106,7 +106,7 @@ async fn run_tick(state: &AppState) {
     }
 
     info!(
-        target: "cipherroute::model_sync",
+        target: "zeroproxy::model_sync",
         "daily sync complete: +{total_added} added, ~{total_updated} updated, -{total_pruned} pruned, {errors} errors"
     );
 }

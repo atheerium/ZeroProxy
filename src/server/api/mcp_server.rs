@@ -82,7 +82,7 @@ async fn sse_handler(State(state): State<AppState>) -> Response {
                 }
                 Err(tokio::sync::broadcast::error::RecvError::Lagged(skipped)) => {
                     tracing::warn!(
-                        target: "cipherroute::mcp",
+                        target: "zeroproxy::mcp",
                         skipped,
                         "MCP server SSE session lagged; dropping frames"
                     );
@@ -104,7 +104,7 @@ async fn sse_handler(State(state): State<AppState>) -> Response {
         .header("X-Accel-Buffering", "no")
         .body(Body::from_stream(body_stream))
         .unwrap_or_else(|err| {
-            tracing::error!(target: "cipherroute::mcp", error = %err, "build MCP server SSE response");
+            tracing::error!(target: "zeroproxy::mcp", error = %err, "build MCP server SSE response");
             (StatusCode::INTERNAL_SERVER_ERROR, "internal error").into_response()
         })
 }

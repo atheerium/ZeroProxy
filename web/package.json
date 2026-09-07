@@ -1,5 +1,5 @@
 {
-  "name": "cipherroute",
+  "name": "zeroproxy",
   "version": "0.3.0",
   "description": "CipherRoute Astro dashboard sidecar",
   "private": true,

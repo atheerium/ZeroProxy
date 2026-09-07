@@ -11,7 +11,7 @@
 /// # Examples
 ///
 /// ```
-/// use cipherroute::core::auth::cline_auth::strip_workos_prefix;
+/// use zeroproxy::core::auth::cline_auth::strip_workos_prefix;
 ///
 /// assert_eq!(strip_workos_prefix("workos_sk-abc123"), "sk-abc123");
 /// assert_eq!(strip_workos_prefix("sk-abc123"), "sk-abc123");
@@ -29,7 +29,7 @@ pub fn strip_workos_prefix(token: &str) -> &str {
 /// # Examples
 ///
 /// ```
-/// use cipherroute::core::auth::cline_auth::validate_cline_token;
+/// use zeroproxy::core::auth::cline_auth::validate_cline_token;
 ///
 /// assert!(validate_cline_token("workos_sk-abc123"));
 /// assert!(validate_cline_token("sk-abc123"));
@@ -49,7 +49,7 @@ pub fn validate_cline_token(token: &str) -> bool {
 /// # Examples
 ///
 /// ```
-/// use cipherroute::core::auth::cline_auth::build_cline_auth_header;
+/// use zeroproxy::core::auth::cline_auth::build_cline_auth_header;
 ///
 /// assert_eq!(build_cline_auth_header("workos_sk-abc123"), "Bearer sk-abc123");
 /// assert_eq!(build_cline_auth_header("sk-abc123"), "Bearer sk-abc123");

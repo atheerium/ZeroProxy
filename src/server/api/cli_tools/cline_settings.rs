@@ -52,7 +52,7 @@ pub(super) async fn get_cline_settings(
 
     match read_global_state().await {
         Ok(global_state) => {
-            let has_cipherroute = has_cipherroute_config(&global_state);
+            let has_zeroproxy = has_zeroproxy_config(&global_state);
             let settings = json!({
                 "actModeApiProvider": global_state.as_ref().and_then(|s| s.get("actModeApiProvider")).cloned().unwrap_or(Value::Null),
                 "planModeApiProvider": global_state.as_ref().and_then(|s| s.get("planModeApiProvider")).cloned().unwrap_or(Value::Null),
@@ -62,7 +62,7 @@ pub(super) async fn get_cline_settings(
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "globalStatePath": global_state_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -145,7 +145,7 @@ async fn read_global_state() -> AnyhowResult<Option<Value>> {
     read_json_optional(&global_state_path()).await
 }
 
-fn has_cipherroute_config(global_state: &Option<Value>) -> bool {
+fn has_zeroproxy_config(global_state: &Option<Value>) -> bool {
     let Some(state) = global_state else {
         return false;
     };
@@ -165,7 +165,7 @@ fn has_cipherroute_config(global_state: &Option<Value>) -> bool {
         .unwrap_or("");
     base_url.contains("localhost")
         || base_url.contains("127.0.0.1")
-        || base_url.contains("cipherroute")
+        || base_url.contains("zeroproxy")
 }
 
 async fn write_cline_settings(body: &SaveClineSettingsRequest) -> AnyhowResult<()> {

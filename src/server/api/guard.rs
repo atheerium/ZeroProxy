@@ -115,7 +115,7 @@ pub async fn require_protected(
     // JS parity (chat.js:55-75): /v1/* LLM routes have NO route-level auth.
     // Free (noAuth) providers must work without any key; per-provider
     // credential checks happen inside handlers/executors instead. JS only
-    // enforces keys when settings.requireApiKey is set, which cipherroute
+    // enforces keys when settings.requireApiKey is set, which zeroproxy
     // does not implement — so this middleware is always a pass-through.
     let _ = state;
     Ok(next.run(request).await)
@@ -125,7 +125,7 @@ pub async fn require_protected(
 ///
 /// Delegates to [`super::require_dashboard_or_management_api_key`] so that
 /// management-key-only semantics are consistent across all admin-tier
-/// endpoints — only keys created via `/api/keys` (or `cipherroute key add`)
+/// endpoints — only keys created via `/api/keys` (or `zeroproxy key add`)
 /// satisfy this gate.
 pub async fn require_admin(
     State(state): State<AppState>,

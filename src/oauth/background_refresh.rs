@@ -80,7 +80,7 @@ pub fn select_connections_needing_refresh(
 /// One scheduler tick. Fail-open at top level and per connection.
 async fn run_tick(state: &crate::server::state::AppState) {
     if TICK_RUNNING.swap(true, Ordering::SeqCst) {
-        tracing::debug!(target: "cipherroute::bg_token_refresh", "tick already running, skip");
+        tracing::debug!(target: "zeroproxy::bg_token_refresh", "tick already running, skip");
         return;
     }
     let _guard = TickGuard;
@@ -90,7 +90,7 @@ async fn run_tick(state: &crate::server::state::AppState) {
     if due.is_empty() {
         return;
     }
-    tracing::info!(target: "cipherroute::bg_token_refresh", "refreshing {} due OAuth connection(s)", due.len());
+    tracing::info!(target: "zeroproxy::bg_token_refresh", "refreshing {} due OAuth connection(s)", due.len());
 
     for conn in &due {
         let Some(refresh_token) = conn.refresh_token.clone() else {
@@ -105,12 +105,12 @@ async fn run_tick(state: &crate::server::state::AppState) {
         {
             Ok(result) => {
                 persist_refresh(state, &conn.id, &result).await;
-                tracing::info!(target: "cipherroute::bg_token_refresh",
+                tracing::info!(target: "zeroproxy::bg_token_refresh",
                     "connection {} ({}) refreshed", conn.id, conn.provider);
             }
             Err(e) => {
                 // Fail-open: log and move on.
-                tracing::warn!(target: "cipherroute::bg_token_refresh",
+                tracing::warn!(target: "zeroproxy::bg_token_refresh",
                     "connection {} ({}) refresh failed: {e}", conn.id, conn.provider);
             }
         }

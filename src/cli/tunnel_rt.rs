@@ -1,4 +1,4 @@
-//! `cipherroute tunnel *` — runtime tunnel commands (PLAN v3 mục 4.11).
+//! `zeroproxy tunnel *` — runtime tunnel commands (PLAN v3 mục 4.11).
 //!
 //! Distinct from the in-process `core::tunnel::TunnelManager` used by
 //! `Command::Tunnel` (Start/Stop/Status), these commands hit the live
@@ -109,9 +109,9 @@ async fn run_enable_disable(
     match result {
         Ok(payload) => {
             let schema = if enable {
-                "cipherroute.v1.tunnel.enable"
+                "zeroproxy.v1.tunnel.enable"
             } else {
-                "cipherroute.v1.tunnel.disable"
+                "zeroproxy.v1.tunnel.disable"
             };
             if ctx.is_robot() {
                 emit_robot(schema, payload)?;
@@ -136,7 +136,7 @@ async fn simple(rt: &Runtime, ctx: OutputCtx, path: &str, action: &str) -> anyho
         Ok(payload) => {
             if ctx.is_robot() {
                 emit_robot(
-                    &format!("cipherroute.v1.tunnel.tailscale.{}", action),
+                    &format!("zeroproxy.v1.tunnel.tailscale.{}", action),
                     payload,
                 )?;
             } else {
@@ -156,7 +156,7 @@ async fn run_check(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/tunnel/tailscale-check").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tunnel.tailscale.check", payload)?;
+                emit_robot("zeroproxy.v1.tunnel.tailscale.check", payload)?;
             } else {
                 let installed = payload
                     .get("installed")

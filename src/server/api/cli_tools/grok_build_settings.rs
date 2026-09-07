@@ -1,7 +1,7 @@
 //! Grok Build CLI settings — reads/writes `~/.grok/config.toml`.
 //!
 //! Port of 9router `src/app/api/cli-tools/grok-build-settings/route.js`.
-//! Writes a `[model.cipherroute]` custom model slot and sets it as `[models].default`.
+//! Writes a `[model.zeroproxy]` custom model slot and sets it as `[models].default`.
 
 use std::env;
 use std::path::PathBuf;
@@ -21,14 +21,14 @@ use tokio::{fs, process::Command};
 
 use crate::server::state::AppState;
 
-const MODEL_SLOT: &str = "cipherroute";
+const MODEL_SLOT: &str = "zeroproxy";
 const BUILTIN_DEFAULT: &str = "grok-build";
 /// 9router GROK_SUBAGENT_TYPES.
 const GROK_SUBAGENT_TYPES: [&str; 3] = ["general-purpose", "explore", "plan"];
 /// 9router SUBAGENT_MODELS_SECTION.
 const SUBAGENT_MODELS_SECTION: &str = "subagents.models";
 /// Subagent model-slot prefix: `${MODEL_SLOT}-${type}`.
-const SUBAGENT_SLOT_PREFIX: &str = "cipherroute-";
+const SUBAGENT_SLOT_PREFIX: &str = "zeroproxy-";
 /// 9router UNSET_SENTINEL — a subagent with no previous value.
 const UNSET_SENTINEL: &str = "__9router_unset__";
 
@@ -77,7 +77,7 @@ pub(super) async fn get_grok_build_settings(
             let model = parse_model_section(&toml);
             let default_model = parse_models_default(&toml);
             let subagents = parse_subagent_mappings(&toml);
-            let has_cipherroute = has_cipherroute_config(model.as_ref());
+            let has_zeroproxy = has_zeroproxy_config(model.as_ref());
             Json(json!({
                 "installed": true,
                 "settings": {
@@ -85,7 +85,7 @@ pub(super) async fn get_grok_build_settings(
                     "default": default_model,
                     "subagents": subagents,
                 },
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "configPath": config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -176,7 +176,7 @@ async fn read_config_toml() -> AnyhowResult<String> {
 }
 
 fn model_section_re() -> Regex {
-    // [model.cipherroute] ... until next [section] header or EOF.
+    // [model.zeroproxy] ... until next [section] header or EOF.
     // No look-around (rust regex crate): match the header, then non-header
     // lines are collected by section_body() instead.
     Regex::new(&format!(r"(?m)^\[model\.{MODEL_SLOT}\][ \t]*\r?\n"))
@@ -188,7 +188,7 @@ fn models_section_re() -> Regex {
 }
 
 fn prev_default_re() -> Regex {
-    Regex::new(r#"(?m)^# cipherroute-prev-default = "([^"]*)"[ \t]*\r?\n?"#)
+    Regex::new(r#"(?m)^# zeroproxy-prev-default = "([^"]*)"[ \t]*\r?\n?"#)
         .expect("valid prev-default regex")
 }
 
@@ -458,14 +458,14 @@ fn delete_subagent_field(toml: &str, key: &str) -> String {
 /// 9router rememberPreviousSubagent: record the current `[subagents.models]`
 /// mapping for a type under a marker comment before we override it.
 fn remember_prev_subagent(toml: &str, slot: &str) -> String {
-    let marker = format!("# cipherroute-prev-subagent-{slot} = ");
-    if toml.contains(&format!("# cipherroute-prev-subagent-{slot} =")) {
+    let marker = format!("# zeroproxy-prev-subagent-{slot} = ");
+    if toml.contains(&format!("# zeroproxy-prev-subagent-{slot} =")) {
         return toml.to_string();
     }
     let current = get_subagent_mapping(toml, slot);
     let value = current.unwrap_or_else(|| UNSET_SENTINEL.to_string());
-    let marker_line = format!("# cipherroute-prev-subagent-{slot} = \"{value}\"\n");
-    // Insert before the main [model.cipherroute] section if present.
+    let marker_line = format!("# zeroproxy-prev-subagent-{slot} = \"{value}\"\n");
+    // Insert before the main [model.zeroproxy] section if present.
     let main_re = model_section_re();
     if let Some(m) = main_re.find(toml) {
         return format!("{}{marker_line}{}", &toml[..m.start()], &toml[m.start()..]);
@@ -486,7 +486,7 @@ fn get_subagent_mapping(toml: &str, slot: &str) -> Option<String> {
 /// marker, or delete the field if it was unset before.
 fn restore_prev_subagent(toml: &str, slot: &str) -> String {
     let marker_re = Regex::new(&format!(
-        r#"(?m)^# cipherroute-prev-subagent-{slot} = "([^"]*)"[ \t]*\r?\n?"#
+        r#"(?m)^# zeroproxy-prev-subagent-{slot} = "([^"]*)"[ \t]*\r?\n?"#
     ))
     .expect("valid prev-subagent marker regex");
     let previous = marker_re
@@ -534,7 +534,7 @@ fn remember_prev_default(toml: &str) -> String {
     let current = parse_models_default(toml);
     match current {
         Some(ref c) if c != MODEL_SLOT => {
-            let marker = format!("# cipherroute-prev-default = \"{c}\"\n");
+            let marker = format!("# zeroproxy-prev-default = \"{c}\"\n");
             let model_re = model_section_re();
             if model_re.is_match(toml) {
                 return model_re
@@ -563,7 +563,7 @@ fn clear_models_default_if_ours(toml: &str) -> String {
     next
 }
 
-fn has_cipherroute_config(model: Option<&Value>) -> bool {
+fn has_zeroproxy_config(model: Option<&Value>) -> bool {
     model
         .and_then(|m| m.get("base_url"))
         .and_then(Value::as_str)
@@ -586,7 +586,7 @@ async fn write_grok_config(body: &SaveGrokBuildSettingsRequest) -> AnyhowResult<
         .api_key
         .clone()
         .filter(|k| !k.is_empty())
-        .unwrap_or_else(|| "sk_cipherroute".to_string());
+        .unwrap_or_else(|| "sk_zeroproxy".to_string());
 
     let mut toml = read_config_toml().await?;
     toml = remember_prev_default(&toml);
@@ -666,7 +666,7 @@ async fn reset_grok_config() -> AnyhowResult<Value> {
     fs::write(&path, next).await?;
     Ok(json!({
         "success": true,
-        "message": "cipherroute model slot removed from Grok Build",
+        "message": "zeroproxy model slot removed from Grok Build",
     }))
 }
 
@@ -710,7 +710,7 @@ model = "x"
         let section = build_model_section(
             "gcli/grok-build",
             "http://127.0.0.1:4623/v1",
-            "sk_cipherroute",
+            "sk_zeroproxy",
         );
         let next = upsert_model_section(toml, &section);
         let model = parse_model_section(&next).expect("section present");
@@ -730,7 +730,7 @@ model = "x"
         );
 
         let remembered = remember_prev_default(toml);
-        assert!(remembered.contains("cipherroute-prev-default"));
+        assert!(remembered.contains("zeroproxy-prev-default"));
         let cleared = clear_models_default_if_ours(&set_models_default(&remembered, MODEL_SLOT));
         assert_eq!(
             parse_models_default(&cleared).as_deref(),
@@ -754,14 +754,14 @@ model = "x"
     fn subagent_mappings_parsed() {
         let toml = format!(
             "[models]\ndefault = \"grok-build\"\n\n\
-             [model.cipherroute]\nmodel = \"gcli/grok-build\"\nbase_url = \"http://127.0.0.1:4623/v1\"\n\n\
-             [model.cipherroute-general-purpose]\nmodel = \"gcli/grok-4\"\nbase_url = \"http://127.0.0.1:4623/v1\"\n\n\
-             [subagents.models]\ngeneral-purpose = \"cipherroute-general-purpose\"\nexplore = \"x\"\n"
+             [model.zeroproxy]\nmodel = \"gcli/grok-build\"\nbase_url = \"http://127.0.0.1:4623/v1\"\n\n\
+             [model.zeroproxy-general-purpose]\nmodel = \"gcli/grok-4\"\nbase_url = \"http://127.0.0.1:4623/v1\"\n\n\
+             [subagents.models]\ngeneral-purpose = \"zeroproxy-general-purpose\"\nexplore = \"x\"\n"
         );
         let sub = parse_subagent_mappings(&toml);
         // general-purpose mapped to our slot → model parsed.
         let gp = &sub["general-purpose"];
-        assert_eq!(gp["mapping"], "cipherroute-general-purpose");
+        assert_eq!(gp["mapping"], "zeroproxy-general-purpose");
         assert_eq!(gp["model"]["model"], "gcli/grok-4");
         // explore mapped to something else → no model.
         assert_eq!(sub["explore"]["mapping"], "x");
@@ -792,7 +792,7 @@ model = "x"
         let sub = parse_subagent_mappings(&next);
         assert_eq!(
             sub["general-purpose"]["mapping"],
-            "cipherroute-general-purpose"
+            "zeroproxy-general-purpose"
         );
         assert_eq!(sub["general-purpose"]["model"]["model"], "gcli/grok-4");
         assert_eq!(
@@ -804,16 +804,16 @@ model = "x"
         let restored = remove_model_section_for_slot(&restored, &slot);
         let sub2 = parse_subagent_mappings(&restored);
         assert!(sub2["general-purpose"]["mapping"].is_null());
-        assert!(!restored.contains("[model.cipherroute-general-purpose]"));
+        assert!(!restored.contains("[model.zeroproxy-general-purpose]"));
     }
 
     #[test]
     fn context_window_parsed_from_section() {
-        let toml = "[model.cipherroute]\nmodel = \"m\"\nbase_url = \"http://x/v1\"\ncontext_window = 200000\n";
+        let toml = "[model.zeroproxy]\nmodel = \"m\"\nbase_url = \"http://x/v1\"\ncontext_window = 200000\n";
         let model = parse_model_section(toml).expect("section");
         assert_eq!(model["context_window"], serde_json::json!(200000));
         // Missing / invalid → null.
-        let toml2 = "[model.cipherroute]\nmodel = \"m\"\n";
+        let toml2 = "[model.zeroproxy]\nmodel = \"m\"\n";
         let model2 = parse_model_section(toml2).expect("section");
         assert!(model2["context_window"].is_null());
     }

@@ -1,4 +1,4 @@
-//! `cipherroute chat *` — interact with the proxy from the CLI.
+//! `zeroproxy chat *` — interact with the proxy from the CLI.
 
 use clap::Subcommand;
 use futures_util::StreamExt;
@@ -64,7 +64,7 @@ async fn run_models(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/v1/models").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.chat.models", payload)?;
+                emit_robot("zeroproxy.v1.chat.models", payload)?;
             } else {
                 let data = payload.get("data").and_then(Value::as_array);
                 let count = data.map(|a| a.len()).unwrap_or(0);
@@ -88,7 +88,7 @@ async fn run_tags(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/tags").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.chat.tags", payload)?;
+                emit_robot("zeroproxy.v1.chat.tags", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -126,7 +126,7 @@ async fn run_send(
     match rt.post_json("/api/dashboard/chat/completions", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.chat.response", payload)?;
+                emit_robot("zeroproxy.v1.chat.response", payload)?;
             } else {
                 let content = payload
                     .get("choices")
@@ -175,7 +175,7 @@ async fn run_stream(
             .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&bytes).into_owned()));
         if ctx.is_robot() {
             let envelope = json!({
-                "schema": "cipherroute.v1.chat.event",
+                "schema": "zeroproxy.v1.chat.event",
                 "ok": true,
                 "data": event,
                 "error": null,

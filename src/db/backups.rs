@@ -1,7 +1,7 @@
-//! Database backup snapshot/restore operations for cipherroute.
+//! Database backup snapshot/restore operations for zeroproxy.
 //!
 //! Ported from OmniRoute's `src/lib/db/backup.ts` and adapted for the JSON
-//! `db.json` store used by cipherroute. Each snapshot is a single timestamped
+//! `db.json` store used by zeroproxy. Each snapshot is a single timestamped
 //! file under `${DATA_DIR}/db_backups/` of the form
 //! `db_<utc-iso-no-colons>_<reason>.json`.
 //!
@@ -157,7 +157,7 @@ impl BackupManager {
 
         if json_bytes.len() < MIN_BACKUP_BYTES as usize {
             tracing::warn!(
-                target: "cipherroute::db::backups",
+                target: "zeroproxy::db::backups",
                 size = json_bytes.len(),
                 "skipping backup — snapshot JSON too small to be valid"
             );
@@ -182,7 +182,7 @@ impl BackupManager {
             if let Some(latest) = self.latest_backup_size().await? {
                 if latest > MIN_BACKUP_BYTES && (json_bytes.len() as u64) < latest / 2 {
                     tracing::warn!(
-                        target: "cipherroute::db::backups",
+                        target: "zeroproxy::db::backups",
                         previous = latest,
                         current = json_bytes.len(),
                         "skipping backup — snapshot shrank by >50% since last backup"
@@ -201,7 +201,7 @@ impl BackupManager {
 
         let info = describe_backup(&self.backup_dir, &filename).await?;
         tracing::info!(
-            target: "cipherroute::db::backups",
+            target: "zeroproxy::db::backups",
             id = %info.id,
             size = info.size,
             reason = %info.reason,
@@ -238,7 +238,7 @@ impl BackupManager {
                 Ok(info) => entries.push(info),
                 Err(err) => {
                     tracing::warn!(
-                        target: "cipherroute::db::backups",
+                        target: "zeroproxy::db::backups",
                         file = %name_str,
                         error = %err,
                         "skipping unreadable backup file"
@@ -290,7 +290,7 @@ impl BackupManager {
         if fs::try_exists(&path).await? {
             fs::remove_file(&path).await?;
             tracing::info!(
-                target: "cipherroute::db::backups",
+                target: "zeroproxy::db::backups",
                 id = %backup_id,
                 "deleted db backup"
             );
@@ -338,7 +338,7 @@ impl BackupManager {
             let path = self.backup_dir.join(&info.id);
             if let Err(err) = fs::remove_file(&path).await {
                 tracing::warn!(
-                    target: "cipherroute::db::backups",
+                    target: "zeroproxy::db::backups",
                     id = %info.id,
                     error = %err,
                     "failed to delete backup"

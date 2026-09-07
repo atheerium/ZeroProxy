@@ -157,7 +157,7 @@ impl ClientPool {
                 tokio::time::sleep(CLEANUP_INTERVAL).await;
                 pool.cleanup_stale();
                 tracing::trace!(
-                    target: "cipherroute::client_pool",
+                    target: "zeroproxy::client_pool",
                     "cleaned stale connections: {} reqwest, {} hyper remaining",
                     pool.reqwest_clients.len(),
                     pool.hyper_clients.len(),

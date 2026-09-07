@@ -199,7 +199,7 @@ impl StreamingTransformer for AnthropicToOpenAiTransformer {
                     Ok(event) => event,
                     Err(e) => {
                         tracing::trace!(
-                            target: "cipherroute::transform",
+                            target: "zeroproxy::transform",
                             "Anthropic parse error ({} bytes): {}",
                             data.len(),
                             e
@@ -481,7 +481,7 @@ impl StreamingTransformer for GeminiToOpenAiTransformer {
                     Ok(event) => event,
                     Err(e) => {
                         tracing::trace!(
-                            target: "cipherroute::transform",
+                            target: "zeroproxy::transform",
                             "Gemini parse error ({} bytes): {}",
                             data.len(),
                             e
@@ -630,7 +630,7 @@ impl StreamingTransformer for OllamaToOpenAiTransformer {
                     Ok(event) => event,
                     Err(e) => {
                         tracing::trace!(
-                            target: "cipherroute::transform",
+                            target: "zeroproxy::transform",
                             "Ollama parse error ({} bytes): {}",
                             data.len(),
                             e
@@ -787,7 +787,7 @@ impl StreamingTransformer for CommandCodeToOpenAiTransformer {
             }
         } else {
             tracing::trace!(
-                target: "cipherroute::transform",
+                target: "zeroproxy::transform",
                 "CommandCode: initial JSON parse failed ({} bytes)",
                 line.len()
             );
@@ -797,7 +797,7 @@ impl StreamingTransformer for CommandCodeToOpenAiTransformer {
             Ok(v) => v,
             Err(e) => {
                 tracing::trace!(
-                    target: "cipherroute::transform",
+                    target: "zeroproxy::transform",
                     "CommandCode parse error ({} bytes): {}",
                     line.len(),
                     e

@@ -1,4 +1,4 @@
-//! `cipherroute usage *` — runtime usage statistics.
+//! `zeroproxy usage *` — runtime usage statistics.
 //!
 //! These commands talk to the running server's `/api/usage/*` endpoints.
 //! They are deliberately thin wrappers: the server already owns formatting
@@ -100,7 +100,7 @@ async fn run_summary(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/usage/summary").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.summary", payload)?;
+                emit_robot("zeroproxy.v1.usage.summary", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -151,7 +151,7 @@ async fn run_summary(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
 
 async fn run_daily(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/usage/daily").await {
-        Ok(payload) => emit_listy(ctx, "cipherroute.v1.usage.daily", payload, |entries| {
+        Ok(payload) => emit_listy(ctx, "zeroproxy.v1.usage.daily", payload, |entries| {
             humanln(ctx, format!("{} days", entries.len()));
         }),
         Err(e) => rt_error_to_exit(ctx, e),
@@ -161,7 +161,7 @@ async fn run_daily(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
 async fn run_chart(rt: &Runtime, ctx: OutputCtx, period: &str) -> anyhow::Result<i32> {
     let path = format!("/api/usage/chart?period={}", urlencoding::encode(period));
     match rt.get_json(&path).await {
-        Ok(payload) => emit_listy(ctx, "cipherroute.v1.usage.chart", payload, |entries| {
+        Ok(payload) => emit_listy(ctx, "zeroproxy.v1.usage.chart", payload, |entries| {
             humanln(ctx, format!("{} buckets", entries.len()));
         }),
         Err(e) => rt_error_to_exit(ctx, e),
@@ -176,7 +176,7 @@ async fn run_history(rt: &Runtime, ctx: OutputCtx, limit: Option<u64>) -> anyhow
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.history", payload)?;
+                emit_robot("zeroproxy.v1.usage.history", payload)?;
             } else {
                 let entries = payload
                     .get("history")
@@ -196,7 +196,7 @@ async fn run_stats(rt: &Runtime, ctx: OutputCtx, period: &str) -> anyhow::Result
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.stats", payload)?;
+                emit_robot("zeroproxy.v1.usage.stats", payload)?;
             } else {
                 let totals = payload.get("totals").cloned().unwrap_or(json!({}));
                 humanln(
@@ -241,7 +241,7 @@ async fn run_providers(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/usage/providers").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.providers", payload)?;
+                emit_robot("zeroproxy.v1.usage.providers", payload)?;
             } else {
                 let providers = payload
                     .get("providers")
@@ -285,7 +285,7 @@ async fn run_logs(
     match rt.get_json_query("/api/usage/logs", &query).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.logs", payload)?;
+                emit_robot("zeroproxy.v1.usage.logs", payload)?;
             } else {
                 let rows = payload
                     .get("logs")
@@ -318,7 +318,7 @@ async fn run_request_logs(rt: &Runtime, ctx: OutputCtx, id: &str) -> anyhow::Res
                 )?);
             }
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.request_log", payload)?;
+                emit_robot("zeroproxy.v1.usage.request_log", payload)?;
             } else {
                 let first = &rows[0];
                 humanln(
@@ -352,7 +352,7 @@ async fn run_stream(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
         let body: Value = serde_json::from_slice(&bytes)
             .unwrap_or_else(|_| Value::String(String::from_utf8_lossy(&bytes).into_owned()));
         let envelope = json!({
-            "schema": "cipherroute.v1.usage.event",
+            "schema": "zeroproxy.v1.usage.event",
             "ok": true,
             "data": body,
             "error": null,
@@ -368,7 +368,7 @@ async fn run_pricing(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/usage/pricing").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.usage.pricing", payload)?;
+                emit_robot("zeroproxy.v1.usage.pricing", payload)?;
             } else {
                 let pricing = payload
                     .get("pricing")

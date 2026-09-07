@@ -174,7 +174,7 @@ fn spawn_bridge(plugin: PluginDef, _data_dir: PathBuf) -> Result<Arc<BridgeEntry
                     Ok(None) => break,
                     Err(err) => {
                         tracing::warn!(
-                            target: "cipherroute::mcp",
+                            target: "zeroproxy::mcp",
                             plugin = %name,
                             error = %err,
                             "stdout read error; tearing down bridge"
@@ -194,7 +194,7 @@ fn spawn_bridge(plugin: PluginDef, _data_dir: PathBuf) -> Result<Arc<BridgeEntry
         tokio::spawn(async move {
             let mut reader = BufReader::new(stderr).lines();
             while let Ok(Some(line)) = reader.next_line().await {
-                tracing::warn!(target: "cipherroute::mcp", plugin = %name, "{line}");
+                tracing::warn!(target: "zeroproxy::mcp", plugin = %name, "{line}");
             }
         });
     }

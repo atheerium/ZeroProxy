@@ -1,4 +1,4 @@
-//! `cipherroute provider oauth *` — wrap the OAuth/device-code/import endpoints.
+//! `zeroproxy provider oauth *` — wrap the OAuth/device-code/import endpoints.
 //!
 //! Each subcommand maps to a single HTTP endpoint on the running server.
 //! For `start` and `status` we keep things stateless: the server already owns
@@ -102,7 +102,7 @@ async fn run_start(
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.start", payload)?;
+                emit_robot("zeroproxy.v1.oauth.start", payload)?;
             } else {
                 let url = payload
                     .get("url")
@@ -129,7 +129,7 @@ async fn run_poll(
     match rt.post_json(&path, &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.poll", payload)?;
+                emit_robot("zeroproxy.v1.oauth.poll", payload)?;
             } else {
                 let status = payload.get("status").and_then(Value::as_str).unwrap_or("?");
                 humanln(ctx, format!("status: {}", status));
@@ -145,7 +145,7 @@ async fn run_status(rt: &Runtime, ctx: OutputCtx, provider: &str) -> anyhow::Res
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.status", payload)?;
+                emit_robot("zeroproxy.v1.oauth.status", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -169,7 +169,7 @@ async fn run_refresh(
     match rt.post_json(&path, &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.refresh", payload)?;
+                emit_robot("zeroproxy.v1.oauth.refresh", payload)?;
             } else {
                 let status = payload
                     .get("status")
@@ -188,7 +188,7 @@ async fn run_import_kiro(rt: &Runtime, ctx: OutputCtx, auto: bool) -> anyhow::Re
         match rt.get_json("/api/oauth/kiro/auto-import").await {
             Ok(payload) => {
                 if ctx.is_robot() {
-                    emit_robot("cipherroute.v1.oauth.import_kiro", payload)?;
+                    emit_robot("zeroproxy.v1.oauth.import_kiro", payload)?;
                 } else {
                     humanln(
                         ctx,
@@ -208,7 +208,7 @@ async fn run_import_kiro(rt: &Runtime, ctx: OutputCtx, auto: bool) -> anyhow::Re
         match rt.post_json("/api/oauth/kiro/import", &body).await {
             Ok(payload) => {
                 if ctx.is_robot() {
-                    emit_robot("cipherroute.v1.oauth.import_kiro", payload)?;
+                    emit_robot("zeroproxy.v1.oauth.import_kiro", payload)?;
                 } else {
                     humanln(ctx, "Imported Kiro identity.");
                 }
@@ -225,7 +225,7 @@ async fn run_iflow_cookie(rt: &Runtime, ctx: OutputCtx, source: &str) -> anyhow:
     match rt.post_json("/api/oauth/iflow/cookie", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.iflow_cookie", payload)?;
+                emit_robot("zeroproxy.v1.oauth.iflow_cookie", payload)?;
             } else {
                 humanln(ctx, "Imported iFlow cookie.");
             }
@@ -241,7 +241,7 @@ async fn run_gitlab_pat(rt: &Runtime, ctx: OutputCtx, source: &str) -> anyhow::R
     match rt.post_json("/api/oauth/gitlab/pat", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.oauth.gitlab_pat", payload)?;
+                emit_robot("zeroproxy.v1.oauth.gitlab_pat", payload)?;
             } else {
                 humanln(ctx, "Imported GitLab PAT.");
             }

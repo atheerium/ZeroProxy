@@ -5,7 +5,7 @@
 //! output against a stored `insta` snapshot.
 //!
 //! To update snapshots after an intentional translation change:
-//!   INSTA_UPDATE=always cargo test -p cipherroute -- test::translator
+//!   INSTA_UPDATE=always cargo test -p zeroproxy -- test::translator
 //!
 //! To review pending (new/changed) snapshots:
 //!   cargo insta review

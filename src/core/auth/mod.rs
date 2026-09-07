@@ -13,19 +13,19 @@ pub const CLI_TOKEN_HEADER: &str = "x-9r-cli-token";
 type HmacSha256 = Hmac<Sha256>;
 
 /// Directory where the persisted API-key HMAC secret file is stored.
-fn cipherroute_dir() -> PathBuf {
+fn zeroproxy_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("DATA_DIR") {
         return PathBuf::from(dir);
     }
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .unwrap_or_else(|| PathBuf::from(".").into());
-    PathBuf::from(home).join(".cipherroute")
+    PathBuf::from(home).join(".zeroproxy")
 }
 
 /// Path to the persisted API-key HMAC secret file.
 fn api_key_secret_path() -> PathBuf {
-    cipherroute_dir().join("api_key_secret")
+    zeroproxy_dir().join("api_key_secret")
 }
 
 /// Generate a fresh random secret: 32 random bytes hex-encoded (64 chars).
@@ -56,7 +56,7 @@ fn persist_secret_to(path: PathBuf, secret: &str) {
 /// Resolution order at first call (then cached for the process lifetime):
 /// 1. `API_KEY_SECRET` environment variable, when set.
 /// 2. A per-install random secret persisted at `$DATA_DIR/api_key_secret`
-///    (or `~/.cipherroute/api_key_secret`). Generated on first use so there is
+///    (or `~/.zeroproxy/api_key_secret`). Generated on first use so there is
 ///    never a well-known fallback; the persisted value keeps existing API
 ///    keys valid across restarts.
 ///    Pure resolution: env var wins, then persisted file, then a fresh random
@@ -87,7 +87,7 @@ pub fn api_key_secret() -> &'static str {
 
 /// Path to the persisted dashboard initial-password file.
 fn initial_password_path() -> PathBuf {
-    cipherroute_dir().join("initial_password")
+    zeroproxy_dir().join("initial_password")
 }
 
 /// Generate a fresh random dashboard password: 20 base62 chars (~119 bits).
@@ -109,7 +109,7 @@ fn generate_random_password() -> String {
 /// 2. A per-install random password persisted at `$DATA_DIR/initial_password`.
 ///    Generated on first use so there is never a well-known default; the
 ///    persisted value keeps the same password valid across restarts until
-///    the operator sets a real one or runs `cipherroute auth reset-password`.
+///    the operator sets a real one or runs `zeroproxy auth reset-password`.
 ///    Pure resolution: env var wins, then the persisted generated password,
 ///    then a fresh random one.
 fn resolve_dashboard_initial_password(env: Option<&str>, path: &std::path::Path) -> String {
@@ -129,7 +129,7 @@ fn resolve_dashboard_initial_password(env: Option<&str>, path: &std::path::Path)
 /// Resolves the dashboard initial password.
 ///
 /// Reads from disk on every call (no process-wide cache) so that:
-/// - `cipherroute auth reset-password` from another process takes effect
+/// - `zeroproxy auth reset-password` from another process takes effect
 ///   immediately on the running server (a cached value would keep the old,
 ///   possibly leaked password valid until restart);
 /// - a fresh install mints the password exactly once and the startup banner
@@ -146,7 +146,7 @@ pub fn dashboard_initial_password() -> String {
 /// [`has_stored_password_hash`]), this identifies a fresh install running on
 /// the generated initial password — i.e. the password is "ephemeral": minted
 /// on first use, replaced once the operator sets a real one, and resettable
-/// via `cipherroute auth reset-password`.
+/// via `zeroproxy auth reset-password`.
 pub fn dashboard_password_is_ephemeral() -> bool {
     std::env::var("INITIAL_PASSWORD").is_err()
 }
@@ -418,7 +418,7 @@ mod tests {
     #[test]
     fn reset_takes_effect_immediately_no_cache() {
         // Regression: `dashboard_initial_password()` used to cache the value
-        // in a process-wide OnceLock, so after `cipherroute auth reset-password`
+        // in a process-wide OnceLock, so after `zeroproxy auth reset-password`
         // the running server kept accepting the old (possibly leaked) password
         // until restart. It must now read from disk on every call.
         let _guard = ENV_LOCK.lock().unwrap();

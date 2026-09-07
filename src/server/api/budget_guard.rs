@@ -26,7 +26,7 @@ use crate::types::UsageDb;
 pub const BUDGET_REMAINING_HEADER: &str = "x-budget-remaining";
 
 /// Robot-envelope schema stamped on the 429 body when the budget is exceeded.
-pub const BUDGET_EXCEEDED_SCHEMA: &str = "cipherroute.v1.budget.exceeded";
+pub const BUDGET_EXCEEDED_SCHEMA: &str = "zeroproxy.v1.budget.exceeded";
 
 /// Enforce the per-key monthly budget.
 ///

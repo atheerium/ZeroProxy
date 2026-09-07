@@ -1,4 +1,4 @@
-//! Cloud auth, credential refresh, and alias APIs that must match cipherroute.
+//! Cloud auth, credential refresh, and alias APIs that must match zeroproxy.
 
 use axum::{
     extract::State,

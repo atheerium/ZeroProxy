@@ -49,11 +49,11 @@ async fn get_continue_settings(State(state): State<AppState>, headers: HeaderMap
 
     match read_json_optional(&settings_path).await {
         Ok(Some(settings)) => {
-            let has_cipherroute = has_cipherroute_config(&settings);
+            let has_zeroproxy = has_zeroproxy_config(&settings);
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "settingsPath": settings_path.to_string_lossy().to_string(),
             }))
             .into_response()
@@ -148,7 +148,7 @@ async fn delete_continue_settings(State(state): State<AppState>, headers: Header
 // ---------------------------------------------------------------------------
 
 /// Check whether the config has at least one CipherRoute model entry.
-fn has_cipherroute_config(config: &Value) -> bool {
+fn has_zeroproxy_config(config: &Value) -> bool {
     config
         .get("models")
         .and_then(Value::as_array)

@@ -1,6 +1,6 @@
 //! Tests for CLI tool settings writing behavior.
 //!
-//! Tests the build_apply_body function (used by the `cipherroute tool apply`
+//! Tests the build_apply_body function (used by the `zeroproxy tool apply`
 //! command) and the server-side write functions for per-tool settings files.
 //!
 //! Uses tempfile to simulate home directories so no real config files are

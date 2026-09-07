@@ -54,7 +54,7 @@ impl Db {
                 Ok(db) => Ok(db),
                 Err(err) if is_permission_denied(&err) && *dir != default => {
                     tracing::warn!(
-                        target: "cipherroute::db",
+                        target: "zeroproxy::db",
                         configured = %dir.display(),
                         fallback = %default.display(),
                         "DATA_DIR not writable (permission denied); falling back to default"
@@ -72,7 +72,7 @@ impl Db {
         fs::create_dir_all(&data_dir).await?;
 
         // SQLite is the sole runtime store — mandatory, no fallback.
-        let sqlite_path = data_dir.join("cipherroute.sqlite");
+        let sqlite_path = data_dir.join("zeroproxy.sqlite");
         let sqlite = sqlite::SqliteDb::open(&sqlite_path).map_err(|e| {
             anyhow::anyhow!(
                 "Failed to open SQLite DB at {}: {}",
@@ -88,7 +88,7 @@ impl Db {
 
         if !migrated_marker.exists() && (db_json_path.exists() || usage_json_path.exists()) {
             tracing::info!(
-                target: "cipherroute::db",
+                target: "zeroproxy::db",
                 "Legacy JSON files detected — importing into SQLite once"
             );
 
@@ -114,7 +114,7 @@ impl Db {
                 })
                 .await
                 .context("spawn_blocking for db.json import")??;
-                tracing::info!(target: "cipherroute::db", "db.json imported into SQLite");
+                tracing::info!(target: "zeroproxy::db", "db.json imported into SQLite");
             }
 
             if usage_json_path.exists() {
@@ -129,14 +129,14 @@ impl Db {
                 })
                 .await
                 .context("spawn_blocking for usage.json import")??;
-                tracing::info!(target: "cipherroute::db", "usage.json imported into SQLite");
+                tracing::info!(target: "zeroproxy::db", "usage.json imported into SQLite");
             }
 
             fs::write(&migrated_marker, b"1").await.with_context(|| {
                 format!("write migrated marker at {}", migrated_marker.display())
             })?;
             tracing::info!(
-                target: "cipherroute::db",
+                target: "zeroproxy::db",
                 "Legacy JSON import complete — wrote {}",
                 migrated_marker.display()
             );
@@ -441,7 +441,7 @@ impl Db {
     pub fn export_db(&self) -> anyhow::Result<(Vec<u8>, String)> {
         let snapshot = self.snapshot.load_full();
         let json = serde_json::to_vec_pretty(snapshot.as_ref())?;
-        let filename = format!("cipherroute-db-{}.json", chrono_like_stamp());
+        let filename = format!("zeroproxy-db-{}.json", chrono_like_stamp());
         Ok((json, filename))
     }
 
@@ -460,7 +460,7 @@ impl Db {
     pub fn export_usage_db(&self) -> anyhow::Result<(Vec<u8>, String)> {
         let snapshot = self.usage_snapshot.load_full();
         let json = serde_json::to_vec_pretty(snapshot.as_ref())?;
-        let filename = format!("cipherroute-usage-{}.json", chrono_like_stamp());
+        let filename = format!("zeroproxy-usage-{}.json", chrono_like_stamp());
         Ok((json, filename))
     }
 
@@ -493,8 +493,8 @@ fn default_data_dir() -> PathBuf {
     let home = std::env::var_os("HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
-    let preferred = home.join(".cipherroute");
-    let legacy = home.join(".cipherroute");
+    let preferred = home.join(".zeroproxy");
+    let legacy = home.join(".zeroproxy");
 
     if preferred.exists() || !legacy.exists() {
         preferred
@@ -551,7 +551,7 @@ mod tests {
     #[tokio::test]
     async fn db_init_creates_sqlite() {
         let dir = tempfile::tempdir().unwrap();
-        let sqlite_path = dir.path().join("cipherroute.sqlite");
+        let sqlite_path = dir.path().join("zeroproxy.sqlite");
 
         // SQLite must be created and readable.
         let sqlite = SqliteDb::open(&sqlite_path).unwrap();
@@ -571,7 +571,7 @@ mod tests {
     #[tokio::test]
     async fn db_init_creates_usage_sqlite() {
         let dir = tempfile::tempdir().unwrap();
-        let sqlite_path = dir.path().join("cipherroute-usage.sqlite");
+        let sqlite_path = dir.path().join("zeroproxy-usage.sqlite");
 
         let sqlite = SqliteDb::open(&sqlite_path).unwrap();
         let usage_db = sqlite

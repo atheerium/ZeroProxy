@@ -309,7 +309,7 @@ mod tests {
     #[tokio::test]
     async fn test_performance_tracker_basic() {
         // Create a mock usage tracker
-        let temp_dir = std::env::temp_dir().join("cipherroute_test_perf");
+        let temp_dir = std::env::temp_dir().join("zeroproxy_test_perf");
         let _ = std::fs::remove_dir_all(&temp_dir);
         let db = crate::db::Db::load_from(&temp_dir).await.unwrap();
         let db = Arc::new(db);

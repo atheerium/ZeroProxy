@@ -7,17 +7,17 @@ use tokio::net::TcpListener;
 use tracing::info;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 
-use cipherroute::cli::config::ResolvedConfig;
-use cipherroute::cli::{
+use zeroproxy::cli::config::ResolvedConfig;
+use zeroproxy::cli::{
     chat as cli_chat, db as cli_db, logs as cli_logs, media as cli_media, mitm as cli_mitm,
     provider_oauth, quota as cli_quota, settings as cli_settings, tool as cli_tool,
     translator as cli_translator, tunnel_rt as cli_tunnel_rt, usage as cli_usage, AuthCmd, Cli,
     Command, ProviderCmd, SchemaCmd, ServerCmd, TunnelCmd,
 };
-use cipherroute::db::watcher::spawn_watcher;
-use cipherroute::db::Db;
-use cipherroute::server::console_logs::{shared_console_log_buffer, ConsoleLogMakeWriter};
-use cipherroute::server::state::AppState;
+use zeroproxy::db::watcher::spawn_watcher;
+use zeroproxy::db::Db;
+use zeroproxy::server::console_logs::{shared_console_log_buffer, ConsoleLogMakeWriter};
+use zeroproxy::server::state::AppState;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
@@ -31,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut cli = Cli::parse();
-    cipherroute::core::tls::ensure_rustls_provider();
+    zeroproxy::core::tls::ensure_rustls_provider();
     let ctx = cli.output_ctx();
     let resolved = ResolvedConfig::resolve(cli.cli_overrides())?;
 
@@ -52,38 +52,38 @@ async fn main() -> anyhow::Result<()> {
                 }
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::run_provider(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::run_provider(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
             Command::Key { cmd } => {
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::run_key(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::run_key(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
             Command::Pool { cmd } => {
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::run_pool(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::run_pool(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
             Command::Combo { cmd } => {
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::combo::run(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::combo::run(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
             Command::Models { cmd } => {
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::models::run(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::models::run(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
             Command::Tunnel { cmd } => match cmd {
                 TunnelCmd::Start { .. } | TunnelCmd::Stop | TunnelCmd::Status => {
                     let db = Db::load().await?;
                     let db = Arc::new(db);
-                    cipherroute::cli::run_tunnel(cmd.clone(), db, ctx).await?;
+                    zeroproxy::cli::run_tunnel(cmd.clone(), db, ctx).await?;
                     return Ok(());
                 }
                 TunnelCmd::Enable { provider, port } => {
@@ -154,23 +154,23 @@ async fn main() -> anyhow::Result<()> {
             }
             Command::Completion { shell } => {
                 let mut cmd = Cli::command();
-                clap_complete::generate(*shell, &mut cmd, "cipherroute", &mut std::io::stdout());
+                clap_complete::generate(*shell, &mut cmd, "zeroproxy", &mut std::io::stdout());
                 return Ok(());
             }
             Command::Schema { cmd } => {
                 let exit = match cmd {
                     SchemaCmd::List => {
-                        cipherroute::cli::schema::run_list(ctx)?;
+                        zeroproxy::cli::schema::run_list(ctx)?;
                         0
                     }
                     SchemaCmd::Show { resource } => {
-                        cipherroute::cli::schema::run_show(ctx, resource)?
+                        zeroproxy::cli::schema::run_show(ctx, resource)?
                     }
                     SchemaCmd::Example { resource } => {
-                        cipherroute::cli::schema::run_example(ctx, resource)?
+                        zeroproxy::cli::schema::run_example(ctx, resource)?
                     }
                     SchemaCmd::Stability => {
-                        cipherroute::cli::schema::run_stability(ctx)?;
+                        zeroproxy::cli::schema::run_stability(ctx)?;
                         0
                     }
                 };
@@ -180,7 +180,7 @@ async fn main() -> anyhow::Result<()> {
                 return Ok(());
             }
             Command::Doctor => {
-                let exit = cipherroute::cli::doctor::run(ctx, &resolved).await?;
+                let exit = zeroproxy::cli::doctor::run(ctx, &resolved).await?;
                 if exit != 0 {
                     std::process::exit(exit);
                 }
@@ -196,17 +196,17 @@ async fn main() -> anyhow::Result<()> {
                     // Hoist subcommand-level `--no-open` onto the global flag
                     // so the foreground server-boot path (which reads
                     // `cli.no_open`) honors it. Bug #6: README and SKILL.md
-                    // both show `cipherroute server start --detach --no-open`,
+                    // both show `zeroproxy server start --detach --no-open`,
                     // so we accept it here too.
                     if *no_open {
                         cli.no_open = true;
                     }
-                    let opts = cipherroute::cli::server::StartOptions {
+                    let opts = zeroproxy::cli::server::StartOptions {
                         host: host.clone().unwrap_or_else(|| cli.host.clone()),
                         port: port.unwrap_or(cli.port),
                         detach: *detach,
                     };
-                    match cipherroute::cli::server::run_start(ctx, &resolved, opts).await? {
+                    match zeroproxy::cli::server::run_start(ctx, &resolved, opts).await? {
                         Some(exit) => {
                             if exit != 0 {
                                 std::process::exit(exit);
@@ -218,21 +218,21 @@ async fn main() -> anyhow::Result<()> {
                     }
                 }
                 ServerCmd::Stop => {
-                    let exit = cipherroute::cli::server::run_stop(ctx, &resolved).await?;
+                    let exit = zeroproxy::cli::server::run_stop(ctx, &resolved).await?;
                     if exit != 0 {
                         std::process::exit(exit);
                     }
                     return Ok(());
                 }
                 ServerCmd::Status => {
-                    let exit = cipherroute::cli::server::run_status(ctx, &resolved).await?;
+                    let exit = zeroproxy::cli::server::run_status(ctx, &resolved).await?;
                     if exit != 0 {
                         std::process::exit(exit);
                     }
                     return Ok(());
                 }
                 ServerCmd::Init { force } => {
-                    let exit = cipherroute::cli::server::run_init(ctx, &resolved, *force).await?;
+                    let exit = zeroproxy::cli::server::run_init(ctx, &resolved, *force).await?;
                     if exit != 0 {
                         std::process::exit(exit);
                     }
@@ -248,9 +248,9 @@ async fn main() -> anyhow::Result<()> {
                         no_verify,
                         no_activate,
                     } => {
-                        cipherroute::cli::auth::run_login(
+                        zeroproxy::cli::auth::run_login(
                             ctx,
-                            cipherroute::cli::auth::LoginOptions {
+                            zeroproxy::cli::auth::LoginOptions {
                                 url: url.clone(),
                                 api_key: api_key.clone(),
                                 profile: profile.clone(),
@@ -263,22 +263,22 @@ async fn main() -> anyhow::Result<()> {
                     AuthCmd::Logout {
                         profile,
                         keep_default,
-                    } => cipherroute::cli::auth::run_logout(
+                    } => zeroproxy::cli::auth::run_logout(
                         ctx,
-                        cipherroute::cli::auth::LogoutOptions {
+                        zeroproxy::cli::auth::LogoutOptions {
                             profile: profile.clone(),
                             keep_default: *keep_default,
                         },
                     )?,
                     AuthCmd::Whoami { verify } => {
-                        cipherroute::cli::auth::run_whoami(ctx, &resolved, *verify).await?
+                        zeroproxy::cli::auth::run_whoami(ctx, &resolved, *verify).await?
                     }
-                    AuthCmd::List => cipherroute::cli::auth::run_list(ctx)?,
+                    AuthCmd::List => zeroproxy::cli::auth::run_list(ctx)?,
                     AuthCmd::ResetPassword { show } => {
-                        cipherroute::cli::auth::run_reset_password(
+                        zeroproxy::cli::auth::run_reset_password(
                             ctx,
                             &resolved,
-                            cipherroute::cli::auth::ResetPasswordOptions { show: *show },
+                            zeroproxy::cli::auth::ResetPasswordOptions { show: *show },
                         )
                         .await?
                     }
@@ -361,7 +361,7 @@ async fn main() -> anyhow::Result<()> {
             Command::Sync { cmd } => {
                 let db = Db::load().await?;
                 let db = Arc::new(db);
-                cipherroute::cli::sync::run(cmd.clone(), &db, ctx).await?;
+                zeroproxy::cli::sync::run(cmd.clone(), &db, ctx).await?;
                 return Ok(());
             }
         }
@@ -385,11 +385,11 @@ async fn main() -> anyhow::Result<()> {
     spawn_auto_backup(db.clone());
     // Prune old usage/request details on startup (keep 30 days).
     spawn_usage_retention_cleanup(db.clone());
-    cipherroute::server::auth::spawn_jti_cleanup();
+    zeroproxy::server::auth::spawn_jti_cleanup();
     // Snapshot before the db handle moves into AppState: the startup banner
     // needs the stored password-hash state after the server starts.
-    let banner_uses_generated_password = cipherroute::core::auth::dashboard_password_is_ephemeral()
-        && !cipherroute::core::auth::has_stored_password_hash(&db.snapshot().settings);
+    let banner_uses_generated_password = zeroproxy::core::auth::dashboard_password_is_ephemeral()
+        && !zeroproxy::core::auth::has_stored_password_hash(&db.snapshot().settings);
     let state = AppState::new(db)
         .init_oidc_from_env()
         .await
@@ -408,35 +408,35 @@ async fn main() -> anyhow::Result<()> {
         });
     }
     // Quota auto-ping foundation: observe enabled Claude/Codex OAuth windows.
-    cipherroute::server::api::quota_auto_ping::spawn_quota_auto_ping(state.clone());
+    zeroproxy::server::api::quota_auto_ping::spawn_quota_auto_ping(state.clone());
     // Provider health daemon: probe API-key providers every 3 min and degrade
     // them per observed status (429 → 2 min, 503 → 10 min, 5xx → 5 min).
-    cipherroute::core::health::spawn_health_daemon(state.clone());
+    zeroproxy::core::health::spawn_health_daemon(state.clone());
     // Daily model sync: fetch available models from upstream providers every 24h
     // and persist as custom_models (source: "auto_sync").
-    cipherroute::core::model_sync::spawn_model_sync(state.clone());
+    zeroproxy::core::model_sync::spawn_model_sync(state.clone());
 
     // Background proactive OAuth token refresh (9router
     // backgroundTokenRefresh.js): tick every 5 min, refresh tokens expiring
     // within max(provider lead, 30 min) so idle periods don't surface 401s.
-    cipherroute::oauth::background_refresh::spawn_background_token_refresh(state.clone().into());
+    zeroproxy::oauth::background_refresh::spawn_background_token_refresh(state.clone().into());
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let addr = format!("{}:{}", cli.host, cli.port);
-    info!("Starting cipherroute on {}", addr);
+    info!("Starting zeroproxy on {}", addr);
     let listener = TcpListener::bind(&addr).await?;
     let bound = listener.local_addr().ok();
     let bound_port = bound.map(|a| a.port()).unwrap_or(cli.port);
 
     // Resume tunnel/tailscale if settings say they were enabled last session.
     // Process supervision lives in Rust — not the browser tab.
-    cipherroute::server::api::quota_auto_ping::spawn_boot_resume(state.clone(), bound_port);
+    zeroproxy::server::api::quota_auto_ping::spawn_boot_resume(state.clone(), bound_port);
 
     // Print startup banner to stderr so the user sees it even when
     // stdout is captured (containers, CI, …). The tracing subscriber
     // writes to the log file only — this is the only terminal feedback.
     eprintln!();
-    eprintln!("  cipherroute {}", env!("CARGO_PKG_VERSION"));
+    eprintln!("  zeroproxy {}", env!("CARGO_PKG_VERSION"));
     eprintln!(
         "  Dashboard → http://{}:{}",
         browser_host(&cli.host),
@@ -451,13 +451,13 @@ async fn main() -> anyhow::Result<()> {
     // Surface the generated dashboard initial password exactly once. This
     // runs only when no `INITIAL_PASSWORD` env var and no stored bcrypt hash
     // exists, i.e. a fresh install using the generated fallback. The line is
-    // also captured in the detached-server log ($DATA_DIR/cipherroute.log).
+    // also captured in the detached-server log ($DATA_DIR/zeroproxy.log).
     if banner_uses_generated_password {
         eprintln!();
         eprintln!("  Initial dashboard password (shown only once):");
         eprintln!(
             "    {}",
-            cipherroute::core::auth::dashboard_initial_password()
+            zeroproxy::core::auth::dashboard_initial_password()
         );
         eprintln!("  Change it from the dashboard after logging in.");
     }
@@ -478,9 +478,9 @@ async fn main() -> anyhow::Result<()> {
             // ready, modern browsers retry. A short sleep is enough.
             tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             if let Err(err) = open::that(&url) {
-                tracing::warn!(target: "cipherroute", "could not open browser at {url}: {err}");
+                tracing::warn!(target: "zeroproxy", "could not open browser at {url}: {err}");
             } else {
-                tracing::info!(target: "cipherroute", "opened {url} in default browser");
+                tracing::info!(target: "zeroproxy", "opened {url} in default browser");
             }
         });
     }
@@ -528,10 +528,10 @@ fn is_stdout_tty() -> bool {
 /// so the loop just nudges the manager on a fixed interval. Honors
 /// `DISABLE_AUTO_BACKUP=1`.
 fn spawn_auto_backup(db: Arc<Db>) {
-    use cipherroute::db::backups::{BackupManager, BackupReason};
+    use zeroproxy::db::backups::{BackupManager, BackupReason};
 
     if BackupManager::is_auto_disabled() {
-        tracing::info!(target: "cipherroute::db::backups", "auto-backup disabled via DISABLE_AUTO_BACKUP");
+        tracing::info!(target: "zeroproxy::db::backups", "auto-backup disabled via DISABLE_AUTO_BACKUP");
         return;
     }
 
@@ -546,7 +546,7 @@ fn spawn_auto_backup(db: Arc<Db>) {
                 Ok(m) => m,
                 Err(err) => {
                     tracing::warn!(
-                        target: "cipherroute::db::backups",
+                        target: "zeroproxy::db::backups",
                         error = %err,
                         "auto backup: export failed"
                     );
@@ -556,13 +556,13 @@ fn spawn_auto_backup(db: Arc<Db>) {
             };
             match mgr.create_from_json(BackupReason::Auto, &json_bytes).await {
                 Ok(Some(info)) => tracing::debug!(
-                    target: "cipherroute::db::backups",
+                    target: "zeroproxy::db::backups",
                     id = %info.id,
                     "auto backup created"
                 ),
                 Ok(None) => {}
                 Err(err) => tracing::warn!(
-                    target: "cipherroute::db::backups",
+                    target: "zeroproxy::db::backups",
                     error = %err,
                     "auto backup failed"
                 ),
@@ -595,12 +595,12 @@ fn spawn_usage_retention_cleanup(db: Arc<Db>) {
             }) {
                 Ok(0) => {}
                 Ok(count) => tracing::info!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     deleted = count,
                     "pruned old usageHistory records"
                 ),
                 Err(e) => tracing::warn!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     error = %e,
                     "usage retention cleanup failed"
                 ),
@@ -621,12 +621,12 @@ fn spawn_usage_retention_cleanup(db: Arc<Db>) {
             }) {
                 Ok(0) => {}
                 Ok(count) => tracing::info!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     deleted = count,
                     "pruned old requestDetails records"
                 ),
                 Err(e) => tracing::warn!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     error = %e,
                     "requestDetails retention cleanup failed"
                 ),
@@ -650,12 +650,12 @@ fn spawn_usage_retention_cleanup(db: Arc<Db>) {
             }) {
                 Ok(0) => {}
                 Ok(count) => tracing::info!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     deleted = count,
                     "pruned old usageDaily records"
                 ),
                 Err(e) => tracing::warn!(
-                    target: "cipherroute::db::retention",
+                    target: "zeroproxy::db::retention",
                     error = %e,
                     "usageDaily retention cleanup failed"
                 ),
@@ -671,9 +671,9 @@ async fn seed_default_api_key_if_missing(db: &Db) -> anyhow::Result<()> {
         return Ok(());
     }
 
-    use cipherroute::core::auth::generate_api_key_with_machine;
-    use cipherroute::server::api::consistent_machine_id;
-    use cipherroute::types::ApiKey;
+    use zeroproxy::core::auth::generate_api_key_with_machine;
+    use zeroproxy::server::api::consistent_machine_id;
+    use zeroproxy::types::ApiKey;
 
     let machine_id = consistent_machine_id();
     let key = generate_api_key_with_machine(&machine_id);
@@ -691,7 +691,7 @@ async fn seed_default_api_key_if_missing(db: &Db) -> anyhow::Result<()> {
     };
 
     db.update(|d| d.api_keys.push(api_key.clone())).await?;
-    tracing::info!(target: "cipherroute", "seeded default API key (apiKeys was empty)");
+    tracing::info!(target: "zeroproxy", "seeded default API key (apiKeys was empty)");
     eprintln!("  Default API key (saved):");
     eprintln!("    {key}");
     eprintln!();
@@ -726,7 +726,7 @@ async fn run_route(
         .find(|k| k.is_active())
         .map(|k| k.key.clone())
         .ok_or_else(|| {
-            anyhow::anyhow!("No active API key. Add one: cipherroute key add <name> <key>")
+            anyhow::anyhow!("No active API key. Add one: zeroproxy key add <name> <key>")
         })?;
 
     let port = std::env::var("PORT")

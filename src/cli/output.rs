@@ -67,7 +67,7 @@ impl OutputCtx {
 /// line for streaming commands). Errors emit `RobotEnvelope::error(...)`.
 #[derive(Debug, Clone, Serialize)]
 pub struct RobotEnvelope {
-    /// Stable schema identifier, e.g. `cipherroute.v1.provider.list`.
+    /// Stable schema identifier, e.g. `zeroproxy.v1.provider.list`.
     pub schema: String,
     pub ok: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -98,7 +98,7 @@ impl RobotEnvelope {
 
     pub fn error(code: impl Into<String>, message: impl Into<String>) -> Self {
         Self {
-            schema: "cipherroute.v1.error".to_string(),
+            schema: "zeroproxy.v1.error".to_string(),
             ok: false,
             data: None,
             error: Some(RobotError {
@@ -117,7 +117,7 @@ impl RobotEnvelope {
 
     pub fn write_stdout(&self) -> io::Result<()> {
         let line = serde_json::to_string(self)
-            .unwrap_or_else(|_| "{\"schema\":\"cipherroute.v1.error\",\"ok\":false}".to_string());
+            .unwrap_or_else(|_| "{\"schema\":\"zeroproxy.v1.error\",\"ok\":false}".to_string());
         let mut stdout = io::stdout().lock();
         writeln!(stdout, "{}", line)?;
         stdout.flush()
@@ -181,9 +181,9 @@ mod tests {
 
     #[test]
     fn robot_envelope_ok_serializes_minimal_shape() {
-        let env = RobotEnvelope::ok("cipherroute.v1.test", json!({"foo": 1}));
+        let env = RobotEnvelope::ok("zeroproxy.v1.test", json!({"foo": 1}));
         let s = serde_json::to_string(&env).unwrap();
-        assert!(s.contains("\"schema\":\"cipherroute.v1.test\""));
+        assert!(s.contains("\"schema\":\"zeroproxy.v1.test\""));
         assert!(s.contains("\"ok\":true"));
         assert!(s.contains("\"foo\":1"));
         assert!(!s.contains("\"error\""));
@@ -193,7 +193,7 @@ mod tests {
     fn robot_envelope_error_uses_error_schema() {
         let env = RobotEnvelope::error("not_found", "missing");
         let s = serde_json::to_string(&env).unwrap();
-        assert!(s.contains("\"schema\":\"cipherroute.v1.error\""));
+        assert!(s.contains("\"schema\":\"zeroproxy.v1.error\""));
         assert!(s.contains("\"ok\":false"));
         assert!(s.contains("\"code\":\"not_found\""));
     }

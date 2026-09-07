@@ -279,7 +279,7 @@ mod tests {
     #[test]
     fn open_creates_parent_dir() {
         let tmp = std::env::temp_dir().join(format!(
-            "cipherroute-test-{}-{}",
+            "zeroproxy-test-{}-{}",
             std::process::id(),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)

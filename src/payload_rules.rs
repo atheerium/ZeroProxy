@@ -9,7 +9,7 @@
 //! * `override` — force params, replacing any caller-supplied value
 //! * `filter`   — strip JSON pointer-style paths from the outgoing payload
 //! * `default_raw` — `default`-style fill but applied to the raw upstream
-//!   payload after format conversion. In cipherroute today most providers
+//!   payload after format conversion. In zeroproxy today most providers
 //!   accept the body verbatim, so this currently behaves identically to
 //!   `default`. Kept as a distinct slot so we can wire it after the
 //!   per-provider transform layer lands without another schema bump.
@@ -200,7 +200,7 @@ pub fn apply_request_rules(
     mutated
 }
 
-/// `default_raw` is applied after format-conversion. In cipherroute's
+/// `default_raw` is applied after format-conversion. In zeroproxy's
 /// current pipeline the body is forwarded mostly verbatim, so we expose
 /// this as a separate entry point that callers can choose to invoke after
 /// they perform any provider-specific transform.
@@ -453,7 +453,7 @@ pub fn apply_system_prompt(body: &mut Value, config: &SystemPromptConfig) -> boo
     }
 
     // Anthropic-style top-level `system` field. (Not always present
-    // because cipherroute mostly sees OpenAI-format requests, but worth
+    // because zeroproxy mostly sees OpenAI-format requests, but worth
     // handling for the Anthropic-compat endpoint.)
     let system_field = obj.get("system");
     match config.mode {

@@ -2016,7 +2016,7 @@ fn cline_headers(token: &str, extra_headers: Vec<(String, String)>) -> Vec<(Stri
         ),
         ("X-PLATFORM".to_string(), std::env::consts::OS.to_string()),
         ("X-PLATFORM-VERSION".to_string(), "rust".to_string()),
-        ("X-CLIENT-TYPE".to_string(), "cipherroute".to_string()),
+        ("X-CLIENT-TYPE".to_string(), "zeroproxy".to_string()),
         (
             "X-CLIENT-VERSION".to_string(),
             env!("CARGO_PKG_VERSION").to_string(),

@@ -237,7 +237,7 @@ fn headroom_dir() -> std::path::PathBuf {
             let home = std::env::var_os("HOME")
                 .map(std::path::PathBuf::from)
                 .unwrap_or_else(|| std::path::PathBuf::from("."));
-            home.join(".cipherroute")
+            home.join(".zeroproxy")
         });
     data_dir.join("headroom")
 }

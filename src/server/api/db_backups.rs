@@ -116,7 +116,7 @@ async fn restore_handler(
         Ok(m) => m,
         Err(err) => {
             tracing::warn!(
-                target: "cipherroute::db::backups",
+                target: "zeroproxy::db::backups",
                 error = %err,
                 "pre-restore backup: export failed; aborting restore"
             );
@@ -128,7 +128,7 @@ async fn restore_handler(
         .await
     {
         tracing::warn!(
-            target: "cipherroute::db::backups",
+            target: "zeroproxy::db::backups",
             error = %err,
             "pre-restore backup failed; aborting restore"
         );
@@ -261,7 +261,7 @@ async fn import_handler(
         Ok(m) => m,
         Err(err) => {
             tracing::warn!(
-                target: "cipherroute::db::backups",
+                target: "zeroproxy::db::backups",
                 error = %err,
                 "pre-import backup: export failed; aborting import"
             );
@@ -273,7 +273,7 @@ async fn import_handler(
         .await
     {
         tracing::warn!(
-            target: "cipherroute::db::backups",
+            target: "zeroproxy::db::backups",
             error = %err,
             "pre-import backup failed; aborting import"
         );
@@ -336,7 +336,7 @@ async fn collect_multipart_payload(mut multipart: Multipart) -> Result<Vec<u8>, 
 
 fn internal_error(err: anyhow::Error) -> Response {
     tracing::error!(
-        target: "cipherroute::db::backups",
+        target: "zeroproxy::db::backups",
         error = %err,
         "db-backup operation failed"
     );

@@ -224,7 +224,7 @@ pub fn kimi() -> OAuthProviderConfig {
 pub fn kilocode() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "kilocode",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://api.kilo.ai/api/device-auth/codes",
         token_url: "https://api.kilo.ai/api/device-auth/codes",
         scopes: &[],
@@ -241,7 +241,7 @@ pub fn kilocode() -> OAuthProviderConfig {
 pub fn kimchi() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "kimchi",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "",
         token_url: "",
         scopes: &[],
@@ -301,7 +301,7 @@ pub fn gemini_cli() -> OAuthProviderConfig {
 pub fn qoder() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "qoder",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://api.qoder.ai/oauth/device/code",
         token_url: "https://api.qoder.ai/oauth/token",
         scopes: &[],
@@ -313,7 +313,7 @@ pub fn qoder() -> OAuthProviderConfig {
 pub fn clinepass() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "clinepass",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://api.cline.bot/api/v1/auth/authorize",
         token_url: "https://api.cline.bot/api/v1/auth/token",
         scopes: &[],
@@ -344,7 +344,7 @@ pub fn zed() -> OAuthProviderConfig {
 pub fn cline() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "cline",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://api.cline.bot/api/v1/auth/authorize",
         token_url: "https://api.cline.bot/api/v1/auth/token",
         scopes: &[],
@@ -358,7 +358,7 @@ pub fn cline() -> OAuthProviderConfig {
 pub fn codebuddy_cn() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "codebuddy-cn",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://copilot.tencent.com/v2/plugin/auth/state",
         token_url: "https://copilot.tencent.com/v2/plugin/auth/token",
         scopes: &[],
@@ -383,7 +383,7 @@ pub fn codebuddy_cn() -> OAuthProviderConfig {
 pub fn codebuddy_intl() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "codebuddy-intl",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://www.codebuddy.ai/v2/plugin/auth/state",
         token_url: "https://www.codebuddy.ai/v2/plugin/auth/token",
         scopes: &[],
@@ -408,7 +408,7 @@ pub fn codebuddy_intl() -> OAuthProviderConfig {
 pub fn cursor() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "cursor",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://api2.cursor.sh",
         token_url: "",
         scopes: &[],
@@ -447,7 +447,7 @@ pub fn antigravity() -> OAuthProviderConfig {
 pub fn gitlab() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "gitlab",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://gitlab.com/oauth/authorize",
         token_url: "https://gitlab.com/oauth/token",
         scopes: &["api", "read_user"],
@@ -461,7 +461,7 @@ pub fn gitlab() -> OAuthProviderConfig {
 pub fn codebuddy() -> OAuthProviderConfig {
     OAuthProviderConfig {
         id: "codebuddy",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url: "https://copilot.tencent.com/v2/plugin/auth/state",
         token_url: "https://copilot.tencent.com/v2/plugin/auth/token",
         scopes: &[],
@@ -494,7 +494,7 @@ pub fn gitlab_with_baseurl(base_url: &str) -> OAuthProviderConfig {
     let token_url = alloc_string(&format!("{}/oauth/token", base));
     OAuthProviderConfig {
         id: "gitlab-selfhost",
-        client_id: "cipherroute",
+        client_id: "zeroproxy",
         authorize_url,
         token_url,
         scopes: &["api", "read_user"],

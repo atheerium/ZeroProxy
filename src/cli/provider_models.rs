@@ -1,4 +1,4 @@
-//! `cipherroute provider models *` — model registry per provider.
+//! `zeroproxy provider models *` — model registry per provider.
 //!
 //! Wraps the in-DB model alias map (`modelAliases`), custom models
 //! (`customModels`), and disabled-model list (in `extra.disabledModels`).
@@ -118,7 +118,7 @@ async fn run_list(db: &Db, ctx: OutputCtx, provider: &str) -> anyhow::Result<()>
     });
 
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider-models.list", payload)?;
+        emit_robot("zeroproxy.v1.provider-models.list", payload)?;
     } else {
         humanln(ctx, format!("Provider models — {provider}"));
         humanln(ctx, format!("  custom ({}):", custom.len()));
@@ -195,7 +195,7 @@ async fn run_test(
     });
 
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.provider-models.test", payload)?;
+        emit_robot("zeroproxy.v1.provider-models.test", payload)?;
     } else if valid {
         humanln(ctx, format!("OK   {provider_alias} ({latency_ms}ms)"));
     } else {
@@ -219,7 +219,7 @@ async fn run_alias(db: &Db, ctx: OutputCtx, cmd: AliasCmd) -> anyhow::Result<()>
             let aliases = snapshot.model_aliases.clone();
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.provider-models.alias.list",
+                    "zeroproxy.v1.provider-models.alias.list",
                     json!({ "aliases": aliases, "count": aliases.len() }),
                 )?;
             } else {
@@ -258,7 +258,7 @@ async fn run_alias(db: &Db, ctx: OutputCtx, cmd: AliasCmd) -> anyhow::Result<()>
                 "target": { "provider": provider, "model": model }
             });
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.provider-models.alias.set", payload)?;
+                emit_robot("zeroproxy.v1.provider-models.alias.set", payload)?;
             } else {
                 humanln(ctx, format!("set alias {alias} -> {provider}/{model}"));
             }
@@ -269,7 +269,7 @@ async fn run_alias(db: &Db, ctx: OutputCtx, cmd: AliasCmd) -> anyhow::Result<()>
             if !existed {
                 if ctx.is_robot() {
                     emit_robot(
-                        "cipherroute.v1.provider-models.alias.unset",
+                        "zeroproxy.v1.provider-models.alias.unset",
                         json!({ "alias": alias, "removed": false }),
                     )?;
                 } else {
@@ -283,7 +283,7 @@ async fn run_alias(db: &Db, ctx: OutputCtx, cmd: AliasCmd) -> anyhow::Result<()>
             .await?;
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.provider-models.alias.unset",
+                    "zeroproxy.v1.provider-models.alias.unset",
                     json!({ "alias": alias, "removed": true }),
                 )?;
             } else {
@@ -321,9 +321,9 @@ async fn run_set_disabled(
     .await?;
 
     let schema = if disable {
-        "cipherroute.v1.provider-models.disable"
+        "zeroproxy.v1.provider-models.disable"
     } else {
-        "cipherroute.v1.provider-models.enable"
+        "zeroproxy.v1.provider-models.enable"
     };
     if ctx.is_robot() {
         emit_robot(
@@ -353,7 +353,7 @@ async fn run_custom(db: &Db, ctx: OutputCtx, cmd: CustomCmd) -> anyhow::Result<(
             let models = snapshot.custom_models.clone();
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.provider-models.custom.list",
+                    "zeroproxy.v1.provider-models.custom.list",
                     json!({ "customModels": models, "count": models.len() }),
                 )?;
             } else {
@@ -403,7 +403,7 @@ async fn run_custom(db: &Db, ctx: OutputCtx, cmd: CustomCmd) -> anyhow::Result<(
                 .await?;
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.provider-models.custom.add",
+                    "zeroproxy.v1.provider-models.custom.add",
                     serde_json::to_value(&entry)?,
                 )?;
             } else {
@@ -420,7 +420,7 @@ async fn run_custom(db: &Db, ctx: OutputCtx, cmd: CustomCmd) -> anyhow::Result<(
             if !existed {
                 if ctx.is_robot() {
                     emit_robot(
-                        "cipherroute.v1.provider-models.custom.remove",
+                        "zeroproxy.v1.provider-models.custom.remove",
                         json!({
                             "provider": provider,
                             "model": model,
@@ -439,7 +439,7 @@ async fn run_custom(db: &Db, ctx: OutputCtx, cmd: CustomCmd) -> anyhow::Result<(
             .await?;
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.provider-models.custom.remove",
+                    "zeroproxy.v1.provider-models.custom.remove",
                     json!({
                         "provider": provider,
                         "model": model,

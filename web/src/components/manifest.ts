@@ -19,8 +19,8 @@ interface Manifest {
 
 export default function manifest(): Manifest {
   return {
-    name: 'CipherRoute - AI Infrastructure Management',
-    short_name: 'CipherRoute',
+    name: 'ZeroProxy - AI Infrastructure Management',
+    short_name: 'ZeroProxy',
     description: 'One endpoint for all your AI providers. Manage keys, monitor usage, and scale effortlessly.',
     start_url: '/',
     display: 'standalone',

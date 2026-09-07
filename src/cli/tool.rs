@@ -1,4 +1,4 @@
-//! `cipherroute tool *` — manage CLI-tool integrations (claude, codex, copilot,
+//! `zeroproxy tool *` — manage CLI-tool integrations (claude, codex, copilot,
 //! openclaw, hermes, cowork) via `/api/cli-tools/*` (PLAN v3 mục 4.12).
 //!
 //! `apply <name>` writes a tool's settings (model/api-key/base-url) by POSTing
@@ -125,7 +125,7 @@ async fn run_list(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/cli-tools").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tool.list", payload)?;
+                emit_robot("zeroproxy.v1.tool.list", payload)?;
             } else {
                 let tools = payload
                     .get("tools")
@@ -166,7 +166,7 @@ async fn run_show(rt: &Runtime, ctx: OutputCtx, name: &str) -> anyhow::Result<i3
     match rt.get_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tool.show", payload)?;
+                emit_robot("zeroproxy.v1.tool.show", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -203,7 +203,7 @@ async fn run_apply(
     if dry_run {
         let preview = json!({"path": path, "body": body});
         if ctx.is_robot() {
-            emit_robot("cipherroute.v1.tool.apply.dry_run", preview)?;
+            emit_robot("zeroproxy.v1.tool.apply.dry_run", preview)?;
         } else {
             humanln(ctx, "[dry-run] POST {path}".replace("{path}", &path));
             humanln(ctx, serde_json::to_string_pretty(&body).unwrap_or_default());
@@ -214,7 +214,7 @@ async fn run_apply(
     match rt.post_json(&path, &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tool.apply", payload)?;
+                emit_robot("zeroproxy.v1.tool.apply", payload)?;
             } else {
                 humanln(ctx, format!("Applied settings for `{name}`."));
             }
@@ -293,7 +293,7 @@ async fn run_revert(rt: &Runtime, ctx: OutputCtx, name: &str) -> anyhow::Result<
     match rt.delete_json(&path).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tool.revert", payload)?;
+                emit_robot("zeroproxy.v1.tool.revert", payload)?;
             } else {
                 humanln(ctx, format!("Reverted `{name}` settings."));
             }
@@ -315,7 +315,7 @@ async fn run_execute(rt: &Runtime, ctx: OutputCtx, argv: Vec<String>) -> anyhow:
         "args": rest,
     });
     match rt.post_json("/api/cli-tools/execute", &body).await {
-        Ok(payload) => emit_command_result(ctx, "cipherroute.v1.tool.execute", payload),
+        Ok(payload) => emit_command_result(ctx, "zeroproxy.v1.tool.execute", payload),
         Err(e) => rt_error_to_exit(ctx, e),
     }
 }
@@ -332,7 +332,7 @@ async fn run_run(
         "args": argv,
     });
     match rt.post_json(&path, &body).await {
-        Ok(payload) => emit_command_result(ctx, "cipherroute.v1.tool.run", payload),
+        Ok(payload) => emit_command_result(ctx, "zeroproxy.v1.tool.run", payload),
         Err(e) => rt_error_to_exit(ctx, e),
     }
 }
@@ -363,7 +363,7 @@ async fn run_help(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/cli-tools/help").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.tool.help", payload)?;
+                emit_robot("zeroproxy.v1.tool.help", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -424,9 +424,9 @@ async fn run_antigravity(
         "enabled": enable,
     });
     let schema = if enable {
-        "cipherroute.v1.tool.antigravity.enable"
+        "zeroproxy.v1.tool.antigravity.enable"
     } else {
-        "cipherroute.v1.tool.antigravity.disable"
+        "zeroproxy.v1.tool.antigravity.disable"
     };
     if ctx.is_robot() {
         emit_robot(schema, combined)?;

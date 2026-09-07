@@ -1352,7 +1352,7 @@ async fn store_connection(
     let _client_id = provider_config
         .as_ref()
         .and_then(|c| c.get_param("client_id"))
-        .unwrap_or("cipherroute")
+        .unwrap_or("zeroproxy")
         .to_string();
 
     let _now = now_secs();
@@ -2695,7 +2695,7 @@ async fn start_device_code_compat(
             .map(|s| s.to_string())
             .unwrap_or_else(|| {
                 if provider_config.client_id.is_empty() {
-                    "cipherroute".to_string()
+                    "zeroproxy".to_string()
                 } else {
                     provider_config.client_id.to_string()
                 }
@@ -4391,7 +4391,7 @@ pub async fn start_oauth_flow(
     let client_id = if provider == "xai" {
         XAI_CLIENT_ID
     } else {
-        "cipherroute"
+        "zeroproxy"
     };
     let auth_url =
         provider_config.build_auth_url(client_id, redirect_uri, &state_value, &code_challenge);
@@ -4497,7 +4497,7 @@ pub async fn oauth_callback(
         code,
         &flow.code_verifier,
         redirect_uri,
-        "cipherroute",
+        "zeroproxy",
     )
     .await
     {
@@ -4604,7 +4604,7 @@ pub async fn start_device_code(
         // Prefer an explicit `client_id` in extra_params (e.g. KiloCode);
         // otherwise use the provider's configured client_id field (e.g. the
         // GitHub Copilot public client `Iv1.b507a08c87ecfe98`). Falling back
-        // to "cipherroute" breaks GitHub's device flow which rejects unknown
+        // to "zeroproxy" breaks GitHub's device flow which rejects unknown
         // client IDs with `{"error":"Not Found"}` — see 9router#442.
         let client_id = provider_config
             .get_param("client_id")
@@ -4616,7 +4616,7 @@ pub async fn start_device_code(
                     Some(provider_config.client_id.to_string())
                 }
             })
-            .unwrap_or_else(|| "cipherroute".to_string());
+            .unwrap_or_else(|| "zeroproxy".to_string());
 
         match device_code::start_device_flow(&provider_config, &client_id).await {
             Ok(resp) => (resp, None),
@@ -4966,7 +4966,7 @@ pub async fn refresh_token(
     // provider has its own refresh wire format — claude posts JSON to
     // api.anthropic.com, codex via refreshCodexToken, iflow adds a Basic
     // auth header, xai/grok use their own client_id. The generic
-    // form-encoded grant with client_id "cipherroute" only ever worked for
+    // form-encoded grant with client_id "zeroproxy" only ever worked for
     // Auth0-style endpoints, so route through the per-provider dispatcher.
     let provider_specific_data = connection
         .map(|c| c.provider_specific_data.clone())

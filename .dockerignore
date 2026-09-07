@@ -34,7 +34,7 @@ images/
 *.log
 logs/
 data/
-.cipherroute/
+.zeroproxy/
 
 # Test artifacts
 coverage/

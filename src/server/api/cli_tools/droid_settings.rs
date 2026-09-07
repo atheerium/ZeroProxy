@@ -54,11 +54,11 @@ async fn get_droid_settings(State(state): State<AppState>, headers: HeaderMap) -
 
     match read_droid_settings().await {
         Ok(settings) => {
-            let has_cipherroute = settings.as_ref().is_some_and(has_cipherroute_droid_settings);
+            let has_zeroproxy = settings.as_ref().is_some_and(has_zeroproxy_droid_settings);
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "settingsPath": droid_settings_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -196,7 +196,7 @@ async fn write_droid_settings(
         }));
     }
 
-    // Intentionally matches cipherroute's whole-array reordering behavior, including
+    // Intentionally matches zeroproxy's whole-array reordering behavior, including
     // pre-existing non-CipherRoute entries that may shift indexes.
     if let Some(default_index) = default_index {
         if default_index < custom_models.len() {
@@ -262,7 +262,7 @@ async fn reset_droid_settings() -> AnyhowResult<Value> {
     }))
 }
 
-fn has_cipherroute_droid_settings(settings: &Value) -> bool {
+fn has_zeroproxy_droid_settings(settings: &Value) -> bool {
     settings
         .get("customModels")
         .and_then(Value::as_array)

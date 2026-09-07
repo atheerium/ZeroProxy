@@ -19,7 +19,7 @@ pub fn export_db(db: &SqliteDb) -> (Vec<u8>, String) {
         .unwrap_or(Value::Null);
     let bytes = serde_json::to_vec_pretty(&json_val).unwrap_or_default();
     let stamp = chrono_like_stamp();
-    (bytes, format!("cipherroute-db-{stamp}.json"))
+    (bytes, format!("zeroproxy-db-{stamp}.json"))
 }
 
 /// Export usage history to canonical format.
@@ -29,7 +29,7 @@ pub fn export_usage(db: &SqliteDb) -> (Vec<u8>, String) {
         .unwrap_or(Value::Null);
     let bytes = serde_json::to_vec_pretty(&json_val).unwrap_or_default();
     let stamp = chrono_like_stamp();
-    (bytes, format!("cipherroute-usage-{stamp}.json"))
+    (bytes, format!("zeroproxy-usage-{stamp}.json"))
 }
 
 pub(crate) fn export_all(conn: &Connection) -> rusqlite::Result<Value> {

@@ -33,7 +33,7 @@ pub fn smart_filter_text(text: &str) -> Option<String> {
         let head_end = MAX_TEXT_CHARS.saturating_sub(300);
         let head = &collapsed[..head_end];
         format!(
-            "{head}\n\n... [truncated {} chars by cipherroute bridge. Page is large; ask user to scroll/navigate to a specific section, or click an element with the refs shown above]",
+            "{head}\n\n... [truncated {} chars by zeroproxy bridge. Page is large; ask user to scroll/navigate to a specific section, or click an element with the refs shown above]",
             text.len() - head.len()
         )
     } else {
@@ -147,7 +147,7 @@ fn collapse_repeated(text: &str) -> String {
             }
             let omitted = group_len - COLLAPSE_KEEP_HEAD - COLLAPSE_KEEP_TAIL;
             out.push(format!(
-                "{indent}... [{omitted} similar \"{role}\" items omitted by cipherroute bridge]"
+                "{indent}... [{omitted} similar \"{role}\" items omitted by zeroproxy bridge]"
             ));
             for line in &lines[tail_start..j] {
                 out.push((*line).to_string());
@@ -301,7 +301,7 @@ mod tests {
         let out = smart_filter_text(&huge).expect("should filter");
         assert!(out.len() <= MAX_TEXT_CHARS + 300);
         assert!(out.contains("truncated"));
-        assert!(out.contains("cipherroute bridge"));
+        assert!(out.contains("zeroproxy bridge"));
     }
 
     #[test]

@@ -137,7 +137,7 @@ pub mod device_code {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             tracing::warn!(
-                target: "cipherroute::oauth",
+                target: "zeroproxy::oauth",
                 provider = _provider_config.id,
                 "device code request failed: HTTP {} body={}",
                 status,
@@ -176,7 +176,7 @@ pub mod device_code {
                 (
                     "client_id",
                     if client_id.is_empty() {
-                        "cipherroute"
+                        "zeroproxy"
                     } else {
                         client_id
                     },
@@ -335,7 +335,7 @@ pub mod device_code {
 
     pub async fn kiro_register_client() -> Result<(String, String), OAuthError> {
         let client = reqwest::Client::new();
-        let client_id = format!("cipherroute-{}", uuid::Uuid::new_v4());
+        let client_id = format!("zeroproxy-{}", uuid::Uuid::new_v4());
         let now_secs = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap_or_default()

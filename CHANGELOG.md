@@ -105,9 +105,9 @@
   - `earliest_retry_after` filter — filter out already-expired rate-limit timestamps with `.filter(|until| *until > now)`
 
 ### API test fixes
-- Fix `db_backups_api` test assertion — match `cipherroute-db-` prefix instead of `cipherroute-backup-`
+- Fix `db_backups_api` test assertion — match `zeroproxy-db-` prefix instead of `zeroproxy-backup-`
 - Fix `proxy_pools_api` dashboard cookie auth tests — sign JWT with `jwt_secret()`
-  instead of hardcoded `cipherroute-default-secret-change-me`
+  instead of hardcoded `zeroproxy-default-secret-change-me`
 
 ## CI/CD
 - All 1008 tests pass across all platforms (CI ✅)
@@ -186,7 +186,7 @@
 
 # v0.1.0 (2026-06-07)
 
-Initial cipherroute release. Single-binary AI router.<!-- keep existing content below -->
+Initial zeroproxy release. Single-binary AI router.<!-- keep existing content below -->
 
 
 # v0.4.14 (2026-05-03)
@@ -217,7 +217,7 @@ Initial cipherroute release. Single-binary AI router.<!-- keep existing content 
 ## Fixes
 - Include alias-backed models in /v1/models listing
 - Improve cloudflared exit code error messages
-- Redirect ~/.cipherroute to DATA_DIR in Docker (persist usage across updates)
+- Redirect ~/.zeroproxy to DATA_DIR in Docker (persist usage across updates)
 - Prevent SSE listener leak in console-logs stream
 - Gate MITM sudo prompts on server platform
 - Fix Azure validation and persistence (providerSpecificData, Organization required)

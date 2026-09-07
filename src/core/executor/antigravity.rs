@@ -1459,7 +1459,7 @@ mod tests {
 
     #[test]
     fn transform_request_strips_competitive_system_prompt() {
-        // Regression test for cipherroute-mfs3.5 (9router v0.5.55 parity).
+        // Regression test for zeroproxy-mfs3.5 (9router v0.5.55 parity).
         // Antigravity flags requests containing Zed IDE's Claude prompt and
         // blocks them with 429 Quota Exhausted. Strip the competitive text.
         let competitive_text = "You are a Claude agent, built on Anthropic's Claude Agent SDK.";

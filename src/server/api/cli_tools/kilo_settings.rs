@@ -52,7 +52,7 @@ pub(super) async fn get_kilo_settings(
 
     match read_auth().await {
         Ok(auth) => {
-            let has_cipherroute = has_cipherroute_config(&auth);
+            let has_zeroproxy = has_zeroproxy_config(&auth);
             let auth_keys = auth
                 .as_ref()
                 .and_then(|value| value.as_object())
@@ -61,7 +61,7 @@ pub(super) async fn get_kilo_settings(
             Json(json!({
                 "installed": true,
                 "settings": { "auth": auth_keys },
-                "hasCipherRoute": has_cipherroute,
+                "hasCipherRoute": has_zeroproxy,
                 "authPath": auth_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -144,11 +144,11 @@ async fn read_auth() -> AnyhowResult<Option<Value>> {
     read_json_optional(&auth_path()).await
 }
 
-fn has_cipherroute_config(auth: &Option<Value>) -> bool {
+fn has_zeroproxy_config(auth: &Option<Value>) -> bool {
     let Some(auth) = auth else { return false };
     let entry = auth
         .get("openai-compatible")
-        .or_else(|| auth.get("cipherroute"))
+        .or_else(|| auth.get("zeroproxy"))
         .or_else(|| auth.get("9router"));
     let Some(entry) = entry else { return false };
     let base_url = entry
@@ -158,7 +158,7 @@ fn has_cipherroute_config(auth: &Option<Value>) -> bool {
         .unwrap_or("");
     base_url.contains("localhost")
         || base_url.contains("127.0.0.1")
-        || base_url.contains("cipherroute")
+        || base_url.contains("zeroproxy")
 }
 
 async fn write_kilo_settings(body: &SaveKiloSettingsRequest) -> AnyhowResult<()> {
@@ -219,7 +219,7 @@ async fn reset_kilo_settings() -> AnyhowResult<Value> {
         }));
     };
     auth.remove("openai-compatible");
-    auth.remove("cipherroute");
+    auth.remove("zeroproxy");
     auth.remove("9router");
     write_json(&auth_path(), &Value::Object(auth)).await?;
 

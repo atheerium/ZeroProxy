@@ -80,9 +80,9 @@ export default function SkillsPageClient() {
     <div className="max-w-4xl mx-auto space-y-6 pb-8">
       <Card padding="md">
         <div className="text-xs text-body mb-2">Paste this to your AI:</div>
-        <div className="px-3 py-2 rounded-lg bg-surface-soft font-mono text-[12px] text-ink">
-          Read this skill and use it: {getSkillRawUrl("cipherroute")}
-        </div>
+          <div className="px-3 py-2 rounded-lg bg-surface-soft font-mono text-[12px] text-ink">
+            Read this skill and use it: {getSkillRawUrl("zeroproxy")}
+          </div>
       </Card>
 
       <div className="space-y-2">

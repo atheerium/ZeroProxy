@@ -1,4 +1,4 @@
-//! Runtime HTTP client for CLI commands that need a live `cipherroute` server.
+//! Runtime HTTP client for CLI commands that need a live `zeroproxy` server.
 //!
 //! M4 (observability, runtime usage/logs/quota/chat, oauth) commands cannot
 //! work against `db.json` alone — they need the in-process state of the
@@ -9,7 +9,7 @@
 //! Design points:
 //!
 //! 1. **Endpoint resolution**. We prefer the remote `--url` from the resolved
-//!    config (if set), otherwise we read the `cipherroute.endpoint` sidecar
+//!    config (if set), otherwise we read the `zeroproxy.endpoint` sidecar
 //!    written by `server start` and dial `http://127.0.0.1:<port>`. This
 //!    matches what `server status` already does (see `cli::server`).
 //! 2. **Auth**. We send `x-api-key` if the resolved config has one, otherwise
@@ -302,7 +302,7 @@ impl Runtime {
 /// Resolve the base URL we should dial.
 ///
 /// 1. `--url` / `CIPHERROUTE_URL` if set on the resolved config.
-/// 2. The `cipherroute.endpoint` sidecar written by `server start --detach`.
+/// 2. The `zeroproxy.endpoint` sidecar written by `server start --detach`.
 /// 3. `http://127.0.0.1:<DEFAULT_LOCAL_PORT>` as a last-ditch default so the
 ///    `usage` etc. commands still produce a deterministic "not running"
 ///    error rather than panicking.
@@ -552,7 +552,7 @@ pub fn read_stdin_to_string() -> anyhow::Result<String> {
 ///    --from-file foo.json` working).
 /// 4. otherwise → treat the string as inline text.
 ///
-/// This fixes bug #12 in the bug report: `cipherroute chat send --prompt
+/// This fixes bug #12 in the bug report: `zeroproxy chat send --prompt
 /// "hello"` previously failed with `read input file 'hello': No such file
 /// or directory` because the legacy implementation always treated the
 /// argument as a path. Inline text is now the default for non-file
@@ -583,7 +583,7 @@ pub fn rt_error_to_exit(
     let code = err.code();
     let message = match &err {
         RuntimeError::Unreachable { url, detail } => format!(
-            "server not running ({url}: {detail}). Start it with: cipherroute server start --detach"
+            "server not running ({url}: {detail}). Start it with: zeroproxy server start --detach"
         ),
         RuntimeError::Auth(m) => format!("auth: {m}"),
         RuntimeError::NotFound(m) => format!("not found: {m}"),

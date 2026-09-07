@@ -1,4 +1,4 @@
-//! Catalog of MCP plugins cipherroute can spawn under its stdio→SSE bridge,
+//! Catalog of MCP plugins zeroproxy can spawn under its stdio→SSE bridge,
 //! plus the allowlist that gates which executables may be used for custom
 //! plugins.
 //!

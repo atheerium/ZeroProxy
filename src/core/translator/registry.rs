@@ -442,7 +442,7 @@ impl TranslationRegistry {
             // Direct route: exact source→target pair (lossless for claude→kiro etc.)
             if let Some(transform) = self.request_transforms.get(&(source, target)) {
                 tracing::debug!(
-                    target: "cipherroute::translator",
+                    target: "zeroproxy::translator",
                     "route=direct request {}→{}",
                     source.as_str(),
                     target.as_str()
@@ -450,7 +450,7 @@ impl TranslationRegistry {
                 let _ = transform(model, body, stream, credentials);
             } else {
                 tracing::debug!(
-                    target: "cipherroute::translator",
+                    target: "zeroproxy::translator",
                     "route=pivot request {}→openai→{}",
                     source.as_str(),
                     target.as_str()
@@ -532,7 +532,7 @@ impl TranslationRegistry {
         // Direct route (provider→client)
         if let Some(transform) = self.response_transforms.get(&(source, target)) {
             tracing::debug!(
-                target: "cipherroute::translator",
+                target: "zeroproxy::translator",
                 "route=direct response {}→{}",
                 source.as_str(),
                 target.as_str()
@@ -541,7 +541,7 @@ impl TranslationRegistry {
         }
 
         tracing::debug!(
-            target: "cipherroute::translator",
+            target: "zeroproxy::translator",
             "route=pivot response {}→openai→{}",
             source.as_str(),
             target.as_str()

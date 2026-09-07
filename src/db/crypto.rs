@@ -162,19 +162,19 @@ const TAG_LEN: usize = 16;
 
 /// Directory where the persisted crypto salt file is stored (mirrors the
 /// `api_key_secret` persistence pattern).
-fn cipherroute_dir() -> PathBuf {
+fn zeroproxy_dir() -> PathBuf {
     if let Some(dir) = std::env::var_os("DATA_DIR") {
         return PathBuf::from(dir);
     }
     let home = std::env::var_os("HOME")
         .or_else(|| std::env::var_os("USERPROFILE"))
         .unwrap_or_else(|| PathBuf::from(".").into());
-    PathBuf::from(home).join(".cipherroute")
+    PathBuf::from(home).join(".zeroproxy")
 }
 
 /// Path to the persisted per-install crypto salt.
 fn crypto_salt_path() -> PathBuf {
-    cipherroute_dir().join("crypto_salt")
+    zeroproxy_dir().join("crypto_salt")
 }
 
 /// Get (or create on first use) the per-install 16-byte salt for the
@@ -386,7 +386,7 @@ fn decrypt_opt(field: &mut Option<String>, key: &str) {
     if key.is_empty() {
         if is_marked {
             tracing::error!(
-                target: "cipherroute::crypto",
+                target: "zeroproxy::crypto",
                 "Encrypted credential present but CIPHERROUTE_ENCRYPTION_KEY is unset — \
                  clearing field so ciphertext is never sent upstream. Set the same key \
                  used when writing the DB."
@@ -413,7 +413,7 @@ fn decrypt_opt(field: &mut Option<String>, key: &str) {
         Err(err) => {
             if is_marked || looks_like_ciphertext(&payload) {
                 tracing::error!(
-                    target: "cipherroute::crypto",
+                    target: "zeroproxy::crypto",
                     "Failed to decrypt credential (wrong CIPHERROUTE_ENCRYPTION_KEY?): {err:#} — \
                      clearing field so ciphertext is never sent upstream"
                 );
@@ -501,7 +501,7 @@ pub fn open_db(bytes: &[u8], key: Option<&str>) -> anyhow::Result<AppDb> {
             let actual = sha256_checksum(&recomputed);
             if &actual != expected {
                 tracing::warn!(
-                    target: "cipherroute::db::crypto",
+                    target: "zeroproxy::db::crypto",
                     expected = expected,
                     actual = actual,
                     "JSON checksum mismatch — data may be corrupt on disk"
@@ -560,7 +560,7 @@ pub fn open_json(bytes: &[u8]) -> anyhow::Result<Value> {
             let actual = sha256_checksum(&recomputed);
             if &actual != expected {
                 tracing::warn!(
-                    target: "cipherroute::db::crypto",
+                    target: "zeroproxy::db::crypto",
                     expected = expected,
                     actual = actual,
                     "JSON checksum mismatch — data may be corrupt on disk"

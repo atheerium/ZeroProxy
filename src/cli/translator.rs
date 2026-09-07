@@ -1,4 +1,4 @@
-//! `cipherroute translator *` — request translator pipeline (PLAN v3 mục 4.13).
+//! `zeroproxy translator *` — request translator pipeline (PLAN v3 mục 4.13).
 //!
 //! Talks to `/api/translator/*`. The server exposes a 3-step pipeline
 //! (`/api/translator/translate?step=1..3`): step 1 detects source/target
@@ -99,7 +99,7 @@ async fn run_formats(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
     match rt.get_json("/api/translator/formats").await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.translator.formats", payload)?;
+                emit_robot("zeroproxy.v1.translator.formats", payload)?;
             } else {
                 let arr = payload.as_array().cloned().unwrap_or_default();
                 for f in &arr {
@@ -159,7 +159,7 @@ async fn run_translate(
     match rt.post_json("/api/translator/translate", &step3).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.translator.translate", payload)?;
+                emit_robot("zeroproxy.v1.translator.translate", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -190,7 +190,7 @@ async fn run_send(
     match rt.post_json("/api/translator/send", &send_body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.translator.send", payload)?;
+                emit_robot("zeroproxy.v1.translator.send", payload)?;
             } else {
                 humanln(
                     ctx,
@@ -214,7 +214,7 @@ async fn run_preset_list(rt: &Runtime, ctx: OutputCtx) -> anyhow::Result<i32> {
                 .unwrap_or_else(|| json!({}));
             if ctx.is_robot() {
                 emit_robot(
-                    "cipherroute.v1.translator.preset.list",
+                    "zeroproxy.v1.translator.preset.list",
                     json!({"presets": presets}),
                 )?;
             } else if let Some(obj) = presets.as_object() {
@@ -243,7 +243,7 @@ async fn run_preset_save(
     match rt.post_json("/api/translator/save", &body).await {
         Ok(payload) => {
             if ctx.is_robot() {
-                emit_robot("cipherroute.v1.translator.preset.save", payload)?;
+                emit_robot("zeroproxy.v1.translator.preset.save", payload)?;
             } else {
                 humanln(ctx, format!("Saved preset `{name}`."));
             }
@@ -266,7 +266,7 @@ async fn run_preset_load(rt: &Runtime, ctx: OutputCtx, name: String) -> anyhow::
                     let parsed: Value = serde_json::from_str(&s).unwrap_or(Value::String(s));
                     if ctx.is_robot() {
                         emit_robot(
-                            "cipherroute.v1.translator.preset.load",
+                            "zeroproxy.v1.translator.preset.load",
                             json!({"name": name, "body": parsed}),
                         )?;
                     } else {
@@ -280,7 +280,7 @@ async fn run_preset_load(rt: &Runtime, ctx: OutputCtx, name: String) -> anyhow::
                 Some(other) => {
                     if ctx.is_robot() {
                         emit_robot(
-                            "cipherroute.v1.translator.preset.load",
+                            "zeroproxy.v1.translator.preset.load",
                             json!({"name": name, "body": other}),
                         )?;
                     } else {

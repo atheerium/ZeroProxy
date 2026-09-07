@@ -1,4 +1,4 @@
-//! `cipherroute key *` — extended API key lifecycle commands (M3).
+//! `zeroproxy key *` — extended API key lifecycle commands (M3).
 //!
 //! Complements the existing `key list` / `key add` (which now live as
 //! variants on `KeyCmd` in `cli::mod`). These commands implement the
@@ -86,7 +86,7 @@ async fn run_get(db: &Db, ctx: OutputCtx, id_or_name: &str) -> anyhow::Result<()
         "createdAt": key.created_at,
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.key.get", payload)?;
+        emit_robot("zeroproxy.v1.key.get", payload)?;
     } else {
         humanln(ctx, format!("Key: {} ({})", key.name, key.id));
         humanln(ctx, format!("  key:    {}", mask(&key.key)));
@@ -121,7 +121,7 @@ async fn run_rotate(db: &Db, ctx: OutputCtx, id_or_name: &str) -> anyhow::Result
         "newKeyMasked": mask(&new_secret),
     });
     if ctx.is_robot() {
-        emit_robot("cipherroute.v1.key.rotate", payload)?;
+        emit_robot("zeroproxy.v1.key.rotate", payload)?;
     } else {
         humanln(ctx, format!("rotated key '{id_or_name}'"));
         humanln(ctx, format!("  new key: {new_secret}"));
@@ -137,7 +137,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
         }
         if ctx.is_robot() {
             emit_robot(
-                "cipherroute.v1.key.delete",
+                "zeroproxy.v1.key.delete",
                 json!({ "key": id_or_name, "deleted": false }),
             )?;
         } else {
@@ -152,7 +152,7 @@ async fn run_delete(db: &Db, ctx: OutputCtx, id_or_name: &str, strict: bool) -> 
     .await?;
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.key.delete",
+            "zeroproxy.v1.key.delete",
             json!({ "key": id_or_name, "deleted": true }),
         )?;
     } else {
@@ -182,9 +182,9 @@ async fn run_set_active(
     })
     .await?;
     let schema = if active {
-        "cipherroute.v1.key.enable"
+        "zeroproxy.v1.key.enable"
     } else {
-        "cipherroute.v1.key.disable"
+        "zeroproxy.v1.key.disable"
     };
     if ctx.is_robot() {
         emit_robot(schema, json!({ "key": id_or_name, "active": active }))?;
@@ -283,7 +283,7 @@ async fn run_apply(db: &Db, ctx: OutputCtx, from_file: &str, prune: bool) -> any
     let summary = diff.summary();
     if ctx.is_robot() {
         emit_robot(
-            "cipherroute.v1.key.apply",
+            "zeroproxy.v1.key.apply",
             json!({ "diff": diff, "summary": summary, "prune": prune }),
         )?;
     } else {
