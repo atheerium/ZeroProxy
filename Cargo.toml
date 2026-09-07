@@ -124,7 +124,7 @@ aes-gcm = "0.10"
 # Argon2id KDF — credential key derivation (H20)
 argon2 = "0.5"
 md-5 = "0.10"
-pkcs8 = "0.10"
+pkcs8 = "0.11"
 time = "0.3"
 
 # Client identity
