@@ -97,6 +97,7 @@ Usage: ./scripts/dev.sh [OPTIONS] [MODE]
 OPTIONS (run from repo root — no cd scripts needed):
   --fast          Fast incremental build (default). Cargo debug + web only if stale. ~10-20s.
   --full          Full rebuild + checks. Always rebuilds web, runs fmt/clippy/tests. ~2-5m.
+                  (dev mode uses --web-dir so web changes are instant — no binary rebuild needed)
   --web-only      Only rebuild web/dist (pnpm build).
   --backend-only  Only rebuild Rust binary (cargo build).
   --release       Use release profile (implies slower optimized build).
@@ -281,8 +282,8 @@ case "$MODE" in
     check_dirty_tree || true
     kill_port
     build
-    echo "== starting $BIN server start --port $PORT --detach --no-open =="
-    "$BIN" server start --detach --no-open --port "$PORT"
+    echo "== starting $BIN --web-dir web/dist server start --port $PORT --detach --no-open =="
+    "$BIN" --web-dir "$REPO_ROOT/web/dist" server start --detach --no-open --port "$PORT"
     echo "== status =="
     "$BIN" --robot server status 2>&1 | head -n 20 || curl -sf "http://127.0.0.1:${PORT}/health" && echo "health ok"
     echo "Logs: tail -f ~/.zeroproxy/log.txt  (or journalctl --user -u zeroproxy -f if using service)"
@@ -292,10 +293,10 @@ case "$MODE" in
     check_dirty_tree || true
     kill_port
     build
-    echo "== starting $BIN server start --port $PORT (foreground, Ctrl+C to stop) =="
+    echo "== starting $BIN --web-dir web/dist server start --port $PORT (foreground, Ctrl+C to stop) =="
     echo "   Dashboard: http://127.0.0.1:${PORT}"
     echo "   API:       http://127.0.0.1:${PORT}/v1  (Bearer \$CIPHERROUTE_API_KEY)"
-    exec "$BIN" server start --port "$PORT" --no-open
+    exec "$BIN" --web-dir "$REPO_ROOT/web/dist" server start --port "$PORT" --no-open
     ;;
   *)
     echo "Unknown mode: $MODE" >&2

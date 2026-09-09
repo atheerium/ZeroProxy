@@ -57,12 +57,18 @@ Core workflow that must never break: configure provider → customize available 
 
 Single smooth loop — backend and dashboard are **separate builds** served by the same binary. Run `./scripts/dev.sh` from repo root only.
 
-> **Dashboard is NOT live-reloaded.** `web/src` → `web/dist` is what the Rust server serves. Rebuild after every `web/src` change or features will be invisible.
+### How web assets are served
+
+**`--web-dir` mode (default in dev.sh)**: The server reads `web/dist/` from disk at runtime (`--web-dir web/dist`). Web rebuilds are instantly visible — **no binary rebuild needed**. This is the permanent solution to the stale-embedded-assets problem.
+
+**Embedded mode (release builds)**: `web/dist/` is baked into the binary via `rust-embed` (`#[folder = "web/dist/"]`). Requires `cargo build` to pick up web changes. Used for single-binary distribution only.
+
+> **Never run the release binary for dev work** — it has stale embedded assets. Always use `dev.sh` which adds `--web-dir`.
 
 **Presets:**
 | Change | Command | Notes |
 |---|---|---|
-| Only `web/src` | `--web-only` or `--fast detach` | Stale-aware web rebuild |
+| Only `web/src` | `--web-only` or `--fast detach` | Rebuild web, restart (no cargo needed) |
 | Only `src/` | `--backend-only detach` or `--fast detach` | cargo build + restart |
 | Both | `--fast detach` | ~10-20s |
 | Before push | `--full detach` | web + cargo + fmt/clippy/astro/tests |
