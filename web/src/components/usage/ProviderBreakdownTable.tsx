@@ -187,6 +187,7 @@ export default function ProviderBreakdownTable({
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Requests</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Success</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Avg Latency</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Avg TTFT</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Input</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Output</th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Total</th>
@@ -230,6 +231,7 @@ export default function ProviderBreakdownTable({
                         <SuccessRate requests={e.requests} failed={e.failedRequests} />
                       </td>
                       <td className="px-4 py-2.5 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(e.avgLatency)}</td>
+                      <td className="px-4 py-2.5 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(e.avgTtft)}</td>
                       <td className="px-4 py-2.5 text-right text-[color:var(--color-danger)] whitespace-nowrap">{compact.format(e.input)}</td>
                       <td className="px-4 py-2.5 text-right text-[color:var(--color-success)] whitespace-nowrap">{compact.format(e.output)}</td>
                       <td className="px-4 py-2.5 text-right font-bold whitespace-nowrap">{compact.format(e.total)}</td>
@@ -257,6 +259,7 @@ export default function ProviderBreakdownTable({
                             <SuccessRate requests={m.requests} failed={m.failedRequests} />
                           </td>
                           <td className="px-4 py-2 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(m.avgLatency)}</td>
+                          <td className="px-4 py-2 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(m.avgTtft)}</td>
                           <td className="px-4 py-2 text-right text-[color:var(--color-danger)] text-xs whitespace-nowrap">{compact.format(m.input)}</td>
                           <td className="px-4 py-2 text-right text-[color:var(--color-success)] text-xs whitespace-nowrap">{compact.format(m.output)}</td>
                           <td className="px-4 py-2 text-right font-medium text-xs whitespace-nowrap">{compact.format(m.total)}</td>

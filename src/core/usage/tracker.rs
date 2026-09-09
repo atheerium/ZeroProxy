@@ -217,6 +217,9 @@ impl UsageTracker {
             bytes_saved,
             image_prompts,
             extra,
+            latency_ms: latency_ms.map(|v| v as i64),
+            ttft_ms: ttft_ms.map(|v| v as i64),
+            ..Default::default()
         }
     }
 
@@ -397,6 +400,7 @@ mod tests {
                 cache_read_input_tokens: None,
                 cache_creation_input_tokens: None,
                 extra: Default::default(),
+                ..Default::default()
             }),
             cost: None,
             status: None,
@@ -406,6 +410,7 @@ mod tests {
             bytes_saved: 0,
             image_prompts: 0,
             extra: Default::default(),
+            ..Default::default()
         }
     }
 
