@@ -1334,6 +1334,7 @@ async fn create_node_api(
         created_at: Some(now.clone()),
         updated_at: Some(now),
         extra: std::collections::BTreeMap::new(),
+        ..Default::default()
     };
 
     let result = state
@@ -1443,6 +1444,7 @@ async fn create_combo_api(
         created_at: Some(now.clone()),
         updated_at: Some(now),
         extra: req.extra,
+        ..Default::default()
     };
 
     let result = state
@@ -1631,6 +1633,7 @@ async fn create_key_api(
         daily_budget_usd: None,
         daily_request_limit: None,
         extra: std::collections::BTreeMap::new(),
+        ..Default::default()
     };
 
     let result = state

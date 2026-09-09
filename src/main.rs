@@ -688,6 +688,7 @@ async fn seed_default_api_key_if_missing(db: &Db) -> anyhow::Result<()> {
         daily_budget_usd: None,
         daily_request_limit: None,
         extra: std::collections::BTreeMap::new(),
+        ..Default::default()
     };
 
     db.update(|d| d.api_keys.push(api_key.clone())).await?;

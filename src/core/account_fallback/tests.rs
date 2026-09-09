@@ -50,9 +50,7 @@ fn make_test_connection(id: &str) -> ProviderConnection {
         consecutive_errors: Some(0),
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
-            provider_specific_data: BTreeMap::new(),
+        provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
     }
 }

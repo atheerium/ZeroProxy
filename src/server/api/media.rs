@@ -629,6 +629,7 @@ async fn execute_media_provider(
                     cache_read_input_tokens: None,
                     cache_creation_input_tokens: None,
                     extra: Default::default(),
+                    ..Default::default()
                 };
                 state.usage_tracker().track_request_detached(
                     provider,

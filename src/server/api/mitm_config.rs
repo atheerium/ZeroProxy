@@ -307,6 +307,7 @@ async fn generate_cert(
                 created_at: Some(now_str.clone()),
                 updated_at: None,
                 extra,
+                ..Default::default()
             });
         })
         .await;

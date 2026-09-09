@@ -1746,6 +1746,7 @@ fn usage_tokens(entry: &UsageEntry) -> TokenUsage {
         cached_tokens: None,
         reasoning_tokens: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     })
 }
 
@@ -1866,6 +1867,7 @@ mod tests {
                 cached_tokens: None,
                 reasoning_tokens: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             },
             request: Some(serde_json::json!({ "input": "hello" })),
             provider_request: None,

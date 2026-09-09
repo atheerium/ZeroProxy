@@ -399,6 +399,7 @@ fn tool_table() -> Vec<ToolHandler> {
                     daily_budget_usd: None,
                     daily_request_limit: None,
                     extra: std::collections::BTreeMap::new(),
+                    ..Default::default()
                 };
                 db_update_sync(&state.db, move |db| {
                     db.api_keys.push(k);
@@ -472,6 +473,7 @@ fn tool_table() -> Vec<ToolHandler> {
                     created_at: Some(now.clone()),
                     updated_at: Some(now),
                     extra: std::collections::BTreeMap::new(),
+                    ..Default::default()
                 };
                 db_update_sync(&state.db, move |db| {
                     db.combos.push(combo);

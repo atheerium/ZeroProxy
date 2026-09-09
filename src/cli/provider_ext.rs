@@ -95,8 +95,6 @@ struct ProviderInput {
     #[serde(default)]
     proxy_label: Option<String>,
     #[serde(default)]
-    use_connection_proxy: Option<bool>,
-    #[serde(default)]
     provider_specific_data: Option<BTreeMap<String, Value>>,
 }
 
@@ -607,12 +605,6 @@ fn apply_items(
                     changed = true;
                 }
             }
-            if let Some(ucp) = item.use_connection_proxy {
-                if existing.use_connection_proxy != Some(ucp) {
-                    existing.use_connection_proxy = Some(ucp);
-                    changed = true;
-                }
-            }
             if let Some(psd) = &item.provider_specific_data {
                 if &existing.provider_specific_data != psd {
                     existing.provider_specific_data = psd.clone();
@@ -652,7 +644,6 @@ fn apply_items(
                 priority: item.priority,
                 is_active: Some(item.is_active.unwrap_or(true)),
                 created_at: Some(now.to_string()),
-                updated_at: Some(now.to_string()),
                 api_key: item.api_key.clone(),
                 default_model: item.default_model.clone(),
                 display_name: item.display_name.clone(),
@@ -660,7 +651,6 @@ fn apply_items(
                 global_priority: item.global_priority,
                 proxy_url: item.proxy_url.clone(),
                 proxy_label: item.proxy_label.clone(),
-                use_connection_proxy: item.use_connection_proxy,
                 provider_specific_data: psd,
                 ..Default::default()
             });
@@ -713,7 +703,6 @@ mod tests {
             global_priority: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
             provider_specific_data: None,
         }];
         let names: HashSet<_> = items.iter().map(|i| i.name.clone()).collect();
@@ -759,7 +748,7 @@ mod tests {
             global_priority: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
+
             provider_specific_data: None,
         }];
         let names: HashSet<_> = items.iter().map(|i| i.name.clone()).collect();
@@ -811,7 +800,7 @@ mod tests {
             global_priority: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
+
             provider_specific_data: None,
         }];
         let names: HashSet<_> = items.iter().map(|i| i.name.clone()).collect();
@@ -857,7 +846,7 @@ mod tests {
             global_priority: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
+
             provider_specific_data: None,
         }];
         let names: HashSet<_> = items.iter().map(|i| i.name.clone()).collect();
@@ -889,7 +878,6 @@ mod tests {
             global_priority: Some(10),
             proxy_url: Some("http://proxy:8080".into()),
             proxy_label: Some("corp-proxy".into()),
-            use_connection_proxy: Some(true),
             provider_specific_data: Some(BTreeMap::from([(
                 "extraField".into(),
                 Value::String("extra".into()),
@@ -908,7 +896,6 @@ mod tests {
         assert_eq!(p.global_priority, Some(10));
         assert_eq!(p.proxy_url, Some("http://proxy:8080".into()));
         assert_eq!(p.proxy_label, Some("corp-proxy".into()));
-        assert_eq!(p.use_connection_proxy, Some(true));
         assert_eq!(
             p.provider_specific_data.get("extraField"),
             Some(&Value::String("extra".into()))

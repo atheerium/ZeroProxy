@@ -104,6 +104,7 @@ async fn create_provider_node(
         created_at: Some(now.clone()),
         updated_at: Some(now),
         extra: std::collections::BTreeMap::new(),
+        ..Default::default()
     };
 
     let result = state
@@ -291,6 +292,7 @@ mod tests {
                 daily_budget_usd: None,
                 daily_request_limit: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }];
         })
         .await

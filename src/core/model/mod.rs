@@ -205,12 +205,14 @@ pub fn resolve_model_alias_from_map(
                     provider: resolve_provider_alias(provider_or_alias),
                     model: model.to_string(),
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 })
         }
         ModelAliasTarget::Mapping(mapping) => Some(ProviderModelRef {
             provider: resolve_provider_alias(&mapping.provider),
             model: mapping.model.clone(),
             extra: mapping.extra.clone(),
+            ..Default::default()
         }),
     }
 }

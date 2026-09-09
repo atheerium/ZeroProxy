@@ -113,6 +113,7 @@ async fn create_custom_model(
         r#type: req.r#type.clone(),
         name: req.name.clone(),
         extra: Default::default(),
+        ..Default::default()
     };
 
     let result = state

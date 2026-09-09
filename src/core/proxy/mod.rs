@@ -46,20 +46,21 @@ pub fn resolve_proxy_target(
         });
     }
 
-    if connection.use_connection_proxy.unwrap_or(false) {
-        let data = &connection.provider_specific_data;
-        let enabled = data
-            .get("connectionProxyEnabled")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
-        let url = str_field(data.get("connectionProxyUrl"));
-        let no_proxy = str_field(data.get("connectionNoProxy")).unwrap_or_default();
+    // Connection-level proxy overrides are now removed - provider_specific_data contains the data
+
+    if let Some(data) = connection
+        .provider_specific_data
+        .get("use_connection_proxy_enabled")
+    {
+        let enabled = data.as_bool().unwrap_or(false);
+        let url = str_field(data.get("use_connection_proxy_url"));
+        let no_proxy = str_field(data.get("use_connection_proxy_no_proxy")).unwrap_or_default();
         let pool_id = data
-            .get("connectionProxyPoolId")
-            .or_else(|| data.get("proxyPoolId"))
+            .get("use_connection_proxy_pool_id")
+            .or_else(|| data.get("use_connection_proxy_pool"))
             .and_then(|v| str_field(Some(v)));
         let strict = data
-            .get("strictProxy")
+            .get("use_connection_proxy_strict")
             .and_then(|v| v.as_bool())
             .unwrap_or(false);
 

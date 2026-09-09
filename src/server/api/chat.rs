@@ -294,6 +294,10 @@ async fn chat_completions_impl(
         Err(_) => return json_error_response(StatusCode::BAD_REQUEST, "Invalid JSON body"),
     };
 
+    // Normalize AI-SDK camelCase `reasoningEffort` → snake `reasoning_effort`
+    // so all downstream thinking-suffix / combo logic sees a single canonical form.
+    crate::core::utils::thinking_suffix::normalize_camel_case_thinking_fields(&mut body);
+
     let Some(model_str) = body
         .get("model")
         .and_then(Value::as_str)
@@ -690,6 +694,8 @@ async fn chat_completions_impl(
                         // Apply combo-level thinking suffix to each member model.
                         // The RequestPlan / thinking_suffix pipeline will strip it
                         // and route to the correct provider-specific parameter.
+                        // Only stamp when the client body has NO thinking intent —
+                        // a client-specified reasoning_effort / thinking field wins.
                         let combo_model = if let Some(ref tl) = combo_tl {
                             if crate::core::utils::thinking_suffix::strip_thinking_suffix(
                                 &combo_model,
@@ -697,6 +703,10 @@ async fn chat_completions_impl(
                             .1
                             .is_some()
                             {
+                                combo_model
+                            } else if crate::core::utils::thinking_suffix::body_has_thinking_intent(
+                                &body,
+                            ) {
                                 combo_model
                             } else {
                                 format!("{combo_model}({tl})")
@@ -1423,9 +1433,10 @@ async fn forward_with_provider_fallback(
 
         // 9router resolveTransport: pin multi-endpoint base URL for this request
         if let Some(ref base) = plan.transport_base_url {
-            connection.runtime_transport = Some(crate::types::RuntimeTransport {
-                base_url: Some(base.clone()),
-            });
+            connection.provider_specific_data.insert(
+                "runtime_transport_base_url".to_string(),
+                serde_json::Value::String(base.clone()),
+            );
         }
 
         // get_model_info resolves openai-compatible/anthropic-compatible
@@ -4429,6 +4440,7 @@ fn extract_token_usage_from_bytes(body: &[u8]) -> Option<TokenUsage> {
                     })
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<BTreeMap<_, _>>(),
+                ..Default::default()
             });
         }
     }
@@ -4485,6 +4497,7 @@ fn extract_token_usage_from_bytes(body: &[u8]) -> Option<TokenUsage> {
                 .filter(|(key, _)| !known_fields.contains(&key.as_str()))
                 .map(|(key, value)| (key.clone(), value.clone()))
                 .collect::<BTreeMap<_, _>>(),
+            ..Default::default()
         });
     }
 
@@ -4521,6 +4534,7 @@ fn extract_token_usage_from_bytes(body: &[u8]) -> Option<TokenUsage> {
             ))
             .or_else(|| opt(extract_u64_from_value(&value, "cacheCreationInputTokens"))),
             extra: BTreeMap::new(),
+            ..Default::default()
         });
     }
 
@@ -4551,6 +4565,7 @@ fn estimate_missing_tokens(
         cache_read_input_tokens: None,
         cache_creation_input_tokens: None,
         extra,
+        ..Default::default()
     }
 }
 
@@ -5088,8 +5103,6 @@ mod tests {
             consecutive_errors: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             ttft_ms: None,
             client_app: None,
             pinned: None,

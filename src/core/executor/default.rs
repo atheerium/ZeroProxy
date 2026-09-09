@@ -833,9 +833,9 @@ impl DefaultExecutor {
             _ => "https://token-plan-sgp.xiaomimimo.com/v1",
         };
         let wants_claude = credentials
-            .runtime_transport
-            .as_ref()
-            .and_then(|rt| rt.base_url.as_deref())
+            .provider_specific_data
+            .get("runtime_transport_base_url")
+            .and_then(|v| v.as_str())
             .map(|u| u.contains("/anthropic/") || u.ends_with("/messages"))
             .unwrap_or(false);
         if wants_claude {
@@ -862,36 +862,38 @@ impl DefaultExecutor {
         // otherwise append the provider-default path. Claude beta is baked into the
         // multi-endpoint table (or appended here when missing) so already_endpoint
         // never silently drops urlSuffix.
-        if let Some(rt) = &credentials.runtime_transport {
-            if let Some(rt_base_url) = &rt.base_url {
-                let normalized = rt_base_url.trim_end_matches('/');
-                let already_endpoint = Self::is_already_endpoint(normalized);
-                if already_endpoint {
-                    return Ok(Self::ensure_claude_beta_suffix(normalized, &self.provider));
-                }
-                if let Some(node) = &self.provider_node {
-                    if node.r#type == "anthropic-compatible" {
-                        return Ok(format!("{}/messages", normalized));
-                    }
-                }
-                if matches!(
-                    self.provider.as_str(),
-                    "claude"
-                        | "anthropic"
-                        | "glm"
-                        | "kimi"
-                        | "kimi-coding"
-                        | "minimax"
-                        | "minimax-cn"
-                        | "agentrouter"
-                        | "xiaomi-mimo"
-                        | "mimo"
-                ) {
-                    let messages = format!("{}/messages", normalized);
-                    return Ok(Self::ensure_claude_beta_suffix(&messages, &self.provider));
-                }
-                return Ok(format!("{}/chat/completions", normalized));
+        if let Some(rt_base_url) = credentials
+            .provider_specific_data
+            .get("runtime_transport_base_url")
+            .and_then(|v| v.as_str())
+        {
+            let normalized = rt_base_url.trim_end_matches('/');
+            let already_endpoint = Self::is_already_endpoint(normalized);
+            if already_endpoint {
+                return Ok(Self::ensure_claude_beta_suffix(normalized, &self.provider));
             }
+            if let Some(node) = &self.provider_node {
+                if node.r#type == "anthropic-compatible" {
+                    return Ok(format!("{}/messages", normalized));
+                }
+            }
+            if matches!(
+                self.provider.as_str(),
+                "claude"
+                    | "anthropic"
+                    | "glm"
+                    | "kimi"
+                    | "kimi-coding"
+                    | "minimax"
+                    | "minimax-cn"
+                    | "agentrouter"
+                    | "xiaomi-mimo"
+                    | "mimo"
+            ) {
+                let messages = format!("{}/messages", normalized);
+                return Ok(Self::ensure_claude_beta_suffix(&messages, &self.provider));
+            }
+            return Ok(format!("{}/chat/completions", normalized));
         }
 
         if let Some(node) = &self.provider_node {
@@ -1041,9 +1043,9 @@ impl DefaultExecutor {
             self.provider.as_str(),
             "xiaomi-tokenplan" | "xmtp" | "xiaomi-mimo" | "mimo"
         ) && credentials
-            .runtime_transport
-            .as_ref()
-            .and_then(|rt| rt.base_url.as_deref())
+            .provider_specific_data
+            .get("runtime_transport_base_url")
+            .and_then(|v| v.as_str())
             .is_some_and(|u| u.contains("/anthropic/") || u.ends_with("/messages"))
         {
             // Claude native transport: x-api-key (9router xiaomi-tokenplan / xiaomi-mimo)

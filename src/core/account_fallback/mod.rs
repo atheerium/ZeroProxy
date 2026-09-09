@@ -845,8 +845,6 @@ mod tests {
             consecutive_errors: Some(0),
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             ttft_ms: None,
             client_app: None,
             pinned: None,

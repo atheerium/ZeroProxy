@@ -125,7 +125,6 @@ impl AppDb {
     }
 }
 
-
 /// Runtime transport configuration that can override the static provider config's base URL.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
 #[serde(rename_all = "camelCase")]
@@ -308,7 +307,7 @@ pub struct ProxyPool {
     pub latency_ms: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct CustomModel {
     pub provider_alias: String,
@@ -907,6 +906,12 @@ impl Default for Settings {
             client_ping_any: false,
             capacity_adapter: json!({}),
             extra: BTreeMap::new(),
+            ttft_ms: None,
+            client_app: None,
+            pinned: None,
+            saved_usd: None,
+            error_class: None,
+            latency_ms: None,
         }
     }
 }
@@ -952,7 +957,7 @@ pub enum ModelAliasTarget {
     Mapping(ProviderModelRef),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ProviderModelRef {
     pub provider: String,
@@ -1105,8 +1110,8 @@ pub struct UsageEntry {
     pub latency_ms: Option<i64>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "snake_case")]
+#[derive(Default, Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct TokenUsage {
     #[serde(default)]
     pub prompt_tokens: Option<u64>,

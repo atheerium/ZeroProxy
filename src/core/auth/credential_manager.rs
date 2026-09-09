@@ -240,12 +240,6 @@ fn build_connection_from(src: &ProviderConnection) -> ProviderConnection {
         consecutive_errors: src.consecutive_errors,
         proxy_url: src.proxy_url.clone(),
         proxy_label: src.proxy_label.clone(),
-        use_connection_proxy: src.use_connection_proxy,
-        runtime_transport: src.runtime_transport.as_ref().map(|rt| {
-            crate::types::RuntimeTransport {
-                base_url: rt.base_url.clone(),
-            }
-        }),
         provider_specific_data: src.provider_specific_data.clone(),
         ttft_ms: src.ttft_ms,
         client_app: src.client_app.clone(),

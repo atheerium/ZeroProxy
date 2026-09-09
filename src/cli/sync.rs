@@ -324,6 +324,7 @@ pub(crate) fn compute_plan(
                 r#type: kind_to_type(&model.kind).to_string(),
                 name: model.name.clone(),
                 extra,
+                ..Default::default()
             });
             plan.diff.created.push(model_ref);
         }
@@ -669,6 +670,7 @@ mod tests {
             r#type: "chat".into(),
             name: Some("Sample".into()),
             extra: BTreeMap::new(),
+            ..Default::default()
         };
         model
             .extra
@@ -717,6 +719,7 @@ mod tests {
             r#type: "chat".into(),
             name: None,
             extra: BTreeMap::new(),
+            ..Default::default()
         };
         model
             .extra
@@ -748,6 +751,7 @@ mod tests {
             r#type: "chat".into(),
             name: Some("My copy".into()),
             extra: BTreeMap::new(),
+            ..Default::default()
         };
         app.custom_models.push(model);
 

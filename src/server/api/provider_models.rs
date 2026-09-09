@@ -280,6 +280,7 @@ pub(super) async fn import_provider_models(
                         r#type: "llm".to_string(),
                         name,
                         extra,
+                        ..Default::default()
                     });
                     added += 1;
                 }
@@ -1996,8 +1997,6 @@ mod tests {
             consecutive_errors: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             ttft_ms: None,
             client_app: None,
             pinned: None,

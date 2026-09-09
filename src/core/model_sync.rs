@@ -182,6 +182,7 @@ async fn apply_sync(
                         r#type: "llm".to_string(),
                         name,
                         extra,
+                        ..Default::default()
                     });
                 }
             }

@@ -1376,6 +1376,7 @@ pub async fn run_key(cmd: KeyCmd, db: &Db, ctx: output::OutputCtx) -> anyhow::Re
                 daily_budget_usd: None,
                 daily_request_limit: None,
                 extra: std::collections::BTreeMap::new(),
+                ..Default::default()
             };
 
             let used_http = try_add_key_via_http(&new_key).await;
@@ -1512,6 +1513,7 @@ pub async fn run_pool(cmd: PoolCmd, db: &Db, ctx: output::OutputCtx) -> anyhow::
                 created_at: Some(chrono::Utc::now().to_rfc3339()),
                 updated_at: None,
                 extra: std::collections::BTreeMap::new(),
+                ..Default::default()
             };
 
             db.update(|db| {

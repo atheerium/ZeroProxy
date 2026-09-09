@@ -84,7 +84,6 @@ fn row_to_connection(row: &rusqlite::Row<'_>) -> rusqlite::Result<ProviderConnec
                 c.consecutive_use_count = pc.consecutive_use_count;
                 c.proxy_url = pc.proxy_url;
                 c.proxy_label = pc.proxy_label;
-                c.use_connection_proxy = pc.use_connection_proxy;
                 c.provider_specific_data = pc.provider_specific_data;
                 c.ttft_ms = pc.ttft_ms;
                 c.client_app = pc.client_app;
