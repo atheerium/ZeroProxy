@@ -185,6 +185,24 @@ fn is_gemini_level_model(model: &str) -> bool {
     m.contains("gemini-3") || m.contains("gemini3")
 }
 
+/// Normalize camelCase thinking fields to snake_case at ingress.
+///
+/// AI-SDK (Vercel AI SDK) sends `reasoningEffort` (camelCase) when clients
+/// like OpenCode use variant definitions. Normalize to `reasoning_effort`
+/// so downstream logic sees a single canonical form, then strip the key.
+pub fn normalize_camel_case_thinking_fields(body: &mut Value) {
+    let Some(obj) = body.as_object_mut() else {
+        return;
+    };
+    // reasoningEffort → reasoning_effort (AI-SDK sends camelCase)
+    if let Some(val) = obj.remove("reasoningEffort") {
+        // Only overwrite if snake_case isn't already set (client explicit wins)
+        if !obj.contains_key("reasoning_effort") {
+            obj.insert("reasoning_effort".into(), val);
+        }
+    }
+}
+
 /// True when the body already carries a client- or settings-provided thinking intent.
 ///
 /// Used to avoid double-applying when `providerThinking` already set fields and
@@ -198,6 +216,14 @@ pub fn body_has_thinking_intent(body: &Value) -> bool {
     }
     if body
         .get("reasoning_effort")
+        .and_then(Value::as_str)
+        .is_some_and(|s| !s.is_empty())
+    {
+        return true;
+    }
+    // AI-SDK camelCase variant
+    if body
+        .get("reasoningEffort")
         .and_then(Value::as_str)
         .is_some_and(|s| !s.is_empty())
     {
@@ -242,6 +268,7 @@ fn strip_all_thinking_fields(body: &mut Value) {
     };
     obj.remove("thinking");
     obj.remove("reasoning_effort");
+    obj.remove("reasoningEffort"); // AI-SDK camelCase
     obj.remove("reasoning");
     obj.remove("thinkingConfig");
     obj.remove("enable_thinking");

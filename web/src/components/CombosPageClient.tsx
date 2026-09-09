@@ -6,7 +6,6 @@ import { ConfirmModal } from "@/shared/components/Modal";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
-import { isOpenAICompatibleProvider, isAnthropicCompatibleProvider } from "@/shared/constants/providers";
 import type { ComboStrategyConfig, ComboStrategyOption } from "@/types";
 
 function tierValue(label?: string): number {
@@ -646,6 +645,7 @@ function ComboCard({
         activeProviders={activeProviders}
         title="Select Judge Model"
         closeOnSelect={true}
+        showCombos={false}
       />
     </Card>
   );
@@ -987,14 +987,8 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
     else setNameError("");
   };
 
-  // Toggle in/out of combo so the modal can stay open while operators
-  // pick several models, including unpicking ones added by mistake.
-  const handleAddModel = (model: { value: string }) => {
-    setModels((prev) =>
-      prev.includes(model.value)
-        ? prev.filter((m) => m !== model.value)
-        : [...prev, model.value],
-    );
+  const handleAddModelsMulti = (ids: string[]) => {
+    setModels((prev) => Array.from(new Set([...prev, ...ids])));
   };
 
   const handleRemoveModel = (index: number) => {
@@ -1176,13 +1170,14 @@ function ComboFormModal({ isOpen, combo, onClose, onSave, activeProviders, kindF
       <ModelSelectModal
         isOpen={showModelSelect}
         onClose={() => setShowModelSelect(false)}
-        onSelect={handleAddModel}
+        selectionMode="multi"
+        onSelectIds={handleAddModelsMulti}
         selectedModel={models}
-        closeOnSelect={false}
         activeProviders={activeProviders}
         modelAliases={modelAliases}
         title="Add Models to Combo"
         kindFilter={kindFilter}
+        showCombos={false}
       />
     </>
   );

@@ -65,7 +65,7 @@ const NO_AUTH_PROVIDER_IDS = Object.keys(FREE_PROVIDERS).filter(id => FREE_PROVI
 interface ModelSelectModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (model: Model) => void;
+  onSelect?: (model: Model) => void;
   selectedModel?: string | string[];
   activeProviders?: ActiveProvider[];
   title?: string;
@@ -79,6 +79,9 @@ interface ModelSelectModalProps {
   selectionMode?: "single" | "multi";
   // Called with the selected model ids when the user presses "Apply N".
   onSelectIds?: (ids: string[]) => void;
+  // When false, the combos section is hidden (e.g. adding models to a combo
+  // itself, or selecting a judge model where combos make no sense).
+  showCombos?: boolean;
 }
 
 export default function ModelSelectModal({
@@ -93,6 +96,7 @@ export default function ModelSelectModal({
   closeOnSelect = true,
   selectionMode = "single",
   onSelectIds,
+  showCombos = true,
 }: ModelSelectModalProps) {
   useEnsureCatalog();
   const { getCaps } = useModelCaps();
@@ -426,13 +430,13 @@ export default function ModelSelectModal({
     return groups;
   }, [filteredActiveProviders, modelAliases, allProviders, providerNodes, customModels, kindFilter, disabledMap, liveModelsByAlias, freeOnlyByAlias]);
 
-  // Filter combos by search query (and hide combos when kindFilter is set — combos are LLM-only by design)
+  // Filter combos by search query (hide when kindFilter is set or showCombos=false)
   const filteredCombos = useMemo(() => {
-    if (kindFilter) return [];
+    if (!showCombos || kindFilter) return [];
     if (!searchQuery.trim()) return combos;
     const query = searchQuery.toLowerCase();
     return combos.filter(c => c.name.toLowerCase().includes(query));
-  }, [combos, searchQuery, kindFilter]);
+  }, [combos, searchQuery, kindFilter, showCombos]);
 
   // Filter models by search query
   const filteredGroups = useMemo(() => {
@@ -462,7 +466,7 @@ export default function ModelSelectModal({
   }, [groupedModels, searchQuery]);
 
   const handleSelect = (model: Model) => {
-    onSelect(model);
+    onSelect?.(model);
     if (closeOnSelect) {
       onClose();
       setSearchQuery("");
@@ -576,23 +580,42 @@ export default function ModelSelectModal({
             </div>
             <div className="flex flex-wrap gap-1.5">
               {filteredCombos.map((combo) => {
-                const isSelected = Array.isArray(selectedModel)
+                const isMulti = selectionMode === "multi";
+                const isMultiSelected = isMulti && selectedIds.includes(combo.name);
+                const isSingleSelected = !isMulti && (Array.isArray(selectedModel)
                   ? selectedModel.includes(combo.name)
-                  : selectedModel === combo.name;
+                  : selectedModel === combo.name);
+                const rowClick = () => {
+                  if (isMulti) toggleSelect(combo.name);
+                  else handleSelect({ id: combo.name, name: combo.name, value: combo.name });
+                };
                 return (
-                  <button
+                  <div
                     key={combo.id}
-                    onClick={() => handleSelect({ id: combo.name, name: combo.name, value: combo.name })}
+                    onClick={rowClick}
                     className={`
-                      px-2 py-1 rounded-xl text-xs font-medium transition-all border hover:cursor-pointer
-                      ${isSelected
-                        ? "bg-primary text-white border-primary"
-                        : "bg-surface border-border text-text-main hover:border-primary/50 hover:bg-primary/5"
+                      inline-flex items-center gap-1 px-2 py-1 rounded-xl text-xs font-medium transition-all border hover:cursor-pointer
+                      ${isMultiSelected
+                        ? "border-primary bg-primary/10 text-text-main"
+                        : isSingleSelected
+                          ? "bg-primary text-white border-primary"
+                          : "bg-surface border-border text-text-main hover:border-primary/50 hover:bg-primary/5"
                       }
                     `}
                   >
+                    <span className="material-symbols-outlined text-primary text-[12px]">layers</span>
+                    {isMulti && (
+                      <input
+                        type="checkbox"
+                        checked={isMultiSelected}
+                        onChange={() => toggleSelect(combo.name)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-3.5 w-3.5 rounded border-gray-300 text-primary focus:ring-primary shrink-0"
+                        aria-label={`Select combo ${combo.name}`}
+                      />
+                    )}
                     {combo.name}
-                  </button>
+                  </div>
                 );
               })}
             </div>
