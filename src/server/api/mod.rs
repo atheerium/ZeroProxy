@@ -1369,11 +1369,15 @@ async fn list_combos_api(State(state): State<AppState>, headers: HeaderMap) -> R
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct CreateComboRequest {
     name: Option<String>,
     #[serde(default)]
     models: Vec<String>,
     kind: Option<String>,
+    /// Members the operator has explicitly muted.
+    #[serde(default)]
+    disabled_models: Option<Vec<String>>,
     /// Free-form extra fields (e.g. `strategy`) preserved on the created combo.
     #[serde(default)]
     extra: std::collections::BTreeMap<String, serde_json::Value>,
@@ -1438,7 +1442,7 @@ async fn create_combo_api(
         id,
         name: name.to_string(),
         models: req.models,
-        disabled_models: Vec::new(),
+        disabled_models: req.disabled_models.unwrap_or_default(),
         thinking_level: req.thinking_level.filter(|tl| !tl.is_empty()),
         kind: req.kind.filter(|kind| !kind.is_empty()),
         created_at: Some(now.clone()),

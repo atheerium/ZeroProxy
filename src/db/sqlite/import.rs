@@ -160,6 +160,14 @@ fn import_all(conn: &Connection, payload: &Value) -> rusqlite::Result<usize> {
             let models_vec = Value::Array(vec![]);
             let models_val = item.get("models").unwrap_or(&models_vec);
             let models_str = serde_json::to_string(models_val).unwrap_or_else(|_| "[]".into());
+            let mut data = json!({});
+            if let Some(tl) = item.get("thinkingLevel").filter(|v| *v != &Value::Null) {
+                data["thinkingLevel"] = tl.clone();
+            }
+            if let Some(dm) = item.get("disabledModels").filter(|v| *v != &Value::Null) {
+                data["disabledModels"] = dm.clone();
+            }
+            let data_str = serde_json::to_string(&data).unwrap_or_else(|_| "{}".into());
             conn.execute(
                 "INSERT INTO combos(id, name, kind, models, data, createdAt, updatedAt) VALUES(?1,?2,?3,?4,?5,?6,?7)",
                 rusqlite::params![
@@ -167,7 +175,7 @@ fn import_all(conn: &Connection, payload: &Value) -> rusqlite::Result<usize> {
                     item.get("name").and_then(Value::as_str).unwrap_or(""),
                     item.get("kind").and_then(Value::as_str),
                     models_str,
-                    "{}",
+                    data_str,
                     item.get("createdAt").and_then(Value::as_str).unwrap_or(""),
                     item.get("updatedAt").and_then(Value::as_str).unwrap_or(""),
                 ],

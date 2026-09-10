@@ -1720,7 +1720,7 @@ fn build_request_detail_records(usage_db: &UsageDb) -> Vec<RequestDetailRecord> 
                 .status
                 .clone()
                 .unwrap_or_else(|| "success".to_string()),
-            latency: request_latency_from_extra(&entry.extra),
+            latency: request_latency_from_entry(entry),
             tokens: usage_tokens(entry),
             request: entry.extra.get("request").cloned(),
             provider_request: entry.extra.get("providerRequest").cloned(),
@@ -1750,12 +1750,18 @@ fn usage_tokens(entry: &UsageEntry) -> TokenUsage {
     })
 }
 
-fn request_latency_from_extra(extra: &BTreeMap<String, Value>) -> RequestLatency {
-    extra
-        .get("latency")
-        .cloned()
-        .and_then(|value| serde_json::from_value::<RequestLatency>(value).ok())
-        .unwrap_or_default()
+fn request_latency_from_entry(entry: &UsageEntry) -> RequestLatency {
+    if let Some(latency) = entry.extra.get("latency") {
+        if let Ok(parsed) = serde_json::from_value::<RequestLatency>(latency.clone()) {
+            if parsed.total > 0 || parsed.ttft > 0 {
+                return parsed;
+            }
+        }
+    }
+    RequestLatency {
+        ttft: entry.ttft_ms.unwrap_or(0) as u64,
+        total: entry.latency_ms.unwrap_or(0) as u64,
+    }
 }
 
 fn fallback_request_detail_id(entry: &UsageEntry, index: usize) -> String {

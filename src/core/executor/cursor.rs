@@ -905,6 +905,22 @@ fn encode_tool_result(tool_result: &Value) -> Vec<u8> {
         .and_then(|v| v.as_str())
         .or_else(|| tool_result.get("name").and_then(|v| v.as_str()))
         .unwrap_or("");
+
+    let mut tool_result = tool_result.clone();
+
+    if !tool_name.is_empty() {
+        if let Some(obj) = tool_result.as_object_mut() {
+            if obj.get("outputs").is_none() {
+                obj.insert(
+                    "outputs".to_string(),
+                    serde_json::json!([{
+                        "type": "text",
+                        "text": ""
+                    }]),
+                );
+            }
+        }
+    }
     let raw_args = tool_result
         .get("raw_args")
         .and_then(|v| v.as_str())

@@ -177,12 +177,22 @@ pub(crate) fn export_all(conn: &Connection) -> rusqlite::Result<Value> {
             let kind: Option<String> = row.get(2)?;
             let models_str: String = row.get(3)?;
             let models: Vec<String> = serde_json::from_str(&models_str).unwrap_or_default();
+            let data_str: String = row.get(4)?;
+            let data: Value = serde_json::from_str(&data_str).unwrap_or(json!({}));
             let created_at: String = row.get(5)?;
             let updated_at: String = row.get(6)?;
-            Ok(json!({
+            let mut obj = json!({
                 "id": id, "name": name, "kind": kind, "models": models,
                 "createdAt": created_at, "updatedAt": updated_at,
-            }))
+            });
+            // Merge thinkingLevel and disabledModels from the data column
+            if let Some(tl) = data.get("thinkingLevel").filter(|v| *v != &Value::Null) {
+                obj["thinkingLevel"] = tl.clone();
+            }
+            if let Some(dm) = data.get("disabledModels").filter(|v| *v != &Value::Null) {
+                obj["disabledModels"] = dm.clone();
+            }
+            Ok(obj)
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()?
     };
@@ -302,6 +312,8 @@ fn chrono_like_stamp() -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::db::sqlite::repo::combo_repo;
+    use crate::types::Combo;
 
     #[test]
     fn export_returns_json_with_all_keys() {
@@ -324,6 +336,97 @@ mod tests {
         ] {
             assert!(val.get(*key).is_some(), "missing key {key}");
         }
+    }
+
+    #[test]
+    fn export_combo_includes_thinking_level() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let combo = Combo {
+            id: "c1".into(),
+            name: "tl-export".into(),
+            kind: Some("fallback".into()),
+            models: vec!["openai/gpt-4o".into()],
+            thinking_level: Some("high".into()),
+            disabled_models: vec!["openai/gpt-4o-mini".into()],
+            created_at: Some("2026-01-01".into()),
+            updated_at: Some("2026-01-01".into()),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| combo_repo::create(tx, &combo))
+            .unwrap();
+        let (bytes, _) = export_db(&db);
+        let val: Value = serde_json::from_slice(&bytes).unwrap();
+        let combos = val["combos"].as_array().unwrap();
+        assert_eq!(combos.len(), 1);
+        assert_eq!(combos[0]["thinkingLevel"].as_str(), Some("high"));
+        assert_eq!(
+            combos[0]["disabledModels"].as_array(),
+            Some(&vec![json!("openai/gpt-4o-mini")])
+        );
+    }
+
+    #[test]
+    fn export_combo_omits_null_thinking_level() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let combo = Combo {
+            id: "c2".into(),
+            name: "no-tl".into(),
+            models: vec!["a".into()],
+            created_at: Some("2026-01-01".into()),
+            updated_at: Some("2026-01-01".into()),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| combo_repo::create(tx, &combo))
+            .unwrap();
+        let (bytes, _) = export_db(&db);
+        let val: Value = serde_json::from_slice(&bytes).unwrap();
+        let combos = val["combos"].as_array().unwrap();
+        assert!(combos[0].get("thinkingLevel").is_none());
+        assert!(combos[0].get("disabledModels").is_none());
+    }
+
+    #[test]
+    fn export_import_roundtrip_thinking_level() {
+        use crate::db::sqlite::import::import_db;
+
+        let db = SqliteDb::open_in_memory().unwrap();
+        let combo = Combo {
+            id: "c3".into(),
+            name: "rt-combo".into(),
+            kind: Some("fusion".into()),
+            models: vec!["anthropic/claude-sonnet".into()],
+            thinking_level: Some("medium".into()),
+            disabled_models: vec!["b".into()],
+            created_at: Some("2026-01-01".into()),
+            updated_at: Some("2026-01-01".into()),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| combo_repo::create(tx, &combo))
+            .unwrap();
+
+        // Export
+        let (bytes, _) = export_db(&db);
+        let exported: Value = serde_json::from_slice(&bytes).unwrap();
+
+        // Import into a fresh DB
+        let db2 = SqliteDb::open_in_memory().unwrap();
+        import_db(&db2, &exported).unwrap();
+
+        // Verify
+        let combos = exported["combos"].as_array().unwrap();
+        assert_eq!(combos[0]["thinkingLevel"].as_str(), Some("medium"));
+        assert_eq!(
+            combos[0]["disabledModels"].as_array(),
+            Some(&vec![json!("b")])
+        );
+
+        // Also verify via direct repo read
+        let read = db2
+            .with_conn(|c| combo_repo::get_by_name(c, "rt-combo"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.thinking_level.as_deref(), Some("medium"));
+        assert_eq!(read.disabled_models, vec!["b"]);
     }
 
     #[test]

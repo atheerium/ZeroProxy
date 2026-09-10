@@ -465,7 +465,8 @@ fn aggregate_live_entry(
         .as_deref()
         .map(|s| s != "success")
         .unwrap_or(false);
-    let (latency_total_ms, latency_ttft_ms) = extract_latency_from_extra(&entry.extra);
+    let (latency_total_ms, latency_ttft_ms) =
+        extract_latency_from_extra(&entry.extra, entry.latency_ms, entry.ttft_ms);
     let latency_count = if latency_total_ms > 0 { 1u64 } else { 0u64 };
     let provider = entry.provider.clone().unwrap_or_default();
     let provider_display = provider_names
@@ -635,7 +636,11 @@ fn aggregate_live_entry(
     update_last_used(&mut endpoint_bucket.last_used, &timestamp);
 }
 
-fn extract_latency_from_extra(extra: &BTreeMap<String, serde_json::Value>) -> (u64, u64) {
+fn extract_latency_from_extra(
+    extra: &BTreeMap<String, serde_json::Value>,
+    latency_ms: Option<i64>,
+    ttft_ms: Option<i64>,
+) -> (u64, u64) {
     if let Some(latency) = extra.get("latency") {
         if let Some(obj) = latency.as_object() {
             let total = obj
@@ -648,10 +653,14 @@ fn extract_latency_from_extra(extra: &BTreeMap<String, serde_json::Value>) -> (u
                 .and_then(|v| v.as_u64())
                 .or_else(|| obj.get("ttftMs").and_then(|v| v.as_u64()))
                 .unwrap_or(0);
-            return (total, ttft);
+            if total > 0 || ttft > 0 {
+                return (total, ttft);
+            }
         }
     }
-    (0, 0)
+    let total = latency_ms.unwrap_or(0) as u64;
+    let ttft = ttft_ms.unwrap_or(0) as u64;
+    (total, ttft)
 }
 
 fn merge_by_provider(
@@ -752,6 +761,9 @@ fn merge_by_account(
         bucket.cache_read_input_tokens += counter.cache_read_input_tokens;
         bucket.cache_creation_input_tokens += counter.cache_creation_input_tokens;
         bucket.cost += counter.cost;
+        bucket.latency_total_sum += counter.latency_total_sum;
+        bucket.latency_ttft_sum += counter.latency_ttft_sum;
+        bucket.latency_count += counter.latency_count;
         bucket.raw_model = raw_model;
         bucket.provider = provider_display;
         bucket.connection_id = connection_id.clone();
@@ -794,6 +806,9 @@ fn merge_by_api_key(
         bucket.cache_read_input_tokens += counter.cache_read_input_tokens;
         bucket.cache_creation_input_tokens += counter.cache_creation_input_tokens;
         bucket.cost += counter.cost;
+        bucket.latency_total_sum += counter.latency_total_sum;
+        bucket.latency_ttft_sum += counter.latency_ttft_sum;
+        bucket.latency_count += counter.latency_count;
         bucket.raw_model = raw_model;
         bucket.provider = provider_display;
         bucket.api_key = api_key.clone();
@@ -829,6 +844,9 @@ fn merge_by_endpoint(
         bucket.prompt_tokens += counter.prompt_tokens;
         bucket.completion_tokens += counter.completion_tokens;
         bucket.cost += counter.cost;
+        bucket.latency_total_sum += counter.latency_total_sum;
+        bucket.latency_ttft_sum += counter.latency_ttft_sum;
+        bucket.latency_count += counter.latency_count;
         bucket.endpoint = endpoint;
         bucket.raw_model = raw_model;
         bucket.provider = provider_display;

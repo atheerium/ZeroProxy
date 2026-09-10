@@ -25,6 +25,11 @@ pub fn insert(conn: &Connection, entry: &UsageEntry) -> rusqlite::Result<()> {
         .tokens
         .as_ref()
         .map(|t| serde_json::to_string(t).unwrap_or_default());
+    let meta_json = if entry.extra.is_empty() {
+        None::<String>
+    } else {
+        Some(serde_json::to_string(&entry.extra).unwrap_or_default())
+    };
     conn.execute(
         "INSERT INTO usageHistory(timestamp, provider, model, connectionId, apiKey, endpoint,
                 promptTokens, completionTokens, cost, status, tokens, meta,
@@ -50,7 +55,7 @@ pub fn insert(conn: &Connection, entry: &UsageEntry) -> rusqlite::Result<()> {
             entry.cost,
             entry.status.as_deref(),
             tokens_json,
-            None::<String>,
+            meta_json,
             entry.bytes_before as i64,
             entry.bytes_after as i64,
             entry.bytes_saved as i64,
@@ -86,32 +91,40 @@ fn row_to_usage(row: &rusqlite::Row<'_>) -> rusqlite::Result<UsageEntry> {
     let timestamp: Option<String> = row.get(0)?;
     let provider: Option<String> = row.get(1)?;
     let model: String = row.get(2)?;
-    let _conn_id: Option<String> = row.get(3)?;
-    let _api_key: Option<String> = row.get(4)?;
-    let _endpoint: Option<String> = row.get(5)?;
+    let connection_id: Option<String> = row.get(3)?;
+    let api_key: Option<String> = row.get(4)?;
+    let endpoint: Option<String> = row.get(5)?;
     let prompt_tokens: Option<i64> = row.get(6)?;
     let completion_tokens: Option<i64> = row.get(7)?;
     let cost: Option<f64> = row.get(8)?;
     let status: Option<String> = row.get(9)?;
     let tokens_str: Option<String> = row.get(10)?;
+    let meta_str: Option<String> = row.get(11)?;
     let bytes_before: u64 = row.get::<_, i64>(12).unwrap_or(0) as u64;
     let bytes_after: u64 = row.get::<_, i64>(13).unwrap_or(0) as u64;
     let bytes_saved: u64 = row.get::<_, i64>(14).unwrap_or(0) as u64;
     let image_prompts: u64 = row.get::<_, i64>(15).unwrap_or(0) as u64;
 
     let tokens = tokens_str.and_then(|s| serde_json::from_str(&s).ok());
+    let extra: std::collections::BTreeMap<String, Value> = meta_str
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
 
     Ok(UsageEntry {
         timestamp,
         provider,
         model,
         tokens,
+        connection_id,
+        api_key,
+        endpoint,
         cost,
         status,
         bytes_before,
         bytes_after,
         bytes_saved,
         image_prompts,
+        extra,
         ..Default::default()
     })
 }
@@ -135,5 +148,43 @@ mod tests {
         let history = db.with_conn(|c| get_history(c, 10, 0)).unwrap();
         assert_eq!(history.len(), 1);
         assert_eq!(history[0].model, "gpt-4o");
+    }
+
+    #[test]
+    fn roundtrip_with_latency_and_connection() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let mut extra = std::collections::BTreeMap::new();
+        extra.insert("latency".to_string(), json!({"total": 1234, "ttft": 567}));
+        extra.insert("error_class".to_string(), json!("timeout"));
+        let entry = UsageEntry {
+            model: "nvidia/nemotron-3-super-120b-a12b".into(),
+            provider: Some("nvidia".into()),
+            timestamp: Some("2026-09-09T00:12:24Z".into()),
+            connection_id: Some("conn-abc".into()),
+            api_key: Some("sk-nvidia-key".into()),
+            endpoint: Some("/v1/chat/completions".into()),
+            status: Some("success".into()),
+            cost: Some(0.05),
+            latency_ms: Some(1234),
+            ttft_ms: Some(567),
+            extra,
+            ..Default::default()
+        };
+        db.with_transaction(|tx| insert(tx, &entry)).unwrap();
+        let history = db.with_conn(|c| get_history(c, 10, 0)).unwrap();
+        assert_eq!(history.len(), 1);
+        let loaded = &history[0];
+        assert_eq!(loaded.model, "nvidia/nemotron-3-super-120b-a12b");
+        assert_eq!(loaded.provider.as_deref(), Some("nvidia"));
+        assert_eq!(loaded.connection_id.as_deref(), Some("conn-abc"));
+        assert_eq!(loaded.api_key.as_deref(), Some("sk-nvidia-key"));
+        assert_eq!(loaded.endpoint.as_deref(), Some("/v1/chat/completions"));
+        assert_eq!(loaded.status.as_deref(), Some("success"));
+        assert_eq!(loaded.cost, Some(0.05));
+        // Verify latency survived via extra
+        let latency = loaded.extra.get("latency").unwrap();
+        assert_eq!(latency["total"], 1234);
+        assert_eq!(latency["ttft"], 567);
+        assert_eq!(loaded.extra["error_class"], "timeout");
     }
 }

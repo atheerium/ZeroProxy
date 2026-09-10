@@ -137,6 +137,51 @@ mod tests {
     }
 
     #[test]
+    fn roundtrip_thinking_level() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let combo = Combo {
+            id: "c1".into(),
+            name: "tl-combo".into(),
+            kind: Some("fallback".into()),
+            models: vec!["openai/gpt-4o".into()],
+            thinking_level: Some("high".into()),
+            disabled_models: vec!["openai/gpt-4o-mini".into()],
+            created_at: Some("2026-01-01".into()),
+            updated_at: Some("2026-01-01".into()),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| create(tx, &combo)).unwrap();
+        let read = db
+            .with_conn(|c| get_by_name(c, "tl-combo"))
+            .unwrap()
+            .unwrap();
+        assert_eq!(read.thinking_level.as_deref(), Some("high"));
+        assert_eq!(read.disabled_models, vec!["openai/gpt-4o-mini"]);
+    }
+
+    #[test]
+    fn update_thinking_level() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let combo = Combo {
+            id: "c1".into(),
+            name: "upd-tl".into(),
+            models: vec!["a".into()],
+            thinking_level: Some("low".into()),
+            created_at: Some("2026-01-01".into()),
+            updated_at: Some("2026-01-01".into()),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| create(tx, &combo)).unwrap();
+        let mut updated = combo.clone();
+        updated.thinking_level = Some("high".into());
+        updated.disabled_models = vec!["a".into()];
+        db.with_transaction(|tx| update(tx, &updated)).unwrap();
+        let read = db.with_conn(|c| get_by_name(c, "upd-tl")).unwrap().unwrap();
+        assert_eq!(read.thinking_level.as_deref(), Some("high"));
+        assert_eq!(read.disabled_models, vec!["a"]);
+    }
+
+    #[test]
     fn unique_name_constraint() {
         let db = SqliteDb::open_in_memory().unwrap();
         let c1 = Combo {

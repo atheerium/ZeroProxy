@@ -257,7 +257,12 @@ export default function CombosPage() {
         ...normalizeStrategy(updated[comboName]),
         ...patch,
       };
-      if (!next.fallbackStrategy || next.fallbackStrategy === "fallback") {
+      const isDefault =
+        (!next.fallbackStrategy || next.fallbackStrategy === "fallback") &&
+        next.ttftTimeoutMs == null &&
+        !next.judgeModel &&
+        !next.fusionTuning;
+      if (isDefault) {
         delete updated[comboName];
       } else {
         updated[comboName] = next;
@@ -429,10 +434,18 @@ function ComboCard({
 }: ComboCardProps) {
   const [health, setHealth] = useState<ComboHealthEntry[]>([]);
   const [showJudgeSelect, setShowJudgeSelect] = useState(false);
+  const [localTtft, setLocalTtft] = useState<string>(
+    strategy.ttftTimeoutMs != null ? String(strategy.ttftTimeoutMs) : ""
+  );
 
   const current = strategy.fallbackStrategy || "fallback";
   const judge = strategy.judgeModel || "";
   const isFusion = current === "fusion";
+
+  // Sync local state when strategy changes externally (e.g. after initial load)
+  useEffect(() => {
+    setLocalTtft(strategy.ttftTimeoutMs != null ? String(strategy.ttftTimeoutMs) : "");
+  }, [strategy.ttftTimeoutMs]);
 
   // Poll the combo's quarantine state so the "cooling down" pill on the
   // card reflects the backend without having to open the edit modal.
@@ -577,7 +590,13 @@ function ComboCard({
             <Select
               options={STRATEGY_OPTIONS}
               value={current}
-              onChange={(e) => onSetStrategy({ fallbackStrategy: e.target.value })}
+              onChange={(e) => {
+                const v = parseInt(localTtft, 10);
+                onSetStrategy({
+                  fallbackStrategy: e.target.value,
+                  ttftTimeoutMs: isNaN(v) || v <= 0 ? undefined : v,
+                });
+              }}
               selectClassName="py-1.5 text-xs"
             />
           </div>
@@ -591,9 +610,10 @@ function ComboCard({
                 min={0}
                 step={1000}
                 placeholder="0"
-                value={strategy.ttftTimeoutMs ?? ""}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
+                value={localTtft}
+                onChange={(e) => setLocalTtft(e.target.value)}
+                onBlur={() => {
+                  const v = parseInt(localTtft, 10);
                   onSetStrategy({ ttftTimeoutMs: isNaN(v) || v <= 0 ? undefined : v });
                 }}
                 className="w-16 rounded border border-border bg-background px-1.5 py-1 font-mono text-[11px] text-text placeholder:text-text-muted/50 focus:border-primary focus:outline-none"

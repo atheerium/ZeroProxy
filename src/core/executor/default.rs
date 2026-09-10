@@ -1176,12 +1176,32 @@ impl DefaultExecutor {
         normalize_developer_role(&mut body);
 
         // Convert OpenAI-format tools to Claude format when the provider
-        // uses a Claude-compatible endpoint (minimax, glm, kimi, etc.)
+        // uses a Claude-compatible endpoint (minimax, glm, kimi, kilocode, etc.)
         if matches!(
             self.provider.as_str(),
-            "minimax" | "minimax-cn" | "glm" | "kimi" | "kimi-coding" | "agentrouter"
+            "minimax" | "minimax-cn" | "glm" | "kimi" | "kimi-coding" | "agentrouter" | "kilocode"
         ) {
             convert_openai_tools_to_claude(&mut body);
+
+            // Normalize tool messages for Cohere by adding tool_name field
+            if self.provider == "kilocode" {
+                if let Some(messages) = body.get_mut("messages").and_then(|v| v.as_array_mut()) {
+                    for msg in messages.iter_mut() {
+                        if let Some(obj) = msg.as_object_mut() {
+                            if obj.get("role").and_then(|v| v.as_str()) == Some("tool") {
+                                if let Some(tool_call_id) =
+                                    obj.get("tool_call_id").and_then(|v| v.as_str())
+                                {
+                                    obj.insert(
+                                        "tool_name".to_string(),
+                                        Value::String(tool_call_id.to_string()),
+                                    );
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         // Strip unsupported tool types for Fireworks/OCg upstream
