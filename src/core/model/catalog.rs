@@ -203,7 +203,7 @@ mod tests {
             ("selfhosted-stt", "selfhosted-stt"),
             ("selfhosted-tts", "selfhosted-tts"),
             ("tencent", "hunyuan"),
-            ("tokenrouter", "tokenrouter"),
+            ("tokenrouter", "trk"),
             ("venice", "venice"),
             ("zed", "zd"),
             ("alims-intl", "alims-intl"),
@@ -279,8 +279,8 @@ mod tests {
 
         // tokenrouter: video/image/audio kinds preserved from the seed snapshot.
         let tr = catalog
-            .models_for_alias("tokenrouter")
-            .expect("tokenrouter models");
+            .models_for_alias("trk")
+            .expect("trk models (tokenrouter alias)");
         assert!(tr
             .iter()
             .any(|m| m.id == "MiniMax-Hailuo-2.3" && m.kind == "video"));
@@ -354,7 +354,7 @@ mod tests {
             ("kilo-gateway", "kgw"),
             ("api-airforce", "af"),
             ("bluesminds", "bm"),
-            ("tokenrouter", "tokenrouter"),
+            ("tokenrouter", "trk"),
             ("perplexity-agent", "perplexity-agent"),
             ("alitp-intl", "alitp-intl"),
         ] {

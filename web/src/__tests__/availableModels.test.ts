@@ -3,8 +3,8 @@ import { buildAvailableModels, isFreeModelId } from "@/shared/models/availableMo
 
 describe("isFreeModelId", () => {
   it("flags :free and -free suffixes", () => {
-    expect(isFreeModelId("moonshot/kimi-k3-free", "tr")).toBe(true);
-    expect(isFreeModelId("qwen/qwen3:free", "tr")).toBe(true);
+    expect(isFreeModelId("moonshot/kimi-k3-free", "trk")).toBe(true);
+    expect(isFreeModelId("qwen/qwen3:free", "trk")).toBe(true);
     expect(isFreeModelId("gpt-4", "openai")).toBe(false);
   });
   it("respects explicitFree", () => {

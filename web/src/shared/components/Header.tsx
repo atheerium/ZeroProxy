@@ -4,6 +4,7 @@ import { useMemo, useState, useEffect } from "react";
 import ProviderIcon from "@/shared/components/ProviderIcon";
 import HeaderMenu from "@/shared/components/HeaderMenu";
 import ThemeToggle from "@/shared/components/ThemeToggle";
+import BuildInfoBadge from "@/shared/components/BuildInfoBadge";
 import DonateModal from "@/shared/components/DonateModal";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS } from "@/shared/constants/config";
 import { MEDIA_PROVIDER_KINDS, AI_PROVIDERS } from "@/shared/constants/providers";
@@ -322,6 +323,7 @@ export default function Header({ onMenuClick, showMenuButton = true }: HeaderPro
           <span className="material-symbols-outlined text-[20px]">volunteer_activism</span>
           <span className="hidden sm:inline">Donate</span>
         </button>
+        <BuildInfoBadge />
         <ThemeToggle />
         <HeaderMenu onLogout={handleLogout} />
       </div>

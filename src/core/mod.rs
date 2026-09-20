@@ -2,6 +2,7 @@ pub mod a2a;
 pub mod account_fallback;
 pub mod auth;
 pub mod combo;
+pub mod compress;
 pub mod config;
 pub mod dns;
 pub mod executor;

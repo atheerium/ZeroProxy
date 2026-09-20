@@ -32,6 +32,13 @@ fn main() {
         );
     }
 
+    // Emit build-time identity env vars so the binary carries its own provenance.
+    for (k, v) in build_env() {
+        println!("cargo:rustc-env={k}={v}");
+    }
+    println!("cargo:rerun-if-changed=.git/index");
+    println!("cargo:rerun-if-changed=.git/HEAD");
+
     // Trigger a rebuild whenever the embedded assets change. Without this,
     // editing `web/dist/...` won't invalidate the existing rust-embed cache
     // and the binary will keep serving stale assets.
@@ -66,6 +73,38 @@ fn main() {
 /// Returns `Some(reason)` if any file under `web/src` has an mtime strictly
 /// newer than `web/dist/index.html` (the build output marker). Walks `web/src`
 /// recursively; tolerates missing source dir.
+fn build_env() -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    // Build time (UTC RFC3339)
+    let time_str = std::process::Command::new("date")
+        .args(["-u", "+%Y-%m-%dT%H:%M:%SZ"])
+        .output()
+        .ok()
+        .and_then(|o| String::from_utf8(o.stdout).ok())
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| "unknown".into());
+    out.push(("ZEROPROXY_BUILD_TIME".into(), time_str));
+    // Short git SHA (or empty if unavailable)
+    let sha = std::process::Command::new("git")
+        .args(["rev-parse", "--short", "HEAD"])
+        .current_dir(".")
+        .output()
+        .ok()
+        .and_then(|o| {
+            let s = String::from_utf8(o.stdout).ok()?;
+            let trimmed = s.trim();
+            if trimmed.len() >= 4 {
+                Some(trimmed.to_string())
+            } else {
+                None
+            }
+        })
+        .unwrap_or_default();
+    out.push(("ZEROPROXY_GIT_SHA".into(), sha));
+    out
+}
+
 fn newest_src_newer_than_dist() -> Option<String> {
     let dist_marker = std::path::Path::new("web/dist/index.html");
     let dist_mtime = match std::fs::metadata(dist_marker).and_then(|m| m.modified()) {

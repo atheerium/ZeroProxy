@@ -1,0 +1,15 @@
+---
+import Layout from '@/layouts/Layout.astro';
+import ComboDetailClient from '@/components/ComboDetailClient';
+import DashboardLayout from '@/shared/components/layouts/DashboardLayout';
+
+export async function getStaticPaths() {
+  // Combo ids are runtime UUIDs unknown at build time; use dynamic shell.
+  return [{ params: { id: '_dynamic' } }];
+}
+---
+<Layout>
+  <DashboardLayout client:only="react">
+    <ComboDetailClient client:only="react" />
+  </DashboardLayout>
+</Layout>

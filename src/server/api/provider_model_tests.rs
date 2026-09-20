@@ -375,6 +375,143 @@ pub(super) async fn test_combo_model(
     .into_response()
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ComboTestRequest {
+    pub(super) combo: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ComboTestResult {
+    pub(super) model: String,
+    pub(super) ok: bool,
+    pub(super) latency_ms: u64,
+    pub(super) error: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(super) struct ComboTestResponse {
+    pub(super) combo: String,
+    pub(super) results: Vec<ComboTestResult>,
+}
+
+pub(super) async fn test_combo(
+    State(state): State<AppState>,
+    headers: HeaderMap,
+    Json(req): Json<ComboTestRequest>,
+) -> Response {
+    if let Err(response) = super::require_dashboard_or_management_api_key(&headers, &state) {
+        return response;
+    }
+
+    let combo_name = req.combo.trim();
+    if combo_name.is_empty() {
+        return (
+            StatusCode::BAD_REQUEST,
+            Json(json!({ "error": "`combo` is required" })),
+        )
+            .into_response();
+    }
+
+    let combo = state
+        .db
+        .snapshot()
+        .combos
+        .iter()
+        .find(|c| c.name == combo_name)
+        .cloned();
+    let combo = match combo {
+        Some(c) => c,
+        None => {
+            return (
+                StatusCode::NOT_FOUND,
+                Json(json!({ "error": format!("Combo '{}' not found", combo_name) })),
+            )
+                .into_response();
+        }
+    };
+
+    let models = combo.models.clone();
+    let disabled = combo.disabled_models.clone();
+    let disabled_set: std::collections::HashSet<String> = disabled.into_iter().collect();
+
+    let state_clone = state.clone();
+    let api_key = internal_api_key(&state);
+    let mut results = Vec::with_capacity(models.len());
+
+    // Parallel probes — spawn each via tokio::spawn to avoid blocking.
+    let handles: Vec<_> = models
+        .into_iter()
+        .filter(|m| !disabled_set.contains(m))
+        .map(|model| {
+            let api_key = api_key.clone();
+            let state_for_spawn = state_clone.clone();
+            tokio::spawn(async move {
+                let start = Instant::now();
+                let mut ping_headers = HeaderMap::new();
+                if let Some(key) = api_key.as_deref() {
+                    if let Ok(v) = HeaderValue::from_str(&format!("Bearer {key}")) {
+                        ping_headers.insert(AUTHORIZATION, v);
+                    }
+                }
+                let body = json!({
+                    "model": model,
+                    "max_tokens": 1,
+                    "stream": false,
+                    "messages": [{ "role": "user", "content": "hi" }]
+                });
+
+                let response = match timeout(
+                    MODEL_TEST_TIMEOUT,
+                    chat::chat_completions(State(state_for_spawn), ping_headers, Ok(Json(body))),
+                )
+                .await
+                {
+                    Ok(resp) => resp,
+                    Err(_) => {
+                        return ComboTestResult {
+                            model,
+                            ok: false,
+                            latency_ms: start.elapsed().as_millis() as u64,
+                            error: Some("Request timed out".to_string()),
+                        };
+                    }
+                };
+
+                let latency_ms = start.elapsed().as_millis() as u64;
+                let status = response.status();
+                let ok = status == StatusCode::OK || status == StatusCode::BAD_REQUEST;
+                let error = if ok {
+                    None
+                } else {
+                    Some(read_error_text(response, status).await)
+                };
+
+                ComboTestResult {
+                    model,
+                    ok,
+                    latency_ms,
+                    error,
+                }
+            })
+        })
+        .collect();
+
+    for h in handles {
+        if let Ok(r) = h.await {
+            results.push(r);
+        }
+    }
+
+    Json(ComboTestResponse {
+        combo: combo_name.to_string(),
+        results,
+    })
+    .into_response()
+}
+
 async fn read_error_text(response: Response, status: StatusCode) -> String {
     let text = match to_bytes(response.into_body(), usize::MAX).await {
         Ok(bytes) => String::from_utf8_lossy(&bytes).into_owned(),

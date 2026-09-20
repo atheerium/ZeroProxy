@@ -92,6 +92,10 @@ pub const fn error_type_for(status: u16) -> Option<ErrorTypeInfo> {
             r#type: "server_error",
             code: "gateway_timeout",
         },
+        529 => ErrorTypeInfo {
+            r#type: "server_error",
+            code: "service_overloaded",
+        },
         _ => return None,
     })
 }
@@ -110,6 +114,7 @@ pub const fn default_error_message(status: u16) -> Option<&'static str> {
         502 => "Bad gateway - upstream provider error",
         503 => "Service temporarily unavailable",
         504 => "Gateway timeout",
+        529 => "Service overloaded",
         _ => return None,
     })
 }
@@ -178,6 +183,21 @@ pub const ERROR_RULES: &[ErrorRule] = &[
         cooldown: None,
         backoff: true,
     },
+    // 401 with model-unavailable message → model lock (not OAuth refresh).
+    // Matches phrases like "not supported", "not entitled" that signal
+    // the model is permanently unavailable for this account.
+    ErrorRule {
+        text: Some("not supported"),
+        status: Some(401),
+        cooldown: Some(Duration::from_millis(cooldown_consts::LONG_MS)),
+        backoff: false,
+    },
+    ErrorRule {
+        text: Some("not entitled"),
+        status: Some(401),
+        cooldown: Some(Duration::from_millis(cooldown_consts::LONG_MS)),
+        backoff: false,
+    },
     // Status-based fallbacks.
     ErrorRule {
         text: None,
@@ -196,6 +216,12 @@ pub const ERROR_RULES: &[ErrorRule] = &[
         status: Some(404),
         cooldown: Some(Duration::from_millis(cooldown_consts::LONG_MS)),
         backoff: false,
+    },
+    ErrorRule {
+        text: None,
+        status: Some(529),
+        cooldown: Some(Duration::from_millis(cooldown_consts::SHORT_MS)),
+        backoff: true,
     },
     ErrorRule {
         text: None,

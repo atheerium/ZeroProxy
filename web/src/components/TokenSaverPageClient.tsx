@@ -92,6 +92,9 @@ export default function TokenSaverPageClient() {
   const [cavemanLevel, setCavemanLevel] = useState("full");
   const [ponytailEnabled, setPonytailEnabled] = useState(false);
   const [ponytailLevel, setPonytailLevel] = useState("full");
+  const [sessionDedupEnabled, setSessionDedupEnabled] = useState(true);
+  const [ccrEnabled, setCcrEnabled] = useState(true);
+  const [liteEnabled, setLiteEnabled] = useState(true);
   const [locale, setLocale] = useState("en");
 
   const { copied, copy } = useCopyToClipboard();
@@ -397,6 +400,19 @@ export default function TokenSaverPageClient() {
     patchSetting({ ponytailEnabled: value });
   };
 
+  const handleSessionDedupEnabled = (value: boolean) => {
+    setSessionDedupEnabled(value);
+    patchSetting({ sessionDedupEnabled: value });
+  };
+  const handleCcrEnabled = (value: boolean) => {
+    setCcrEnabled(value);
+    patchSetting({ ccrEnabled: value });
+  };
+  const handleLiteEnabled = (value: boolean) => {
+    setLiteEnabled(value);
+    patchSetting({ liteEnabled: value });
+  };
+
   const handlePonytailLevel = (level: string) => {
     setPonytailLevel(level);
     patchSetting({ ponytailLevel: level });
@@ -417,6 +433,9 @@ export default function TokenSaverPageClient() {
           setCavemanLevel(data.cavemanLevel || "full");
           setPonytailEnabled(!!data.ponytailEnabled);
           setPonytailLevel(data.ponytailLevel || "full");
+          setSessionDedupEnabled(data.sessionDedupEnabled !== false);
+          setCcrEnabled(data.ccrEnabled !== false);
+          setLiteEnabled(data.liteEnabled !== false);
           refreshHeadroomStatus();
         }
       } catch {
@@ -715,6 +734,31 @@ export default function TokenSaverPageClient() {
               onChange={() => handlePonytailEnabled(!ponytailEnabled)}
             />
           </div>
+        </div>
+
+        {/* Session Dedup */}
+        <div className="flex items-center justify-between pt-4 border-t border-border gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Session dedup (cross-turn suffix blocks)</p>
+            <p className="text-sm text-text-muted">Drop repeated assistant responses; lossless</p>
+          </div>
+          <Toggle checked={sessionDedupEnabled} onChange={() => handleSessionDedupEnabled(!sessionDedupEnabled)} />
+        </div>
+        {/* CCR */}
+        <div className="flex items-center justify-between pt-4 border-t border-border gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Content-addressed compression (CCR v1 marker)</p>
+            <p className="text-sm text-text-muted">Replace large blocks with [CCR retrieve hash=...] markers; no retrieve endpoint yet</p>
+          </div>
+          <Toggle checked={ccrEnabled} onChange={() => handleCcrEnabled(!ccrEnabled)} />
+        </div>
+        {/* Lite */}
+        <div className="flex items-center justify-between pt-4 border-t border-border gap-4">
+          <div className="min-w-0 flex-1">
+            <p className="font-medium">Lite format cleanup</p>
+            <p className="text-sm text-text-muted">Collapse whitespace, dedup system prompts, truncate long outputs</p>
+          </div>
+          <Toggle checked={liteEnabled} onChange={() => handleLiteEnabled(!liteEnabled)} />
         </div>
       </Card>
 

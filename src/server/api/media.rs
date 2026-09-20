@@ -643,6 +643,10 @@ async fn execute_media_provider(
                     None,            // ttft_ms
                     Some("success"), // status — inside is_success() block
                     None,            // error_class
+                    None,
+                    None,
+                    None,
+                    None,
                 );
             }
         }

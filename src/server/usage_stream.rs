@@ -24,6 +24,7 @@ pub struct UsageStatsPayload {
     pub by_account: BTreeMap<String, AccountStats>,
     pub by_api_key: BTreeMap<String, ApiKeyStats>,
     pub by_endpoint: BTreeMap<String, EndpointStats>,
+    pub by_combo: BTreeMap<String, AggregateStats>,
     pub last10_minutes: Vec<LastTenMinutesBucket>,
     pub pending: PendingSnapshot,
     pub active_requests: Vec<ActiveRequest>,
@@ -269,6 +270,7 @@ pub fn build_usage_stats(
         by_account: BTreeMap::new(),
         by_api_key: BTreeMap::new(),
         by_endpoint: BTreeMap::new(),
+        by_combo: BTreeMap::new(),
         last10_minutes: build_last_ten_minutes(&usage_db.history),
         pending,
         active_requests,
@@ -632,8 +634,22 @@ fn aggregate_live_entry(
     endpoint_bucket.latency_count += latency_count;
     endpoint_bucket.endpoint = endpoint;
     endpoint_bucket.raw_model = entry.model.clone();
-    endpoint_bucket.provider = provider_display;
+    endpoint_bucket.provider = provider_display.clone();
     update_last_used(&mut endpoint_bucket.last_used, &timestamp);
+
+    // Phase 2: combo-level aggregation (provider-level proxy since UsageEntry has no combo id)
+    let combo_key = provider_display.clone();
+    let combo_bucket = stats.by_combo.entry(combo_key.clone()).or_default();
+    combo_bucket.requests += 1;
+    if is_failed {
+        combo_bucket.failed_requests += 1;
+    }
+    combo_bucket.prompt_tokens += prompt_tokens;
+    combo_bucket.completion_tokens += completion_tokens;
+    combo_bucket.cost += cost;
+    combo_bucket.latency_total_sum += latency_total_ms;
+    combo_bucket.latency_ttft_sum += latency_ttft_ms;
+    combo_bucket.latency_count += latency_count;
 }
 
 fn extract_latency_from_extra(

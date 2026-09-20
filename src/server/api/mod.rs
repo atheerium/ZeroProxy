@@ -355,6 +355,7 @@ pub fn routes(state: AppState) -> Router<AppState> {
             "/api/combos/test-model",
             post(provider_model_tests::test_combo_model),
         )
+        .route("/api/combos/test", post(provider_model_tests::test_combo))
         .route("/api/proxy-pools", get(list_pools_api))
         .route("/api/proxy-pools", post(create_pool_api))
         .route("/api/proxy-pools/{id}", put(update_pool_api))
@@ -442,17 +443,20 @@ async fn v1_root() -> Response {
 async fn health(State(state): State<AppState>) -> Response {
     let base = HealthResponse::new("api");
     let summary = state.health.summary();
+    let build = crate::server::build_info::status();
     Json(json!({
         "status": base.status,
         "component": base.component,
         "providers": summary,
+        "buildInfo": build,
     }))
     .into_response()
 }
 
 async fn api_health(State(state): State<AppState>) -> Response {
     let summary = state.health.summary();
-    Json(json!({ "ok": true, "providers": summary })).into_response()
+    let build = crate::server::build_info::status();
+    Json(json!({ "ok": true, "providers": summary, "buildInfo": build })).into_response()
 }
 
 async fn api_catalog() -> Response {
@@ -472,11 +476,16 @@ async fn get_version_api() -> Response {
         .map(|latest| compare_semver_like(latest, &current_version) > 0)
         .unwrap_or(false);
 
+    let identity = crate::server::build_info::identity();
+    let status = crate::server::build_info::status();
+
     Json(json!({
         "currentVersion": current_version,
         "latestVersion": latest_version,
         "hasUpdate": has_update,
         "dashboardVersion": dashboard_package_version(),
+        "buildInfo": identity,
+        "runtimeInfo": status,
     }))
     .into_response()
 }
@@ -2140,6 +2149,9 @@ struct UpdateSettingsRequest {
     mitm_router_base_url: Option<String>,
     require_login: Option<bool>,
     rtk_enabled: Option<bool>,
+    session_dedup_enabled: Option<bool>,
+    ccr_enabled: Option<bool>,
+    lite_enabled: Option<bool>,
     caveman_enabled: Option<bool>,
     caveman_level: Option<String>,
     observability_enabled: Option<bool>,
@@ -2280,6 +2292,15 @@ async fn update_settings_api(
             }
             if let Some(v) = req.rtk_enabled {
                 db.settings.rtk_enabled = v;
+            }
+            if let Some(v) = req.session_dedup_enabled {
+                db.settings.session_dedup_enabled = v;
+            }
+            if let Some(v) = req.ccr_enabled {
+                db.settings.ccr_enabled = v;
+            }
+            if let Some(v) = req.lite_enabled {
+                db.settings.lite_enabled = v;
             }
             if let Some(v) = req.caveman_enabled {
                 db.settings.caveman_enabled = v;

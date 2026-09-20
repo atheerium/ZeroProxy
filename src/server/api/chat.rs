@@ -18,6 +18,7 @@ use crate::core::account_fallback::{
     build_model_lock_update, filter_available_accounts, StrategyType,
 };
 use crate::core::chat::RequestPlan;
+use crate::core::combo::attempt_stats;
 use crate::core::combo::fusion::{handle_fusion_chat, handle_fusion_chat_deferred};
 use crate::core::combo::{
     capacity_adapter::{
@@ -760,63 +761,87 @@ async fn chat_completions_impl(
                         let combo_name_for_ttft = combo_name_for_ttft.clone();
                         let ttft_cfg = ttft_for_combo;
                         async move {
-                            let response = execute_single_model(
-                                &state,
-                                &body,
-                                &resolved_model,
-                                api_key.as_deref(),
-                                endpoint,
-                                &plan_for_combo,
-                                client_tool_for_combo,
-                                Some(&headers),
-                            )
-                            .await?;
-
-                            // Slow-member TTFT fallback (streaming only, opt-in).
-                            // The first token arrives DURING streaming — after
-                            // upstream headers — so a header time-out would never
-                            // catch a slow first chunk. Peek the first body chunk
-                            // under a timeout instead; on timeout, abort this
-                            // member and fall through to the next combo member.
+                            let combo_name_ref = combo_name_for_ttft.clone();
+                            let combo_model_ref = combo_model.clone();
                             if plan_for_combo.stream && ttft_cfg.is_enabled() {
-                                let (parts, body) = response.into_parts();
-                                let mut stream = body.into_data_stream();
-                                let first = tokio::time::timeout(
-                                    Duration::from_millis(ttft_cfg.timeout_ms),
-                                    stream.next(),
-                                )
-                                .await;
-                                match first {
-                                    Ok(Some(Ok(first_bytes))) => {
-                                        let mut rest = stream;
-                                        let replayed = async_stream::stream! {
-                                            yield Ok(first_bytes);
-                                            while let Some(chunk) = rest.next().await {
-                                                yield chunk;
-                                            }
-                                        };
-                                        Ok(Response::from_parts(parts, Body::from_stream(replayed)))
+                                let effective_timeout = if ttft_cfg.is_adaptive() {
+                                    // Use adaptive timeout logic
+                                    ttft_cfg.compute_effective_timeout(&combo_name_ref, &resolved_model).unwrap_or(ttft_cfg.timeout_ms)
+                                } else {
+                                    ttft_cfg.timeout_ms
+                                };
+                                let timeout_duration = Duration::from_millis(effective_timeout);
+                                match tokio::time::timeout(timeout_duration, async {
+                                    let response = execute_single_model(
+                                        &state,
+                                        &body,
+                                        &resolved_model,
+                                        api_key.as_deref(),
+                                        endpoint,
+                                        &plan_for_combo,
+                                        client_tool_for_combo,
+                                        Some(&headers),
+                                    )
+                                    .await?;
+                                    let (parts, body) = response.into_parts();
+                                    let mut stream = body.into_data_stream();
+                                    let first = stream.next().await;
+                                    match first {
+                                        Some(Ok(first_bytes)) => {
+                                            let mut rest = stream;
+                                            let replayed = async_stream::stream! {
+                                                yield Ok(first_bytes);
+                                                while let Some(chunk) = rest.next().await {
+                                                    yield chunk;
+                                                }
+                                            };
+                                            Ok(Response::from_parts(parts, Body::from_stream(replayed)))
+                                        }
+                                        _ => {
+                                            drop(stream);
+                                            Err(ComboAttemptError::ttft_timeout(
+                        &resolved_model,
+                                                ttft_cfg.timeout_ms,
+                                            ))
+                                        }
                                     }
-                                    _ => {
-                                        // Timeout (or empty / errored first chunk)
-                                        // => slow member. Abort + fall through to
-                                        // the next member, quarantining the slow
-                                        // one so we don't reroll it immediately.
-                                        drop(stream);
+                                }).await {
+                                    Ok(Ok(resp)) => Ok(resp),
+                                    Ok(Err(err)) => Err(err),
+                                    Err(_) => {
+                                        tracing::warn!(
+                                            target: "zeroproxy::combo",
+                                            "TTFT exceeded ({}ms) combo={} model={}, quarantining for {}s",
+                                            effective_timeout,
+                                            combo_name_ref,
+                                            combo_model_ref,
+                                            ttft_cfg.quarantine_secs,
+                                        );
                                         if ttft_cfg.quarantine_secs > 0 {
                                             mark_combo_member_quarantined(
-                                                &combo_name_for_ttft,
-                                                &combo_model,
+                                                &combo_name_ref,
+                                                &combo_model_ref,
                                                 Duration::from_secs(ttft_cfg.quarantine_secs),
                                             );
                                         }
                                         Err(ComboAttemptError::ttft_timeout(
-                                            &combo_model,
-                                            ttft_cfg.timeout_ms,
+                                            &combo_model_ref,
+                                            effective_timeout,
                                         ))
                                     }
                                 }
                             } else {
+                                let response = execute_single_model(
+                                    &state,
+                                    &body,
+                                    &resolved_model,
+                                    api_key.as_deref(),
+                                    endpoint,
+                                    &plan_for_combo,
+                                    client_tool_for_combo,
+                                    Some(&headers),
+                                )
+                                .await?;
                                 Ok(response)
                             }
                         }
@@ -837,6 +862,7 @@ async fn chat_completions_impl(
                     // member.
                     let cooldown = check_fallback_error(error.status, &error.message, 0).cooldown;
                     let attempted = attempted_members.lock().clone();
+                    let last_attempted = attempted.last().cloned().unwrap_or_default();
                     for member in attempted {
                         mark_combo_member_quarantined(
                             &combo_name_for_quarantine,
@@ -844,6 +870,19 @@ async fn chat_completions_impl(
                             cooldown,
                         );
                     }
+                    // Record attempt stats for analysis (Phase 0)
+                    let combo_name_for_stats = combo_name_for_quarantine.clone();
+                    attempt_stats::record_combo_attempt(
+                        &combo_name_for_stats,
+                        last_attempted.as_str(),
+                        resolved.provider.as_deref().unwrap_or("unknown"),
+                        error.status,
+                        None,
+                        0,
+                        Some(error.message.clone()),
+                        false,
+                        false,
+                    );
                     combo_error_response(error)
                 }
             }
@@ -2746,6 +2785,10 @@ async fn proxy_dashboard_sse_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
+            None,
+            None,
+            None,
+            None,
         );
         state.usage_live.notify_update();
         usage
@@ -3313,6 +3356,10 @@ async fn proxy_sse_to_json_response(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
+            None,
+            None,
+            None,
+            None,
         );
         state.usage_live.notify_update();
     }
@@ -3421,6 +3468,10 @@ async fn proxy_response_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
+            None,
+            None,
+            None,
+            None,
         );
         state.usage_live.notify_update();
 
@@ -3990,6 +4041,10 @@ async fn record_streaming_usage(
         ttft_ms,
         status,
         error_class,
+        None,
+        None,
+        None,
+        None,
     );
 }
 

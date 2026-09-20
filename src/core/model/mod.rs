@@ -132,6 +132,9 @@ static ALIAS_TO_PROVIDER_ID: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
         ("gweb", "gemini-web"),
         ("muse-spark-web", "muse-spark-web"),
         ("ms-web", "muse-spark-web"),
+        // TokenRouter (trk alias per OmniRoute parity)
+        ("trk", "tokenrouter"),
+        ("tokenrouter", "tokenrouter"),
     ])
 });
 

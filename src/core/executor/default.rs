@@ -1132,6 +1132,33 @@ impl DefaultExecutor {
                     HeaderValue::from_static("claude-cli/2.0.14 (external, cli)"),
                 );
             }
+            if self.provider == "opencode-zen" {
+                // Use the OpenCode CLI-equivalent header builder (matches
+                // OmniRoute opencodeHeaders.ts). Fixes empty session bug by
+                // never using credentials.id (empty for noAuth provider).
+                let session_str: &str = if !credentials.id.is_empty() {
+                    credentials.id.as_str()
+                } else {
+                    "opencode_default_session"
+                };
+                let request_id = format!("opencode_req_{}", uuid::Uuid::new_v4());
+                for (name, value) in [
+                    (
+                        "User-Agent",
+                        "opencode/1.18.18 ai-sdk/provider-utils/4.0.23 runtime/bun/1.3.14",
+                    ),
+                    ("x-opencode-client", "cli"),
+                    ("x-opencode-session", session_str),
+                    ("x-opencode-request", &request_id),
+                    ("x-opencode-project", "global"),
+                ] {
+                    if let Ok(n) = reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
+                        if let Ok(val) = HeaderValue::from_str(value) {
+                            headers.insert(n, val);
+                        }
+                    }
+                }
+            }
             if self.provider == "cline" || self.provider == "clinepass" {
                 // Cline often needs workos: prefix handled elsewhere; keep Bearer
             }

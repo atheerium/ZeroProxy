@@ -2705,17 +2705,18 @@ async fn start_device_code_compat(
                 }
             });
 
-        let device_resp = match device_code::start_device_flow(&provider_config, &client_id).await {
-            Ok(resp) => resp,
-            Err(e) => {
-                return make_error_response(
-                    StatusCode::BAD_REQUEST,
-                    &e.error_description.unwrap_or_else(|| e.error.clone()),
-                    &e.error,
-                    &provider,
-                );
-            }
-        };
+        let device_resp =
+            match device_code::start_device_flow(&provider_config, &client_id, "").await {
+                Ok(resp) => resp,
+                Err(e) => {
+                    return make_error_response(
+                        StatusCode::BAD_REQUEST,
+                        &e.error_description.unwrap_or_else(|| e.error.clone()),
+                        &e.error,
+                        &provider,
+                    );
+                }
+            };
 
         let now = now_secs();
         let code_verifier = generate_code_verifier();
@@ -4622,7 +4623,7 @@ pub async fn start_device_code(
             })
             .unwrap_or_else(|| "zeroproxy".to_string());
 
-        match device_code::start_device_flow(&provider_config, &client_id).await {
+        match device_code::start_device_flow(&provider_config, &client_id, "").await {
             Ok(resp) => (resp, None),
             Err(e) => {
                 return make_error_response(

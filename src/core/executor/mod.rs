@@ -22,6 +22,7 @@ mod mimo_free;
 mod ollama;
 mod opencode;
 mod opencode_go;
+pub mod opencode_headers;
 mod project_id_cache;
 mod provider;
 pub mod qoder;

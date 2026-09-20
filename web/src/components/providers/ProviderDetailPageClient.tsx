@@ -103,6 +103,12 @@ export default function ProviderDetailPageClient() {
   const [deleteNodeTarget, setDeleteNodeTarget] = useState<{ name: string; type: string } | null>(null);
   const [deletingNode, setDeletingNode] = useState<boolean>(false);
   const [disableAllTarget, setDisableAllTarget] = useState<string[] | null>(null);
+  // Filter / toolbar state for Available Models
+  const [searchQuery, setSearchQuery] = useState("");
+  const [visibilityFilter, setVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
+  const [testAllAutoHideFailed, setTestAllAutoHideFailed] = useState(false);
+  const [testAllProgress, setTestAllProgress] = useState<{ done: number; total: number } | null>(null);
+  const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
 
   const providerInfo = providerNode
     ? {
@@ -541,9 +547,10 @@ export default function ProviderDetailPageClient() {
           await handleAddCustomModel(cleanId, "llm", providerStorageAlias);
           importedCount += 1;
         }
-        if (importedCount === 0) notify.success("All models already exist, no new models added");
+        if (importedCount === 0) { notify.success("All models already exist, no new models added"); setLastRefreshedAt(Date.now()); }
         else {
           notify.success(`Successfully added ${importedCount} models`);
+          setLastRefreshedAt(Date.now());
           await fetchCustomModels();
           am.refresh();
           if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
@@ -561,6 +568,7 @@ export default function ProviderDetailPageClient() {
       const total = data.total ?? 0;
       if (added === 0 && updated === 0) notify.success(`All models up to date — ${total} models`);
       else notify.success(`Imported ${added} new, updated ${updated} — total ${total}`);
+      setLastRefreshedAt(Date.now());
       await fetchCustomModels();
       am.refresh();
       if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("customModelChanged"));
@@ -1159,9 +1167,16 @@ export default function ProviderDetailPageClient() {
       );
     }
     // Single source of truth: catalog + live + custom, merged by the hook.
-    const customModelRows = am.customRows;
-    const displayModels = am.enabledCoreRows;
-    const disabledDisplayModels = am.disabledCoreRows;
+    const lowerQuery = searchQuery.trim().toLowerCase();
+    const filterRow = (r: any) => {
+      const nameStr = (r.id || r.name || "").toLowerCase();
+      const matchesSearch = !lowerQuery || nameStr.includes(lowerQuery) || (r.alias && r.alias.toLowerCase().includes(lowerQuery));
+      const matchesVisibility = visibilityFilter === "all" || (visibilityFilter === "visible" ? !r.disabled : visibilityFilter === "hidden" ? r.disabled : true);
+      return matchesSearch && matchesVisibility;
+    };
+    const customModelRows = am.customRows.filter(filterRow);
+    const displayModels = am.enabledCoreRows.filter(filterRow);
+    const disabledDisplayModels = am.disabledCoreRows.filter(filterRow);
 
     return (
       <div className="flex flex-wrap gap-3">
@@ -1784,6 +1799,147 @@ export default function ProviderDetailPageClient() {
         {!!modelsTestError && (
           <p className="text-xs text-red-500 mb-3 break-words">{modelsTestError}</p>
         )}
+        {/* Filter toolbar */}
+        {!isCompatible && (() => {
+          const allCoreIdsForFilter = [...am.customRows, ...am.enabledCoreRows, ...am.disabledCoreRows];
+          const lowerQuery = searchQuery.trim().toLowerCase();
+          const filteredRows = allCoreIdsForFilter.filter((r: any) => {
+            const nameStr = (r.id || r.name || "").toLowerCase();
+            const matchesSearch = !lowerQuery || nameStr.includes(lowerQuery) || (r.alias && r.alias.toLowerCase().includes(lowerQuery));
+            const matchesVisibility = visibilityFilter === "all" || (visibilityFilter === "visible" ? !r.disabled : visibilityFilter === "hidden" ? r.disabled : true);
+            return matchesSearch && matchesVisibility;
+          });
+          const activeCount = filteredRows.filter((r: any) => !r.disabled).length;
+          const hiddenCount = filteredRows.filter((r: any) => r.disabled).length;
+          const hasResults = filteredRows.length > 0;
+          const canTest = (connections.length > 0 || isFreeNoAuth) && hasResults && activeCount > 0;
+          return (
+            <div className="mb-4 rounded-lg border border-border bg-background px-3 py-2.5">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="Search models..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-2.5 py-1.5 text-xs focus:border-primary focus:outline-none sm:w-56"
+                  />
+                  <div className="flex items-center gap-1">
+                    {(["all", "visible", "hidden"] as const).map((v) => (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setVisibilityFilter(v)}
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                          visibilityFilter === v ? "border-primary bg-primary/10 text-primary" : "border-border bg-surface text-text-muted hover:border-primary/50 hover:text-primary"
+                        }`}
+                      >
+                        {v === "all" ? "All" : v === "visible" ? "Visible" : "Hidden"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+                  <span>{activeCount} active</span>
+                  {hiddenCount > 0 && <span>· {hiddenCount} hidden</span>}
+                  {searchQuery.trim() && <span>· search: "{searchQuery.trim()}"</span>}
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const visibleIds = am.enabledCoreRows.map((r) => r.id);
+                    handleDisableAll(visibleIds);
+                  }}
+                  disabled={activeCount === 0}
+                  className="inline-flex items-center gap-1 rounded-md border border-red-300/40 bg-red-500/5 px-2.5 py-1 text-xs text-red-600 hover:bg-red-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Hide all filtered visible models"
+                >
+                  <span className="material-symbols-outlined text-[13px]">block</span>
+                  Hide visible
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const hiddenIds = am.disabledCoreRows.map((r) => r.id);
+                    // Re-enable filtered hidden only; for bulk simplicity we use the full disabled list
+                    // but this is a best-effort filter-level restore.
+                    const toEnable = hiddenIds.filter((id) => {
+                      const row = am.allRows.find((r) => r.id === id);
+                      return !lowerQuery || (row && (row.id.toLowerCase().includes(lowerQuery) || (row.alias && row.alias.toLowerCase().includes(lowerQuery))));
+                    });
+                    if (toEnable.length === 0) return;
+                    const promises = toEnable.map((id) => am.enable(id));
+                    Promise.all(promises).catch(() => {});
+                  }}
+                  disabled={hiddenCount === 0}
+                  className="inline-flex items-center gap-1 rounded-md border border-green-400/30 bg-green-500/5 px-2.5 py-1 text-xs text-green-600 hover:bg-green-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                  title="Restore filtered hidden models"
+                >
+                  <span className="material-symbols-outlined text-[13px]">restart_alt</span>
+                  Show hidden
+                </button>
+                <span className="mx-1 text-border">|</span>
+                <label className="flex items-center gap-1.5 cursor-pointer text-xs text-text-muted">
+                  <input
+                    type="checkbox"
+                    checked={testAllAutoHideFailed}
+                    onChange={(e) => setTestAllAutoHideFailed(e.target.checked)}
+                    className="h-3 w-3 rounded border-gray-300 text-primary focus:ring-primary"
+                  />
+                  Auto-hide failed
+                </label>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const targets = filteredRows.filter((r: any) => !r.disabled);
+                    if (targets.length === 0 || (!connections.length && !isFreeNoAuth)) return;
+                    setTestAllProgress({ done: 0, total: targets.length });
+                    let done = 0;
+                    for (const row of targets) {
+                      const fullModelStr = row.fullModel || `${providerStorageAlias}/${row.id}`;
+                      try {
+                        setTestingModelIds((prev) => new Set(prev).add(row.id));
+                        const res = await fetch("/api/models/test", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ model: fullModelStr }),
+                        });
+                        const data = await res.json();
+                        setModelTestResults((prev) => ({ ...prev, [row.id]: data.ok ? "ok" : "error" }));
+                        if (!data.ok && testAllAutoHideFailed) {
+                          await am.disable([row.id]);
+                        }
+                      } catch {
+                        setModelTestResults((prev) => ({ ...prev, [row.id]: "error" }));
+                        if (testAllAutoHideFailed) {
+                          await am.disable([row.id]);
+                        }
+                      } finally {
+                        setTestingModelIds((prev) => { const s = new Set(prev); s.delete(row.id); return s; });
+                        done += 1;
+                        setTestAllProgress({ done, total: targets.length });
+                      }
+                    }
+                    setTestAllProgress(null);
+                    notify.success(`Tested ${targets.length} model${targets.length > 1 ? "s" : ""}`);
+                  }}
+                  disabled={!canTest || testAllProgress !== null}
+                  className="inline-flex items-center gap-1 rounded-md border border-violet-400/30 bg-violet-500/5 px-2.5 py-1 text-xs text-violet-600 hover:bg-violet-500/10 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  <span className="material-symbols-outlined text-[13px]">science</span>
+                  {testAllProgress ? `Testing (${testAllProgress.done}/${testAllProgress.total})` : "Test All"}
+                </button>
+                {lastRefreshedAt && (
+                  <span className="ml-auto text-[10px] text-text-muted/70">
+                    Last refreshed: {new Date(lastRefreshedAt).toLocaleString()}
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })()}
         {renderModelsSection()}
       </Card>
 

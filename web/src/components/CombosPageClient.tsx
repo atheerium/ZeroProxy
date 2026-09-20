@@ -124,6 +124,9 @@ export default function CombosPage() {
   const [deleteTarget, setDeleteTarget] = useState<Combo | null>(null);
   const [deleting, setDeleting] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [testingCombo, setTestingCombo] = useState<string | null>(null);
+  const [testResults, setTestResults] = useState<{ combo: string; results: any[] } | null>(null);
+  const [testLoading, setTestLoading] = useState<boolean>(false);
   const notify = useNotificationStore();
   const { copied, copy } = useCopyToClipboard();
   const { getCaps } = useModelCaps();
@@ -221,6 +224,25 @@ export default function CombosPage() {
     } catch (error) {
       console.log("Error updating combo:", error);
       notify.error("Failed to update combo");
+    }
+  };
+
+  const handleTestCombo = async (name: string) => {
+    setTestingCombo(name);
+    setTestLoading(true);
+    try {
+      const res = await fetch("/api/combos/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ combo: name }),
+      });
+      const data = await res.json();
+      setTestResults({ combo: name, results: data.results || [] });
+    } catch (e: any) {
+      setTestResults({ combo: name, results: [{ model: "—", ok: false, error: e?.message || "Failed to test combo" }] });
+    } finally {
+      setTestingCombo(null);
+      setTestLoading(false);
     }
   };
 
@@ -361,6 +383,8 @@ export default function CombosPage() {
               onCopy={copy}
               onEdit={() => setEditingCombo(combo)}
               onDelete={() => handleDelete(combo)}
+              onTestCombo={handleTestCombo}
+              testingCombo={testingCombo}
               strategy={normalizeStrategy(comboStrategies[combo.name])}
               onSetStrategy={(patch) => handleSetComboStrategy(combo.name, patch)}
               getCaps={getCaps}
@@ -403,6 +427,33 @@ export default function CombosPage() {
         variant="danger"
         loading={deleting}
       />
+
+      {/* Combo Test Results Modal */}
+      <Modal isOpen={!!testResults} onClose={() => setTestResults(null)} title={`Combo Test: ${testResults?.combo || ""}`} size="md">
+        <div className="flex flex-col gap-2">
+          {testResults && testResults.results.length === 0 && (
+            <p className="text-sm text-text-muted">No results.</p>
+          )}
+          {testResults && testResults.results.map((r: any, i: number) => (
+            <div key={i} className={`flex items-center justify-between rounded px-3 py-2 text-sm ${r.ok ? "bg-emerald-500/10" : "bg-red-500/10"}`}>
+              <span className="font-mono truncate max-w-[60%]">{r.model}</span>
+              <span className="flex items-center gap-2 text-xs">
+                {r.ok ? (
+                  <span className="text-emerald-600">OK</span>
+                ) : (
+                  <span className="text-red-600">FAIL</span>
+                )}
+                <span className="text-text-muted">{r.latencyMs ? `${r.latencyMs}ms` : "—"}</span>
+              </span>
+            </div>
+          ))}
+          {testResults && testResults.results.some((r: any) => !r.ok) && (
+            <div className="mt-1 text-xs text-text-muted">
+              {testResults.results.filter((r: any) => !r.ok).map((r: any) => r.error || r.model).join(", ")}
+            </div>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }
@@ -414,6 +465,8 @@ interface ComboCardProps {
   onCopy: (name: string, id: string) => void;
   onEdit: () => void;
   onDelete: () => void;
+  onTestCombo: (name: string) => void;
+  testingCombo: string | null;
   strategy: ComboStrategyConfig;
   onSetStrategy: (patch: Partial<ComboStrategyConfig>) => void;
   getCaps?: (model: string) => import("@/shared/constants/models").ModelCaps | null | undefined;
@@ -427,6 +480,8 @@ function ComboCard({
   onCopy,
   onEdit,
   onDelete,
+  onTestCombo,
+  testingCombo,
   strategy,
   onSetStrategy,
   getCaps,
@@ -622,7 +677,7 @@ function ComboCard({
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-1 sm:flex">
+          <div className="grid grid-cols-5 gap-1 sm:flex">
             <button
               onClick={(e) => { e.stopPropagation(); onCopy(combo.name, `combo-${combo.id}`); }}
               className="flex flex-col items-center rounded px-2 py-1 text-text-muted transition-colors hover:bg-black/5 hover:text-primary dark:hover:bg-white/5"
@@ -640,6 +695,26 @@ function ComboCard({
             >
               <span className="material-symbols-outlined text-[18px]">edit</span>
               <span className="text-[10px] leading-tight">Edit</span>
+            </button>
+            <a
+              href={`/dashboard/combos/${combo.id}`}
+              className="flex flex-col items-center rounded px-2 py-1 text-text-muted transition-colors hover:bg-black/5 hover:text-primary dark:hover:bg-white/5"
+              title="Control Center"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span className="material-symbols-outlined text-[18px]">monitoring</span>
+              <span className="text-[10px] leading-tight">Center</span>
+            </a>
+            <button
+              onClick={(e) => { e.stopPropagation(); onTestCombo(combo.name); }}
+              disabled={testingCombo === combo.name}
+              className="flex flex-col items-center rounded px-2 py-1 text-text-muted transition-colors hover:bg-black/5 hover:text-primary dark:hover:bg-white/5 disabled:opacity-40"
+              title="Test combo members"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {testingCombo === combo.name ? "progress_activity" : "play_arrow"}
+              </span>
+              <span className="text-[10px] leading-tight">Test</span>
             </button>
             <button
               onClick={onDelete}

@@ -15,9 +15,11 @@ use crate::core::model::resolve_provider_alias;
 use crate::core::usage::{parse_model_pricing, CostModel};
 use crate::types::{AppDb, Combo, PricingTable};
 
+pub mod attempt_stats;
 pub mod auto_combo;
 pub mod capabilities;
 pub mod capacity_adapter;
+pub mod decision_trace;
 pub mod fusion;
 pub mod hedging;
 pub mod ordering;
@@ -95,18 +97,22 @@ impl FusionConfig {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TtftConfig {
     /// Each member is aborted if the first streaming chunk takes longer than
-    /// this. `0` / absent means the feature is off.
+    /// this. `0` disables (explicit opt-out). Default 5000ms.
     pub timeout_ms: u64,
     /// How long to quarantine a member after a TTFT timeout. `0` means no
     /// quarantine (just skip to the next member). Default 60s.
     pub quarantine_secs: u64,
+    /// Adaptive TTFT configuration. When enabled, the timeout is computed
+    /// based on historical performance with floor/ceil/headroom settings.
+    pub adaptive: Option<AdaptiveTtftConfig>,
 }
 
 impl Default for TtftConfig {
     fn default() -> Self {
         Self {
-            timeout_ms: 0,
+            timeout_ms: 5000,
             quarantine_secs: 60,
+            adaptive: None,
         }
     }
 }
@@ -117,15 +123,38 @@ impl TtftConfig {
         self.timeout_ms > 0
     }
 
-    /// Read `ttftTimeoutMs` / `ttftQuarantineSecs` from a JSON map (either a
-    /// combo's `extra` or a settings entry's flattened extra).
+    /// Whether adaptive TTFT is enabled and configured.
+    pub fn is_adaptive(&self) -> bool {
+        self.adaptive.is_some()
+    }
+
+    /// Read `ttftTimeoutMs`, `tthtQuarantineSecs`, and `ttftAdaptive` from a JSON
+    /// map (either a combo's `extra` or a settings entry's flattened extra).
     pub fn from_value(extra: &std::collections::BTreeMap<String, Value>) -> Self {
         let mut s = Self::default();
-        if let Some(v) = extra.get("ttftTimeoutMs") {
+        if let Some(v) = extra.get("tthtTimeoutMs") {
             s.timeout_ms = v.as_u64().unwrap_or(0).min(u64::from(u32::MAX));
         }
-        if let Some(v) = extra.get("ttftQuarantineSecs") {
+        if let Some(v) = extra.get("tthtQuarantineSecs") {
             s.quarantine_secs = v.as_u64().unwrap_or(60);
+        }
+        if let Some(v) = extra.get("ttftAdaptive") {
+            if let Some(obj) = v.as_object() {
+                let mut cfg = AdaptiveTtftConfig::default();
+                if let Some(v) = obj.get("floorMs") {
+                    cfg.floor_ms = v.as_u64().unwrap_or(5000);
+                }
+                if let Some(v) = obj.get("ceilingMs") {
+                    cfg.ceiling_ms = v.as_u64().unwrap_or(15000);
+                }
+                if let Some(v) = obj.get("headroomX10") {
+                    cfg.headroom_x10 = v.as_u64().unwrap_or(15);
+                }
+                if let Some(v) = obj.get("minSamples") {
+                    cfg.min_samples = v.as_u64().unwrap_or(5) as usize;
+                }
+                s.adaptive = Some(cfg);
+            }
         }
         s
     }
@@ -141,6 +170,60 @@ impl TtftConfig {
             cfg.timeout_ms = v;
         }
         cfg
+    }
+
+    /// Compute the effective timeout for a specific combo member using adaptive
+    /// logic when configured. Returns `None` if adaptive is disabled or insufficient
+    /// data.
+    ///
+    /// Note: For adaptive mode to work correctly, the combo_name should be the
+    /// actual combo name, not "unused". The current implementation uses the
+    /// global attempt_stats registry which needs the actual combo name for accurate
+    /// per-combo statistics.
+    pub fn compute_effective_timeout(&self, combo_name: &str, model: &str) -> Option<u64> {
+        if !self.is_enabled() {
+            return None;
+        }
+
+        if let Some(adaptive) = &self.adaptive {
+            let p90 = crate::core::combo::attempt_stats::get_combo_ttft_p90(combo_name, model);
+
+            if let Some(p90_val) = p90 {
+                let computed = (p90_val * adaptive.headroom_x10 + 9) / 10; // ×headroomX10
+                let clamped = computed.clamp(adaptive.floor_ms, adaptive.ceiling_ms);
+                return Some(clamped);
+            }
+        }
+
+        if self.timeout_ms > 0 {
+            return Some(self.timeout_ms);
+        }
+
+        None
+    }
+}
+
+/// Configuration for adaptive TTFT fallback.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct AdaptiveTtftConfig {
+    /// Minimum timeout floor in milliseconds.
+    pub floor_ms: u64,
+    /// Maximum timeout ceiling in milliseconds.
+    pub ceiling_ms: u64,
+    /// Headroom multiplier (e.g., 15 = ×1.5) applied to p90.
+    pub headroom_x10: u64,
+    /// Minimum number of samples before adaptive logic is trusted.
+    pub min_samples: usize,
+}
+
+impl Default for AdaptiveTtftConfig {
+    fn default() -> Self {
+        Self {
+            floor_ms: 5000,
+            ceiling_ms: 15000,
+            headroom_x10: 15,
+            min_samples: 5,
+        }
     }
 }
 

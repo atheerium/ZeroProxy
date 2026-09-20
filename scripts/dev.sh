@@ -131,12 +131,32 @@ HELP
 
 kill_port() {
   systemctl --user stop openproxy.service 2>/dev/null || true
+  # Graceful stop first (clears pidfile cleanly).
+  if [[ -n "${BIN_DEBUG:-}" && -f "${BIN_DEBUG}" ]]; then
+    "${BIN_DEBUG}" server stop 2>/dev/null || true
+  fi
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
   fi
-  pkill -f "zeroproxy server start"; pkill -f "openproxy" 2>/dev/null || true
-  pkill -f "target/.*/zeroproxy.*${PORT}" 2>/dev/null || true
+  # Kill by cmdline: covers both "server start" form and bare process form (live PID 7740).
+  pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
+  pkill -f "openproxy" 2>/dev/null || true
+  pkill -f "cipherroute.*${PORT}" 2>/dev/null || true
   sleep 0.5
+}
+
+wait_for_port_free() {
+  local tries=0 max=20
+  while (( tries < max )); do
+    if ! (ss -tlnp 2>/dev/null | grep -q ":${PORT} ") && ! (lsof -iTCP:${PORT} 2>/dev/null | grep -q LISTEN); then
+      echo "== port ${PORT} is free =="
+      return 0
+    fi
+    sleep 0.5
+    (( tries++ )) || true
+  done
+  echo "ERROR: port ${PORT} still held after ${max} tries (stale server?)" >&2
+  return 1
 }
 
 check_stale_dashboard() {
@@ -203,6 +223,26 @@ build_backend() {
   cargo "${CARGO_ARGS[@]}"
   echo "== built $BIN =="
   ls -lh "$BIN" | awk '{print $9, $5, $6, $7, $8}'
+}
+
+verify_fresh_binary() {
+  # Confirm the running process serving the port is the binary we just built.
+  local running_pid running_bin running_mtime bin_mtime
+  running_pid=$(ss -tlnp 2>/dev/null | grep ":${PORT} " | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+  if [[ -n "$running_pid" ]] && [[ -r "/proc/${running_pid}/exe" ]]; then
+    running_bin=$(readlink -f "/proc/${running_pid}/exe" 2>/dev/null || echo "")
+    bin_mtime=$(stat -c '%Y' "${BIN}" 2>/dev/null || echo 0)
+    running_mtime=$(stat -c '%Y' "${running_bin}" 2>/dev/null || echo 0)
+    if [[ "$running_bin" == "${REPO_ROOT}/${BIN}" ]]; then
+      echo "== binary verified: pid=${running_pid} binary=${BIN} mtime=${bin_mtime} (running process matches fresh build) =="
+    elif [[ -n "$running_bin" ]]; then
+      echo "!! WARNING: running pid=${running_pid} uses DIFFERENT binary: ${running_bin}" >&2
+      echo "!! Binary we built: ${REPO_ROOT}/${BIN} (mtime=${bin_mtime})" >&2
+      echo "!! This means the server restarted with a stale binary. Changes won't load." >&2
+    fi
+  else
+    echo "== binary check: could not resolve running pid for port ${PORT} (may not have started yet) =="
+  fi
 }
 
 build() {
@@ -281,9 +321,23 @@ case "$MODE" in
   detach)
     check_dirty_tree || true
     kill_port
+    wait_for_port_free || exit 1
     build
     echo "== starting $BIN --web-dir web/dist server start --port $PORT --detach --no-open =="
     "$BIN" --web-dir "$REPO_ROOT/web/dist" server start --detach --no-open --port "$PORT"
+    verify_fresh_binary || true
+    # Confirm the new binary responds and capture receipt metadata.
+    sleep 1
+    HEALTH=$(curl -sf --max-time 5 "http://127.0.0.1:${PORT}/health" 2>/dev/null || echo "NO_ANSWER")
+    if [[ "$HEALTH" == NO_ANSWER ]]; then
+      echo "FAIL: /health did not respond (port=${PORT}) — rebuild likely stale or server failed to start." >&2
+      exit 1
+    fi
+    # Extract build identity from the running server for receipt.
+    RECEIPT=$(curl -sf --max-time 5 "http://127.0.0.1:${PORT}/api/version" 2>/dev/null || echo "{}")
+    echo "== status: binary verified / health ok =="
+    echo "== receipt: $(echo "$RECEIPT" | tr -d '\n') =="
+    echo "== server restarted. Binary freshness confirmed. =="
     echo "== status =="
     "$BIN" --robot server status 2>&1 | head -n 20 || curl -sf "http://127.0.0.1:${PORT}/health" && echo "health ok"
     echo "Logs: tail -f ~/.zeroproxy/log.txt  (or journalctl --user -u zeroproxy -f if using service)"
@@ -292,6 +346,7 @@ case "$MODE" in
   run|restart|"")
     check_dirty_tree || true
     kill_port
+    wait_for_port_free || exit 1
     build
     echo "== starting $BIN --web-dir web/dist server start --port $PORT (foreground, Ctrl+C to stop) =="
     echo "   Dashboard: http://127.0.0.1:${PORT}"

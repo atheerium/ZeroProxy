@@ -45,6 +45,10 @@ impl UsageTracker {
         ttft_ms: Option<u64>,
         status: Option<&str>,
         error_class: Option<&str>,
+        combo_name: Option<&str>,
+        combo_member: Option<&str>,
+        combo_attempt_index: Option<u32>,
+        combo_fallbacks: Option<u32>,
     ) {
         let entry = self.build_usage_entry(
             provider,
@@ -58,6 +62,10 @@ impl UsageTracker {
             ttft_ms,
             status,
             error_class,
+            combo_name,
+            combo_member,
+            combo_attempt_index,
+            combo_fallbacks,
         );
         let entry_status = entry.status.clone();
         if let Err(e) = self
@@ -101,6 +109,10 @@ impl UsageTracker {
         ttft_ms: Option<u64>,
         status: Option<&str>,
         error_class: Option<&str>,
+        combo_name: Option<&str>,
+        combo_member: Option<&str>,
+        combo_attempt_index: Option<u32>,
+        combo_fallbacks: Option<u32>,
     ) {
         let entry = self.build_usage_entry(
             provider,
@@ -114,6 +126,10 @@ impl UsageTracker {
             ttft_ms,
             status,
             error_class,
+            combo_name,
+            combo_member,
+            combo_attempt_index,
+            combo_fallbacks,
         );
         let db = self.db.clone();
         tokio::spawn(async move {
@@ -155,6 +171,10 @@ impl UsageTracker {
         ttft_ms: Option<u64>,
         status: Option<&str>,
         error_class: Option<&str>,
+        combo_name: Option<&str>,
+        combo_member: Option<&str>,
+        combo_attempt_index: Option<u32>,
+        combo_fallbacks: Option<u32>,
     ) -> UsageEntry {
         let prompt_tokens = tokens
             .and_then(|t| t.prompt_tokens.or(t.input_tokens))
@@ -198,6 +218,30 @@ impl UsageTracker {
             extra.insert(
                 "error_class".to_string(),
                 serde_json::Value::String(ec.to_string()),
+            );
+        }
+        if let Some(name) = combo_name {
+            extra.insert(
+                "combo_name".to_string(),
+                serde_json::Value::String(name.to_string()),
+            );
+        }
+        if let Some(member) = combo_member {
+            extra.insert(
+                "combo_member".to_string(),
+                serde_json::Value::String(member.to_string()),
+            );
+        }
+        if let Some(idx) = combo_attempt_index {
+            extra.insert(
+                "combo_attempt_index".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(idx)),
+            );
+        }
+        if let Some(fb) = combo_fallbacks {
+            extra.insert(
+                "combo_fallbacks".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(fb)),
             );
         }
         let status_value = status.map(|s| s.to_string());

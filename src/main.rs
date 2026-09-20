@@ -395,7 +395,8 @@ async fn main() -> anyhow::Result<()> {
         .await
         .with_dashboard_sidecar_url(cli.dashboard_sidecar_url.clone())
         .with_web_dir(cli.web_dir.clone());
-    // Periodic cleanup of stale HTTP client connections.
+    zeroproxy::server::build_info::init(); // capture start-time
+                                           // Periodic cleanup of stale HTTP client connections.
     state.client_pool.start_periodic_cleanup();
     // Periodic cleanup of expired OAuth pending flows (every 5 minutes).
     {

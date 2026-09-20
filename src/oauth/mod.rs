@@ -112,7 +112,51 @@ pub mod device_code {
     pub async fn start_device_flow(
         _provider_config: &OAuthProviderConfig,
         client_id: &str,
+        client_secret: &str,
     ) -> Result<DeviceCodeResponse, OAuthError> {
+        // Kiro uses AWS SSO OIDC device authorization; must POST JSON (not form) to /device_authorization.
+        if _provider_config.id == "kiro" {
+            let base_url = _provider_config.authorize_url.trim_end_matches('/');
+            let url = format!("{base_url}/device_authorization");
+            let body = serde_json::json!({
+                "clientId": client_id,
+                "clientSecret": client_secret,
+                "startUrl": "https://view.awsapps.com/start"
+            });
+            let response = reqwest::Client::new()
+                .post(&url)
+                .header("Content-Type", "application/json")
+                .header("Accept", "application/json")
+                .json(&body)
+                .timeout(std::time::Duration::from_secs(15))
+                .send()
+                .await
+                .map_err(|e| OAuthError {
+                    error: "request_failed".to_string(),
+                    error_description: Some(e.to_string()),
+                })?;
+            if !response.status().is_success() {
+                let status = response.status();
+                let text = response.text().await.unwrap_or_default();
+                tracing::warn!(
+                    target: "zeroproxy::oauth",
+                    provider = "kiro",
+                    "kiro device authorization failed: HTTP {} body={}",
+                    status,
+                    text
+                );
+                let error: OAuthError = serde_json::from_str(&text).unwrap_or(OAuthError {
+                    error: "unknown_error".to_string(),
+                    error_description: Some(format!("HTTP {} body={}", status, text)),
+                });
+                return Err(error);
+            }
+            return response.json().await.map_err(|e| OAuthError {
+                error: "parse_error".to_string(),
+                error_description: Some(e.to_string()),
+            });
+        }
+
         let client = reqwest::Client::builder()
             .user_agent("GitHubCopilotChat/0.38.0")
             .timeout(std::time::Duration::from_secs(15))
@@ -307,7 +351,7 @@ pub mod device_code {
         let (client_id, client_secret) = kiro_register_client().await?;
 
         let kiro_config = super::providers::kiro();
-        let device_resp = start_device_flow(&kiro_config, &client_id).await?;
+        let device_resp = start_device_flow(&kiro_config, &client_id, &client_secret).await?;
 
         Ok(super::KiroDeviceFlow {
             device_code: device_resp,
@@ -344,16 +388,16 @@ pub mod device_code {
 
         let registration = serde_json::json!({
             "client_id": client_id,
-            "client_name": "CipherRoute Device Client",
+            "client_name": "kiro-oauth-client",
             "client_type": "public",
             "grant_types": ["urn:ietf:params:oauth:grant-type:device_code"],
             "redirect_uris": ["http://localhost:4623/oauth/callback"],
-            "token_endpoint_auth_method": "none",
+            "token_endpoint_auth_method": "client_secret_post",
             "expires_at": expires_at
         });
 
         let response = client
-            .post("https://kiro.ai/auth/oidc/register")
+            .post("https://oidc.us-east-1.amazonaws.com/client/register")
             .json(&registration)
             .send()
             .await

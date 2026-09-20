@@ -56,7 +56,8 @@ const compact = new Intl.NumberFormat(undefined, {
 
 const fmtInt = (n: number) => new Intl.NumberFormat().format(n || 0);
 const fmtCost = (n: number) => `$${(n || 0).toFixed(2)}`;
-const fmtMs = (n: number) => n > 0 ? `${Math.round(n)}ms` : "--";
+  const fmtMs = (n: number) => n > 0 ? `${Math.round(n)}ms` : "--";
+  const formatLatencyMs = (ms: number | null) => (ms == null || ms === 0) ? "—" : ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${Math.round(ms)}ms`;
 
 function SuccessRate({ requests, failed }: { requests: number; failed?: number }) {
   if (failed === undefined || failed === null) {
@@ -84,6 +85,9 @@ export default function ProviderBreakdownTable({
   const [stats, setStats] = useState<UsageStatsPayload | null>(null);
   const [loading, setLoading] = useState(false);
   const [expandedProvider, setExpandedProvider] = useState<string | null>(null);
+  const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
+  const [sortKey, setSortKey] = useState<string>("total");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   useEffect(() => {
     if (!isSelfFetching) return;
@@ -105,6 +109,23 @@ export default function ProviderBreakdownTable({
 
   const byProvider = propByProvider || stats?.byProvider || {};
   const byModel = propByModel || stats?.byModel || {};
+
+  // Auto-refresh every 30s when self-fetching
+  useEffect(() => {
+    if (!isSelfFetching) return;
+    const timer = setInterval(() => {
+      setLoading(true);
+      fetch(`/api/usage/stats?period=${periodToBackend(propPeriod || "today")}`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data) => {
+          if (data) setStats(data);
+          setLastRefresh(new Date());
+        })
+        .catch(() => {})
+        .finally(() => setLoading(false));
+    }, 30000);
+    return () => clearInterval(timer);
+  }, [isSelfFetching, propPeriod]);
 
   const entries = useMemo(() => {
     return Object.entries(byProvider).map(([id, data]) => {
@@ -129,7 +150,21 @@ export default function ProviderBreakdownTable({
     });
   }, [byProvider]);
 
-  entries.sort((a, b) => b.total - a.total);
+  const sortEntries = (a: (typeof entries)[0], b: (typeof entries)[0]) => {
+    const keys: Record<string, (e: typeof a) => number> = {
+      total: (e) => e.total,
+      requests: (e) => e.requests,
+      input: (e) => e.input,
+      output: (e) => e.output,
+      cost: (e) => e.cost,
+      avgLatency: (e) => e.avgLatency,
+      avgTtft: (e) => e.avgTtft,
+    };
+    const va = keys[sortKey]?.(a) ?? 0;
+    const vb = keys[sortKey]?.(b) ?? 0;
+    return sortDir === "desc" ? vb - va : va - vb;
+  };
+  entries.sort(sortEntries);
 
   const grandTotal = entries.reduce((sum, e) => sum + e.total, 0);
 
@@ -159,6 +194,26 @@ export default function ProviderBreakdownTable({
     return result;
   }, [expandedProvider, byModel]);
 
+  // Compute summary stats for cards
+  const summaryTotalReq = entries.reduce((s, e) => s + e.requests, 0);
+  const summaryFailedReq = entries.reduce((s, e) => s + (e.failedRequests || 0), 0);
+  const summarySuccessRate = summaryTotalReq > 0 ? ((summaryTotalReq - summaryFailedReq) / summaryTotalReq) * 100 : 0;
+  const summaryAvgLatency = entries.length > 0 ? Math.round(entries.reduce((s, e) => s + (e.avgLatency || 0), 0) / entries.length) : 0;
+  const summaryTotalTokens = entries.reduce((s, e) => s + e.total, 0);
+  const activeProvidersCount = entries.length;
+
+  const handleSort = (key: string) => {
+    if (sortKey === key) {
+      setSortDir(sortDir === "desc" ? "asc" : "desc");
+    } else {
+      setSortKey(key);
+      setSortDir("desc");
+    }
+  };
+  const SortArrow = ({ column }: { column: string }) => (
+    <span className="ml-1 inline-block text-[10px] text-text-muted select-none">{sortKey === column ? (sortDir === "desc" ? "↓" : "↑") : ""}</span>
+  );
+
   if (isSelfFetching && loading) {
     return (
       <Card padding="none" className="overflow-hidden">
@@ -172,8 +227,48 @@ export default function ProviderBreakdownTable({
 
   return (
     <Card padding="none" className="overflow-hidden">
-      <div className="px-4 py-3 border-b border-border">
+      {/* Summary cards row */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-4 border-b border-border">
+        <div className="rounded-lg bg-surface/60 p-3">
+          <div className="text-xs text-text-muted uppercase tracking-wide font-medium">Total Requests</div>
+          <div className="text-xl font-bold text-text-main">{fmtInt(summaryTotalReq)}</div>
+        </div>
+        <div className="rounded-lg bg-surface/60 p-3">
+          <div className="text-xs text-text-muted uppercase tracking-wide font-medium">Avg Latency</div>
+          <div className="text-xl font-bold text-text-main">{formatLatencyMs(summaryAvgLatency)}</div>
+        </div>
+        <div className="rounded-lg bg-surface/60 p-3">
+          <div className="text-xs text-text-muted uppercase tracking-wide font-medium">Success Rate</div>
+          <div className={`text-xl font-bold ${summarySuccessRate >= 99 ? "text-[color:var(--color-success)]" : summarySuccessRate >= 95 ? "text-[color:var(--color-warning)]" : "text-[color:var(--color-danger)]"}`}>{summarySuccessRate.toFixed(1)}%</div>
+        </div>
+        <div className="rounded-lg bg-surface/60 p-3">
+          <div className="text-xs text-text-muted uppercase tracking-wide font-medium">Providers</div>
+          <div className="text-xl font-bold text-text-main">{activeProvidersCount}</div>
+        </div>
+      </div>
+
+      {/* Header with refresh */}
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border">
         <span className="text-sm font-semibold text-text-muted uppercase tracking-wide">Provider Breakdown</span>
+        <div className="flex items-center gap-2">
+          {lastRefresh && (
+            <span className="text-[10px] text-text-muted whitespace-nowrap">Updated {lastRefresh.toLocaleTimeString()}</span>
+          )}
+          <button
+            onClick={() => {
+              setLoading(true);
+              fetch(`/api/usage/stats?period=${periodToBackend(propPeriod || "today")}`)
+                .then((r) => (r.ok ? r.json() : null))
+                .then((data) => { if (data) setStats(data); })
+                .catch(() => {})
+                .finally(() => { setLoading(false); setLastRefresh(new Date()); });
+            }}
+            className="p-1.5 rounded-md hover:bg-surface/60 text-text-muted transition-colors"
+            title="Refresh"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="23 4 23 10 17 10" /><path d="M1 20c1.5-1 3.5-1 5-1s4 .5 8 3 4-1.5 4-1.5" /><path d="M20.3 15.3a9 9 0 1 0-2.1 10.7" /></svg>
+          </button>
+        </div>
       </div>
 
       {entries.length === 0 ? (
@@ -184,14 +279,14 @@ export default function ProviderBreakdownTable({
             <thead>
               <tr className="border-b border-border text-text-muted">
                 <th className="px-4 py-2.5 text-left font-semibold text-xs uppercase tracking-wide">Provider</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Requests</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("requests")}>Requests <SortArrow column="requests" /></th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Success</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Avg Latency</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Avg TTFT</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Input</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Output</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Total</th>
-                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Cost</th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("avgLatency")}>Avg Latency <SortArrow column="avgLatency" /></th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("avgTtft")}>Avg TTFT <SortArrow column="avgTtft" /></th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("input")}>Input <SortArrow column="input" /></th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("output")}>Output <SortArrow column="output" /></th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("total")}>Total <SortArrow column="total" /></th>
+                <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide cursor-pointer hover:text-text-main select-none" onClick={() => handleSort("cost")}>Cost <SortArrow column="cost" /></th>
                 <th className="px-4 py-2.5 text-right font-semibold text-xs uppercase tracking-wide">Share</th>
               </tr>
             </thead>
@@ -274,6 +369,47 @@ export default function ProviderBreakdownTable({
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* Phase 2: Combo metrics section */}
+      {stats?.byCombo && Object.keys(stats.byCombo || {}).length > 0 && (
+        <div className="mt-4 px-4 pt-4 border-t border-border">
+          <h3 className="text-sm font-semibold text-text-muted uppercase tracking-wide mb-3">Combo Metrics</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr className="border-b border-border text-text-muted">
+                  <th className="text-left py-2 px-2 font-semibold text-xs uppercase tracking-wide">Combo</th>
+                  <th className="text-right py-2 px-2 font-semibold text-xs uppercase tracking-wide">Requests</th>
+                  <th className="text-right py-2 px-2 font-semibold text-xs uppercase tracking-wide">Avg TTFT</th>
+                  <th className="text-right py-2 px-2 font-semibold text-xs uppercase tracking-wide">Avg Latency</th>
+                  <th className="text-right py-2 px-2 font-semibold text-xs uppercase tracking-wide">Success</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/40">
+                {Object.entries(stats.byCombo || {}).map(([comboId, data]) => {
+                  const count = (data as any).requests || 0;
+                  const failed = (data as any).failed_requests || 0;
+                  const rate = count > 0 ? (((count - failed) / count) * 100) : 0;
+                  const latCount = (data as any).latency_count || 0;
+                  const avgLatency = latCount > 0 ? ((data as any).latency_total_sum || 0) / latCount : 0;
+                  const avgTtft = latCount > 0 ? ((data as any).latency_ttft_sum || 0) / latCount : 0;
+                  return (
+                    <tr key={comboId} className="hover:bg-surface/40">
+                      <td className="py-1.5 px-2 font-medium text-text-main text-xs truncate max-w-[180px]">{comboId}</td>
+                      <td className="py-1.5 px-2 text-right text-text-muted text-xs whitespace-nowrap">{fmtInt(count)}</td>
+                      <td className="py-1.5 px-2 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(avgTtft)}</td>
+                      <td className="py-1.5 px-2 text-right text-text-muted text-xs whitespace-nowrap">{fmtMs(avgLatency)}</td>
+                      <td className="py-1.5 px-2 text-right whitespace-nowrap">
+                        <span className={`text-xs font-medium ${rate >= 99 ? "text-[color:var(--color-success)]" : rate >= 95 ? "text-[color:var(--color-warning)]" : "text-[color:var(--color-danger)]"}`}>{rate.toFixed(1)}%</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </Card>

@@ -720,6 +720,21 @@ pub struct Settings {
         default = "default_true",
         deserialize_with = "deserialize_null_default"
     )]
+    pub session_dedup_enabled: bool,
+    #[serde(
+        default = "default_true",
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub ccr_enabled: bool,
+    #[serde(
+        default = "default_true",
+        deserialize_with = "deserialize_null_default"
+    )]
+    pub lite_enabled: bool,
+    #[serde(
+        default = "default_true",
+        deserialize_with = "deserialize_null_default"
+    )]
     pub rtk_enabled: bool,
     #[serde(default, deserialize_with = "deserialize_null_default")]
     pub caveman_enabled: bool,
@@ -876,6 +891,9 @@ impl Default for Settings {
             mitm_router_base_url: default_mitm_router_base_url(),
             mitm_port: default_mitm_port(),
             rtk_enabled: true,
+            session_dedup_enabled: true,
+            ccr_enabled: true,
+            lite_enabled: true,
             caveman_enabled: false,
             caveman_level: default_caveman_level(),
             ponytail_enabled: false,

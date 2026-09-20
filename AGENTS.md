@@ -77,6 +77,21 @@ Single smooth loop — backend and dashboard are **separate builds** served by t
 
 After ANY backend change: `./scripts/dev.sh --fast detach && curl http://127.0.0.1:4623/health`. Never report a fix done without rebuild+restart — stale binary is the #1 silent regression source.
 
+### Agent Reload Contract (automatic — never ask the user)
+Every agent that edits backend/dashboard MUST run the correct reload automatically; never use manual `nohup`, bare `pkill`, or the deleted `start_server.sh`. Decision table:
+
+| Change type | Auto-reload command (agent runs) | Why |
+|---|---|---|
+| `src/**` Rust (executor, model, combo, auth, health) | `./scripts/dev.sh --fast detach` (or `--backend-only detach`) | Cargo rebuild required (`provider_catalog.json` embedded via `include_str!`); restart verifies binary freshness |
+| `provider_catalog.json` / embedded assets | `./scripts/dev.sh --fast detach` | Catalog is compile-time embedded; restart-only is NOT enough |
+| DB/config/model-lock only (no `src/` change) | `./scripts/restart.sh` (kill → verify free → start `--web-dir`) | Zero cargo rebuild; avoids stale binary risk |
+| `web/src/**` (dashboard UI) | `./scripts/dev.sh --web-only` (no restart needed) OR `--fast detach` | `--web-dir web/dist` serves disk assets live; rebuild web allows instant visibility |
+| Before any push/commit claim | `./scripts/dev.sh --full detach` | Full web + cargo + fmt/clippy/tests + health gate + binary verification |
+
+Every reload MUST verify: `curl -sf http://127.0.0.1:4623/health` responds with `status: "ok"`, and (for detach/run) `verify_fresh_binary` in `dev.sh` confirms the running PID's `/proc/<pid>/exe` matches the rebuilt binary. If verification fails, abort and report the mismatch (stale binary or wrong port) — do not claim the fix done.
+
+> **Never** start the server without `--web-dir web/dist` for dev work (`start_server.sh` deleted — it served frozen embedded assets, skipped health verification, and used wrong binary name / missing kill patterns). Never rely on `pkill` alone; always confirm port is free before restart.
+
 Full flags: `./scripts/dev.sh --help`. Raw web: `cd web && pnpm dev` (Astro `:4624` with API proxy to `:4623`).
 
 ## Contributing & Git Hygiene

@@ -736,7 +736,7 @@ mod tests {
         // even when there are no provider connections.
         let snapshot = AppDb {
             custom_models: vec![CustomModel {
-                provider_alias: "tr".into(),
+                provider_alias: "trk".into(),
                 id: "MiniMax-M3".into(),
                 r#type: String::new(),
                 name: None,
@@ -746,7 +746,7 @@ mod tests {
         };
 
         let models = build_models_list(&test_state().await, &snapshot, &[LLM_KIND]).await;
-        assert!(models.iter().any(|m| m.id == "tr/MiniMax-M3"),
+        assert!(models.iter().any(|m| m.id == "trk/MiniMax-M3"),
             "custom model with provider_alias 'tr' should appear in /v1/models even without connections");
     }
 
@@ -766,7 +766,7 @@ mod tests {
                 ..Default::default()
             }],
             custom_models: vec![CustomModel {
-                provider_alias: "tr".into(),
+                provider_alias: "trk".into(),
                 id: "MiniMax-M3".into(),
                 r#type: String::new(),
                 name: None,
@@ -776,8 +776,8 @@ mod tests {
         };
 
         let models = build_models_list(&test_state().await, &snapshot, &[LLM_KIND]).await;
-        assert!(models.iter().any(|m| m.id == "tr/MiniMax-M3"),
-            "custom model 'tr/MiniMax-M3' should appear even when it doesn't match any connection's prefix");
+        assert!(models.iter().any(|m| m.id == "trk/MiniMax-M3"),
+            "custom model 'trk/MiniMax-M3' should appear even when it doesn't match any connection's prefix");
     }
 
     #[tokio::test]
@@ -817,14 +817,14 @@ mod tests {
         let snapshot = AppDb {
             custom_models: vec![
                 CustomModel {
-                    provider_alias: "tr".into(),
+                    provider_alias: "trk".into(),
                     id: "MiniMax-M3".into(),
                     r#type: "llm".into(),
                     name: None,
                     extra: BTreeMap::new(),
                 },
                 CustomModel {
-                    provider_alias: "tr".into(),
+                    provider_alias: "trk".into(),
                     id: "flux-pro".into(),
                     r#type: "image".into(),
                     name: None,
@@ -836,11 +836,11 @@ mod tests {
 
         let models = build_models_list(&test_state().await, &snapshot, &[LLM_KIND]).await;
         assert!(
-            models.iter().any(|m| m.id == "tr/MiniMax-M3"),
+            models.iter().any(|m| m.id == "trk/MiniMax-M3"),
             "llm-type custom model should appear in LLM list"
         );
         assert!(
-            !models.iter().any(|m| m.id == "tr/flux-pro"),
+            !models.iter().any(|m| m.id == "trk/flux-pro"),
             "image-type custom model should NOT appear in LLM list"
         );
     }
