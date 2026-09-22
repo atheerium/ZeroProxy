@@ -2037,14 +2037,9 @@ fn cline_headers(token: &str, extra_headers: Vec<(String, String)>) -> Vec<(Stri
     headers
 }
 
-fn cline_access_token(token: &str) -> String {
-    let trimmed = token.trim();
-    if trimmed.starts_with("workos:") {
-        trimmed.to_string()
-    } else {
-        format!("workos:{trimmed}")
-    }
-}
+// JWT-only `workos:` prefix — shared with the executor header hook so
+// clp_/opaque keys never get double-prefixed (401 on the Cline API).
+use crate::core::executor::cline_access_token;
 
 fn random_hex(len_bytes: usize) -> String {
     let mut bytes = vec![0u8; len_bytes];

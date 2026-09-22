@@ -1160,7 +1160,15 @@ impl DefaultExecutor {
                 }
             }
             if self.provider == "cline" || self.provider == "clinepass" {
-                // Cline often needs workos: prefix handled elsewhere; keep Bearer
+                // WorkOS JWT prefix (clineAuth.js getClineAccessToken): Cline OAuth
+                // access tokens are WorkOS JWTs (base64url `eyJ…` header) and must
+                // be sent as `Bearer workos:<jwt>`. ClinePass API keys (e.g.
+                // `clp_…`) are NOT JWTs and go verbatim — prefixing them makes
+                // the Cline API 401. Replaces the generic Bearer set above.
+                let prefixed = cline_access_token(token);
+                if let Ok(val) = HeaderValue::from_str(&format!("Bearer {prefixed}")) {
+                    headers.insert(AUTHORIZATION, val);
+                }
             }
             // Claude header cache overlay for anthropic/claude providers
             if matches!(self.provider.as_str(), "claude" | "anthropic") {
@@ -1703,6 +1711,38 @@ fn bearer_token(credentials: &ProviderConnection) -> Option<&str> {
         .or_else(|| non_empty_option(credentials.api_key.as_deref()))
 }
 
+/// 9router open-sse/shared/clineAuth.js getClineAccessToken: Cline OAuth
+/// access tokens are WorkOS JWTs (base64url `eyJ…` header) and must be sent
+/// as `workos:<jwt>`. Anything already prefixed (case-insensitive) or not
+/// a JWT (e.g. ClinePass `clp_…` keys) goes verbatim.
+pub(crate) fn cline_access_token(raw: &str) -> String {
+    let trimmed = raw.trim();
+    if trimmed.is_empty() {
+        return String::new();
+    }
+    if trimmed.len() >= 7 && trimmed[..7].eq_ignore_ascii_case("workos:") {
+        return trimmed.to_string();
+    }
+    let mut parts = trimmed.split('.');
+    let (h, b) = (
+        parts.next().unwrap_or_default(),
+        parts.next().unwrap_or_default(),
+    );
+    let is_jwt = !h.is_empty()
+        && !b.is_empty()
+        && h.len() >= 3
+        && h.as_bytes()[..3] == *b"eyJ"
+        && h.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_')
+        && b.bytes()
+            .all(|c| c.is_ascii_alphanumeric() || c == b'-' || c == b'_');
+    if is_jwt {
+        format!("workos:{trimmed}")
+    } else {
+        trimmed.to_string()
+    }
+}
+
 /// Providers whose upstream accepts unauthenticated requests (dashboard
 /// `noAuth: true`). They must reach the upstream without an Authorization
 /// header instead of failing with `MissingCredentials`.
@@ -1851,6 +1891,26 @@ fn strip_fireworks_unsupported_tools(body: &mut Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn cline_access_token_prefixes_workos_jwt_only() {
+        // OAuth JWT -> prefixed.
+        let jwt = "eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiIxMjM0In0.c2ln";
+        assert_eq!(cline_access_token(jwt), format!("workos:{jwt}"));
+        // Already prefixed (any case) -> verbatim.
+        assert_eq!(
+            cline_access_token("workos:eyJhYmM.def"),
+            "workos:eyJhYmM.def"
+        );
+        assert_eq!(
+            cline_access_token("WORKOS:eyJhYmM.def"),
+            "WORKOS:eyJhYmM.def"
+        );
+        // ClinePass API key -> verbatim.
+        assert_eq!(cline_access_token("clp_abc123"), "clp_abc123");
+        assert_eq!(cline_access_token("sk-plain"), "sk-plain");
+        assert_eq!(cline_access_token("  "), "");
+    }
 
     #[test]
     fn test_opencode_go_claude_format_models() {
