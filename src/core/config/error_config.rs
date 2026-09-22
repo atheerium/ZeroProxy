@@ -271,6 +271,17 @@ pub fn classify_error(message: Option<&str>, status: Option<u16>) -> ErrorClassi
             return ErrorClassification::Cooldown(d);
         }
     }
+    // Provider-originated rejections ("upstream returned 400 …") are not
+    // client errors on *our* surface: the next combo/auto member may accept
+    // a differently translated body (e.g. Gemini rejecting a stream shape
+    // OpenAI-compatible providers accept). Never classify them Permanent.
+    if lowered
+        .as_deref()
+        .map(|m| m.contains("upstream returned"))
+        .unwrap_or(false)
+    {
+        return ErrorClassification::NoMatch;
+    }
     // Permanent errors (400, 401, 403) that matched no rule at all
     // should not trigger fallback — the error is client-side, not
     // a transient provider issue.
@@ -417,6 +428,21 @@ mod tests {
         assert_eq!(
             classify_error(Some("weird payload"), Some(400)),
             ErrorClassification::Permanent
+        );
+    }
+
+    #[test]
+    fn classify_upstream_400_is_fallback_eligible() {
+        // Provider rejected the translated body — next combo member must run.
+        let msg =
+            "upstream returned 400 for URL https://example/v1/stream: Unknown name \"stream\"";
+        assert_eq!(
+            classify_error(Some(msg), Some(400)),
+            ErrorClassification::NoMatch
+        );
+        assert_eq!(
+            classify_error(Some("upstream returned 401 for URL https://x"), Some(401)),
+            ErrorClassification::NoMatch
         );
     }
 
