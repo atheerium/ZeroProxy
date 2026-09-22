@@ -62,6 +62,9 @@ pub struct RequestPlan {
     pub bypass: bool,
     /// Provider forceStream + client non-stream → aggregate SSE to JSON
     pub sse_to_json: bool,
+    /// Combo / auto preset name for usage tagging (`auto`, `auto/best-coding`,
+    /// `auto/best-free`, or a user combo name). `None` for direct model routes.
+    pub combo_name: Option<String>,
 }
 
 impl RequestPlan {
@@ -118,6 +121,7 @@ impl RequestPlan {
             passthrough: false,
             bypass: false,
             sse_to_json: false,
+            combo_name: None,
         }
     }
 

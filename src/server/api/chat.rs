@@ -743,6 +743,9 @@ async fn chat_completions_impl(
                 let attempted_members = attempted_members.clone();
                 let combo_headers = headers_map.clone();
                 let combo_tl = combo_thinking_level.clone();
+                // Preset / combo id for usage extra — clone before the move
+                // closure so each attempt stamps the same tag (auto vs combo).
+                let combo_name_for_usage = combo_name.clone();
                 execute_combo_strategy_full(
                     &augmented_models,
                     Some(&combo_name),
@@ -815,6 +818,9 @@ async fn chat_completions_impl(
                             RequestPlan::new(endpoint, &body, &combo_provider_str, &resolved_model);
                         combo_plan.passthrough =
                             is_native_passthrough(client_tool_for_combo, &combo_provider_str);
+                        // Tag usage rows with the outer combo/preset id so
+                        // /api/usage/auto can group by preset, not member.
+                        combo_plan.combo_name = Some(combo_name_for_usage.clone());
                         // Accept header not available inside combo closure — use body only
                         apply_stream_plan(
                             &mut combo_plan,
@@ -2512,6 +2518,7 @@ async fn forward_with_provider_fallback(
                             Some(connection.id.as_str()),
                             api_key,
                             endpoint,
+                            plan.combo_name.as_deref(),
                             compression.clone(),
                             request_start,
                             request_body_len,
@@ -2797,6 +2804,7 @@ async fn proxy_dashboard_sse_with_usage_tracking(
     connection_id: Option<&str>,
     api_key: Option<&str>,
     endpoint: Option<&str>,
+    combo_name: Option<&str>,
     compression: Option<CompressionStats>,
     request_start: std::time::Instant,
     request_body_len: usize,
@@ -2851,7 +2859,7 @@ async fn proxy_dashboard_sse_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            combo_name,
             None,
             None,
             None,
@@ -3426,7 +3434,7 @@ async fn proxy_sse_to_json_response(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            plan.combo_name.as_deref(),
             None,
             None,
             None,
@@ -3538,7 +3546,7 @@ async fn proxy_response_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            plan.combo_name.as_deref(),
             None,
             None,
             None,
@@ -3694,6 +3702,7 @@ async fn proxy_response_with_pending_tracking(
     // Capture an owned copy of api_key for usage recording inside the stream
     // (the SSE stream requires 'static lifetimes; &str borrows can't escape).
     let api_key = api_key.map(|s| s.to_string());
+    let combo_name = plan.combo_name.clone();
     // Extract formats before stream closure to avoid lifetime issues
     let needs_stream_translation = plan.needs_translation();
     let stream_source_format = plan.source_format;
@@ -3810,7 +3819,7 @@ async fn proxy_response_with_pending_tracking(
                             );
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3871,7 +3880,7 @@ async fn proxy_response_with_pending_tracking(
                         Ok(Err(_)) => {
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3908,7 +3917,7 @@ async fn proxy_response_with_pending_tracking(
                 }
                 let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                 record_streaming_usage(&state, &provider, &model,
-                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                 state
                     .usage_live
                     .finish_request(&model, &provider, connection_id.as_deref(), false)
@@ -3950,7 +3959,7 @@ async fn proxy_response_with_pending_tracking(
                             );
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -4007,7 +4016,7 @@ async fn proxy_response_with_pending_tracking(
                         Err(_) => {
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -4044,7 +4053,7 @@ async fn proxy_response_with_pending_tracking(
                 }
                 let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                 record_streaming_usage(&state, &provider, &model,
-                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                 state
                     .usage_live
                     .finish_request(&model, &provider, connection_id.as_deref(), false)
@@ -4089,6 +4098,7 @@ async fn record_streaming_usage(
     response_body_len: Option<usize>,
     status: Option<&str>,
     error_class: Option<&str>,
+    combo_name: Option<&str>,
 ) {
     // F4: estimate when upstream omitted usage data (per-field fill for partial usage)
     let usage = match accumulated_usage {
@@ -4111,7 +4121,7 @@ async fn record_streaming_usage(
         ttft_ms,
         status,
         error_class,
-        None,
+        combo_name,
         None,
         None,
         None,
