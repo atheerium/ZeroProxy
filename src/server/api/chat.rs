@@ -31,7 +31,7 @@ use crate::core::combo::{
     ModelCapacity, TtftConfig,
 };
 use crate::core::executor::UpstreamResponse;
-use crate::core::model::{get_model_info, ModelRouteKind};
+use crate::core::model::{get_model_info, ModelRouteKind, ResolvedModel};
 use crate::core::proxy::resolve_proxy_target;
 use crate::core::rtk::headroom::{compress_with_headroom_diag, HeadroomConfig};
 use crate::core::rtk::{apply_request_preprocessing, compress_messages};
@@ -313,6 +313,23 @@ async fn chat_completions_impl(
     let snapshot = state.db.snapshot();
     let resolved = get_model_info(model_str, &snapshot);
 
+    // Smart-auto presets ("auto", "auto/best-coding", "auto/best-free"):
+    // claim the bare preset ids for the dynamic selector, then run the
+    // standard Combo execution arm. The RAW model_str is matched (not the
+    // `combo:`-stripped name), so explicit `combo:auto` still resolves to a
+    // user-persisted combo named "auto" (parse_preset("combo:auto") is None)
+    // while bare "auto" is claimed by the selector even when such a user
+    // combo exists.
+    let auto_preset = crate::core::auto::parse_preset(model_str);
+    let resolved = match &auto_preset {
+        Some(_) => ResolvedModel {
+            provider: None,
+            model: model_str.to_string(),
+            route_kind: ModelRouteKind::Combo,
+        },
+        None => resolved,
+    };
+
     // Stale-snapshot recovery: if the model name looks like a combo (no '/')
     // but wasn't found, reload from SQLite and try once more. This handles
     // combos created by the CLI process that bypasses the server's snapshot.
@@ -441,32 +458,73 @@ async fn chat_completions_impl(
     let response = match resolved.route_kind {
         ModelRouteKind::Combo => {
             let combo_name = resolved.model;
-            let Some(combo_models) = get_combo_models_from_data(&combo_name, &snapshot.combos)
-            else {
-                return json_error_response(StatusCode::BAD_REQUEST, "Unknown combo model");
-            };
 
             // Capability auto-switch is applied AFTER round-robin rotation
             // inside execute_combo_strategy_with_capacity (9router order:
-            // rotate first, then reorderByCapabilities).
+            // rotate first, then reorderByCapabilities). Computed before
+            // member load so the smart-auto selector can filter on it.
             let required_caps = detect_required_capabilities(&body);
-            let disabled_members = get_disabled_members_for_combo(&combo_name, &snapshot.combos);
+
+            // Smart-auto preset: the dynamic selector owns the member list
+            // (a user combo that happens to be named "auto" is ignored here;
+            // it stays reachable via explicit `combo:auto`, which never sets
+            // auto_preset). Empty selection is a 503, not a silent fallback.
+            let combo_models: Vec<String> = if let Some(preset) = auto_preset.as_ref() {
+                let models = crate::core::auto::select_candidates(
+                    *preset,
+                    &snapshot,
+                    &required_caps,
+                    &state.circuit_breaker,
+                );
+                if models.is_empty() {
+                    return json_error_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "no eligible models for auto routing",
+                    );
+                }
+                models
+            } else {
+                let Some(combo_models) = get_combo_models_from_data(&combo_name, &snapshot.combos)
+                else {
+                    return json_error_response(StatusCode::BAD_REQUEST, "Unknown combo model");
+                };
+                combo_models
+            };
+
+            // Auto presets: the selector already excluded disabled and
+            // quarantined members, so there is nothing further to filter.
+            let disabled_members: Vec<String> = if auto_preset.is_some() {
+                Vec::new()
+            } else {
+                get_disabled_members_for_combo(&combo_name, &snapshot.combos)
+            };
 
             // 9router parity (chat.js): augment the combo member list with
             // capacity-adapter pool models when no member satisfies the
             // request's hard capabilities, and remember which models were
             // added so history stripping only ever applies to them.
-            let augmented_models = augment_models_with_capacity_adapter(
-                &combo_models,
-                &required_caps,
-                &snapshot.settings.capacity_adapter,
-            );
-            let adapter_added: HashSet<String> = augmented_models
-                .iter()
-                .filter(|m| !combo_models.contains(m))
-                .cloned()
-                .collect();
+            // Skipped for auto presets: the selector owns the full list.
+            let (augmented_models, adapter_added): (Vec<String>, HashSet<String>) =
+                if auto_preset.is_some() {
+                    (combo_models.clone(), HashSet::new())
+                } else {
+                    let augmented_models = augment_models_with_capacity_adapter(
+                        &combo_models,
+                        &required_caps,
+                        &snapshot.settings.capacity_adapter,
+                    );
+                    let adapter_added: HashSet<String> = augmented_models
+                        .iter()
+                        .filter(|m| !combo_models.contains(m))
+                        .cloned()
+                        .collect();
+                    (augmented_models, adapter_added)
+                };
             let mut strategy = strategy_for_combo(&snapshot, &combo_name);
+            // Smart-auto always follows scored order with try-next-on-failure.
+            if auto_preset.is_some() {
+                strategy = ComboStrategy::Fallback;
+            }
             // Solo-augmented path: an adapter model was prepended to a
             // single-member combo — use the adapter pool's strategy.
             if !adapter_added.is_empty() && combo_models.len() == 1 {
@@ -517,7 +575,15 @@ async fn chat_completions_impl(
             // same broken member and making the CLI agent hang.
             let attempted_members: std::sync::Arc<parking_lot::Mutex<Vec<String>>> =
                 std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
-            let combo_name_for_quarantine = combo_name.clone();
+            // Smart-auto failures share the single AUTO quarantine namespace
+            // so the selector's quarantined-members filter observes them
+            // (per-preset names like "auto/best-coding" would fragment it).
+            let quarantine_name = if auto_preset.is_some() {
+                crate::core::auto::AUTO_QUARANTINE_KEY.to_string()
+            } else {
+                combo_name.clone()
+            };
+            let combo_name_for_quarantine = quarantine_name.clone();
             let ttft_for_combo = ttft_config;
             // Clone for the combo closure: the closure is `move`, but the outer
             // scope needs the original afterwards for the auto-quarantine pass.

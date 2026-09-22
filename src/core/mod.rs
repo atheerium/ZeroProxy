@@ -1,6 +1,7 @@
 pub mod a2a;
 pub mod account_fallback;
 pub mod auth;
+pub mod auto;
 pub mod combo;
 pub mod compress;
 pub mod config;
