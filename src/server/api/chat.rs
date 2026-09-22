@@ -2967,8 +2967,12 @@ fn is_no_auth_provider(provider: &str) -> bool {
     matches!(
         provider,
         "opencode"
+            // 9router parity (openproxy-sewn / PR 51837411): opencode (Free,
+            // noAuth:true) keeps virtual fallback; opencode-go (paid apikey,
+            // NO noAuth flag) must NOT — else a valid stored key is bypassed
+            // and upstream returns AuthError "Missing API key." (note the
+            // period — upstream's text, not ours).
             | "opencode-zen"
-            | "opencode-go"
             | "edge-tts"
             | "google-tts"
             | "local-device"

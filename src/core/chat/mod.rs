@@ -134,6 +134,17 @@ impl RequestPlan {
 
 /// Catalog + custom-model fields: targetFormat, upstreamModelId, strip.
 fn resolve_model_metadata(provider: &str, model: &str) -> (Option<Format>, String, Vec<String>) {
+    // 9router opencode registry parity.
+    if matches!(provider, "opencode" | "opencode-go" | "oc" | "ocg") {
+        if (provider == "opencode" || provider == "oc") && is_muse_spark_model(model) {
+            return (Some(Format::OpenAiResponses), model.to_string(), Vec::new());
+        }
+        if (provider == "opencode-go" || provider == "ocg")
+            && is_opencode_go_responses_only_model(model)
+        {
+            return (Some(Format::OpenAiResponses), model.to_string(), Vec::new());
+        }
+    }
     let catalog = provider_catalog();
     if let Some(entry) = catalog.find_model(provider, model) {
         let target = entry.target_format.as_deref().and_then(Format::from_str);
@@ -157,6 +168,32 @@ fn parse_strip_list(raw: &str) -> Vec<String> {
         .filter(|s| !s.is_empty())
         .map(|s| s.to_ascii_lowercase())
         .collect()
+}
+
+/// Muse Spark (opencode/oc) responses-only routing (9router registry).
+fn is_muse_spark_model(model_id: &str) -> bool {
+    let mut clean = model_id.trim();
+    if let Some(open) = clean.rfind('(') {
+        if clean.ends_with(')') && !clean[open + 1..clean.len() - 1].contains(['(', ')']) {
+            clean = clean[..open].trim_end();
+        }
+    }
+    let base = clean.rsplit('/').next().unwrap_or(clean);
+    let lower = base.to_lowercase();
+    lower.starts_with("muse-spark") || lower.contains("muse-spark")
+}
+
+/// Responses-only models on opencode-go (ocg) per upstream registry.
+fn is_opencode_go_responses_only_model(model_id: &str) -> bool {
+    let mut clean = model_id.trim();
+    if let Some(open) = clean.rfind('(') {
+        if clean.ends_with(')') && !clean[open + 1..clean.len() - 1].contains(['(', ')']) {
+            clean = clean[..open].trim_end();
+        }
+    }
+    let base = clean.rsplit('/').next().unwrap_or(clean);
+    let lower = base.to_lowercase();
+    lower == "grok-4.6" || lower == "gpt-5.6-luna"
 }
 
 /// Multi-endpoint providers (9router `transports[]`): pick entry matching client sourceFormat.
