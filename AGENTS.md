@@ -1,5 +1,12 @@
 # ZeroProxy — Rust AI Proxy Router
 
+# Repositories to refer to:
+https://github.com/diegosouzapw/OmniRoute
+https://github.com/decolua/9router
+https://github.com/quangdang46/openproxy/
+https://github.com/tashfeenahmed/freellmapi
+
+dont reinvent a solution before looking into one of these repositories (in order).
 ## 7 Questions Every Agent Asks
 
 | Q | A | Deep-dive |
