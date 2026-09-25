@@ -4,119 +4,240 @@
 
 | Q | A | Deep-dive |
 |---|---|---|
-| What is this binary | OpenAI-compatible Rust proxy routing to 40+ providers with format translation, fallback, token refresh, usage tracking, SSE | [Architecture](docs/ARCHITECTURE.md) · [Routing engine](docs/ROUTING.md) |
-| How do I build/test | `./scripts/dev.sh --fast detach` (rebuilds stale `web/dist` + cargo, restarts `:4623`) | [Dev workflow](#dev-workflow) · `CONTRIBUTING.md` |
-| How do I add a provider | Add entry to `provider_catalog.json` + `src/core/executor/default.rs` registry; check OmniRoute first | [Providers](docs/PROVIDERS.md) |
-| How does routing work | Parse model → capability detect → capability-aware order → round-robin/fallback → provider | [Routing](docs/ROUTING.md) |
-| Where does a combo come from | `src/core/combo/mod.rs` — ordered list of `provider/model` pairs, scored by strategy | [Routing](docs/ROUTING.md#combos) |
-| How is auth refreshed | `src/oauth/token_refresh.rs` — 401/403 → `dispatch_oauth_refresh`; 404 → 300 s model lock | `src/core/combo/mod.rs:576-603` |
-| How is usage tracked | `src/core/usage/tracker.rs` → SQLite `UsageDb.history`; SSE `/api/usage/stream` | `src/server/api/usage.rs:244` |
+| What is this binary | OpenAI-compatible Rust proxy routing to 40+ providers: format translation, fallback, OAuth refresh, usage tracking, SSE | [ARCHITECTURE.md](docs/ARCHITECTURE.md) (tracked) |
+| How do I build/test | `./scripts/dev.sh --fast detach` then `curl http://127.0.0.1:4623/health` | [Dev workflow](#dev-workflow) · `CONTRIBUTING.md` |
+| How do I add a provider | `src/core/model/provider_catalog.json` + executor in `src/core/executor/default.rs`; check OmniRoute first | [PROVIDERS.md](docs/PROVIDERS.md) — **local-only, see [Docs trap](#docs-trap)** |
+| How does routing work | Parse model → detect capabilities → capability-aware order → round-robin/fallback → executor | `src/core/combo/` |
+| Where does a combo come from | `src/core/combo/mod.rs` — ordered `provider/model` pairs scored by `ComboStrategy` | [ROUTING.md](docs/ROUTING.md) — **local-only** |
+| How is auth refreshed | 401/403 → single `dispatch_oauth_refresh`; 404 → 300 s model-specific lock (not a refresh) | `src/oauth/token_refresh.rs` |
+| How is usage tracked | `src/core/usage/tracker.rs` → SQLite; SSE `/api/usage/stream` | `src/server/api/usage.rs` |
+
+## Traps (verified — these bite agents)
+
+### 1. `cargo test -p cipherroute` does not exist
+Single crate, **no cargo workspace**; the package is `zeroproxy`. `-p cipherroute` fails with
+*package ID specification did not match any packages*. Two committed files still document the
+broken form — `scripts/parity-smoke.sh` and `tests/parity/README.md`. Run filters directly:
+
+```bash
+cargo test --lib parity_tests     # or stream_flags | combo | error_config | chat::
+cargo test -p zeroproxy --lib provider_models   # what dev.sh --check runs
+```
+
+### 2. `web/dist` is gitignored → fresh clone cannot `cargo build`
+The `embed-web` feature is **default-on**, and `build.rs` *panics* if `web/dist/index.html` is
+missing. Always build the dashboard first:
+
+```bash
+cd web && pnpm install --frozen-lockfile && pnpm run build
+```
+
+In **release** builds `build.rs` additionally panics if `web/src` is newer than `web/dist` — a
+deliberate guard against shipping a stale dashboard. Escape hatch:
+`cargo build --release --no-default-features`.
+
+### 3. Two `HARD_CAPS` definitions
+`src/core/combo/mod.rs:438` and `src/core/combo/capabilities.rs:20`. Changing one without the
+other desyncs the capability gate from the fallback path.
+
+### 4. `zeroproxy.service` respawns and steals the port
+The systemd user unit has `Restart=always`; killing the process alone lets it return in ~5 s and
+the next start dies with `EADDRINUSE`. `dev.sh`/`restart.sh` stop the unit first. **Never** use
+bare `pkill`, `nohup`, or a hand-rolled start. `start_server.sh` is deleted on purpose.
+
+### 5. Docs trap — most of `docs/` is gitignored
+`.gitignore` has `docs/*` with only these allow-listed (verified via `git ls-files docs/`):
+`ARCHITECTURE.md`, `agent-orchestration.md`, `git-conventions.md`, `parity-9router.md`,
+`parity-9router-FULL.md`, `parity-9router-impl.md`, `residual-gaps.md`.
+
+`ROUTING.md`, `PROVIDERS.md`, `TRAPS.md`, `STATE.md`, `OMNIROUTE_PROVIDER_PARITY.md`, `ADRs/`
+exist **only on this machine**. Don't cite them as repo truth, and don't assume a fresh clone
+has them. `docs/STATE.md` is also a stale session log from a merged branch — not current state.
+
+### 6. Renamed over time — grep will mislead
+Binary `zeroproxy` (was `cipherroute`, was `openproxy`); schema namespace `zeroproxy.v1` (was
+`cipherroute.v1`); data dir `~/.zeroproxy` (was `~/.cipherroute`). Legacy names survive in
+`pkill` patterns and comments by design. Check `Cargo.toml` `name` before trusting a doc.
 
 ## Invariants (must not break)
 
-1. **Capability filter before routing** — `HARD_CAPS=["vision","pdf","audioInput","videoInput"]` (`src/core/combo/mod.rs:283`); `detect_required_capabilities` (`src/core/combo/mod.rs:289-296`) runs before `reorder_by_capabilities` (`src/core/combo/mod.rs:560-572`), which tier-sorts (tier0/tier1/tier2) then falls back. Hard-cap mismatch skips a model entirely.
-2. **`context_window` cap** — `combo.max_context` in design = max `context_window` of members (`provider_catalog.json`); strip history via `strip_history_for_context` (`src/server/api/chat.rs:646-652`) only for capacity adapter-added models, budget = `(context_window || 200_000)*0.8*4`.
-3. **Fallback only eligible** — `check_fallback_error` (`src/core/combo/mod.rs:576-603`) delegates to `error_config::classify_error` → `ErrorClassification::{Backoff,Cooldown,NoMatch,Permanent}`; `retryAfter` header wins over body; 401/403 → single `dispatch_oauth_refresh`; 404 → 300 s model-specific lock.
-4. **Error classification single source** — always route through `error_config::classify_error`; do not re-implement status→fallback logic in executors.
+1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
+   (`src/core/combo/mod.rs:438`). `detect_required_capabilities` (`:442`) runs *before*
+   `reorder_by_capabilities` (`:697`), which tier-sorts then falls back. A hard-cap mismatch
+   **skips the model entirely** — it is not a fallback trigger.
+2. **`context_window` cap.** History is trimmed by `strip_history_for_context`
+   (`src/core/combo/capacity_adapter.rs:254`) — only for capacity-adapter-added models.
+   Budget = `(context_window || 200_000) * 0.8 * 4`.
+3. **Fallback only on eligible errors.** `check_fallback_error` (`src/core/combo/mod.rs:729`)
+   delegates to `error_config::classify_error` (`src/core/config/error_config.rs:253`) →
+   `ErrorClassification::{Backoff, Cooldown, NoMatch, Permanent}`. `retryAfter` header beats body.
+   **404 → 300 s model lock; it is NOT an auth failure.**
+4. **Error classification has one source.** Never re-implement status→fallback logic inside an
+   executor; go through `error_config::classify_error`.
 
 ## Core: What / Why / How
 
-Zeroproxy is an AI proxy router written in Rust — OpenAI-compatible endpoint that routes requests to 40+ AI providers with format translation, account fallback, token refresh, usage tracking, and SSE streaming.
+OpenAI-compatible endpoint routing to 40+ AI providers with format translation, account
+fallback, token refresh, usage tracking, and SSE streaming. A stripped Rust clone of OmniRoute —
+**avoid OmniRoute's bloat**.
 
-**Why**: Replace 9router (Node.js) with a faster, safer Rust implementation (235+ JS bugs avoided). Type-safe format handling, encrypted secrets, immutable data flow, thread-safe by design.
+**Pipeline**: `model parsing → format detection → request translation → capability-aware
+ordering → provider execution → response translation → SSE streaming`
 
-**How (pipeline)**: `model parsing → format detection → request translation → capability-aware ordering → provider execution → response translation → SSE streaming`
+- **Executor trait**: `ProviderExecutor` — default + per-provider impls (`src/core/executor/`)
+- **Persistence**: SQLite (WAL) + AES-GCM encrypted credential columns (`src/db/`)
+- **Security**: HMAC API keys, bcrypt/JWT auth, SSRF protection (`src/server/auth/`)
 
-- **Account mgmt**: credential selection → token refresh → model-level fallback → combo/fusion
-- **Executor trait**: `ProviderExecutor` with default+specialized impls (`src/core/executor/mod.rs`)
-- **Persistence**: SQLite WAL + encrypted columns (`src/db/`)
-- **Security**: HMAC API keys, bcrypt auth, SSRF protection (`src/server/auth/`)
+**Layout**: `src/core` (domain) · `src/server` (axum HTTP + dashboard embedding) · `src/cli`
+(clap CLI + `--robot` JSON envelopes) · `src/db` (SQLite) · `src/oauth` (refresh flows) ·
+`web/` (Astro 5 + React 19 dashboard, built to `web/dist`).
 
-## Guiding Principle — Lightweight OmniRoute Clone
+### Guiding principle — check OmniRoute before inventing
 
-Zeroproxy is a stripped Rust clone of OmniRoute — **avoid OmniRoute's bloat**. When any feature's objective is unclear, **consult `~/dev/OmniRoute` (fallback `/tmp/omniroute_v3850`) first** — every feature already exists there in some form.
-
-**Lookup order**: `~/dev/OmniRoute/src/` + `~/dev/OmniRoute/open-sse/` → `/tmp/omniroute_v3850/src/managed/`
-
-**Out-of-scope (do NOT port):**
-- MCP servers, A2A/ACP protocols, Electron/PWA/VNC, memory/skills frameworks, analytics beyond minimal usage, cloud/sync backends, Telegram bots, chaos engineering. See `docs/OMNIROUTE_PROVIDER_PARITY.md`.
-- Header-fidelity parity: OpenRouter sends `HTTP-Referer`+`X-Title`; nvidia/llm7 omit `HTTP-Referer`; gemini sends `x-goog-api-key`; kiro/opencode/free-providers use OAuth token flow.
+`~/dev/OmniRoute` (present on this machine) already implements most features. Look there before
+designing something new. **Do NOT port**: MCP servers, A2A/ACP, Electron/PWA/VNC, memory/skills
+frameworks, analytics beyond minimal usage, cloud/sync backends, Telegram bots, chaos engineering.
 
 ## Core Product Surfaces (TOP PRIORITY)
 
-These 4 surfaces ARE the product. Always prioritize regressions + improvements here:
+These 4 surfaces *are* the product. Prioritize their regressions above all else.
 
-1. **Providers page** — `/dashboard/providers/<provider>`: toggle Available Models (disable/enable/custom), persisted in SQLite, survives rebuilds.
+1. **Providers page** — `/dashboard/providers/<provider>`: Available Models toggle
+   (disable/enable/custom), persisted in SQLite, survives rebuilds.
 2. **CLI tools config** — `/dashboard/cli-tools/opencode`.
 3. **Combos page** — `/dashboard/combos`.
-4. **`ModelSelectModal.tsx`** — the single model-picker used everywhere; **must mirror** the provider page's Available Models (same disabled map + custom rows + catalog merge). Any model-list logic change applies to both.
+4. **`web/src/shared/components/ModelSelectModal.tsx`** — the single model-picker used
+   everywhere. It **must mirror** the provider page's Available Models (same disabled map +
+   custom rows + catalog merge). Any model-list change applies to both.
 
-Core workflow that must never break: configure provider → customize available models → create combos → select models for opencode CLI config.
+Hot files prone to cross-agent conflicts: `src/server/api/chat.rs`,
+`web/src/shared/constants/providers.ts`, `src/core/model/provider_catalog.json`.
+
+Never break: configure provider → customize available models → create combos → select models
+for opencode CLI config.
 
 ## Dev Workflow — backend + dashboard
 
-Single smooth loop — backend and dashboard are **separate builds** served by the same binary. Run `./scripts/dev.sh` from repo root only.
+Backend and dashboard are **separate builds** served by one binary. Run `./scripts/dev.sh`
+from repo root only (it resolves its own root, so cwd doesn't matter).
+
+### Presets
+
+| Situation | Command | Cost |
+|---|---|---|
+| Iterate on one layer | `--fast` (default) | ~10-20 s |
+| Daily loop (build + restart) | `--fast detach` | ~10-20 s |
+| Only `web/src` changed | `--web-only` | no cargo |
+| Only `src/` changed | `--backend-only` | no pnpm |
+| **Before any push / done claim** | `--full detach` | ~2-5 min, runs fmt+clippy+astro+tests |
+| Lint only, no build | `--check` | — |
+| Suspect stale `web/dist` | `--web-only` or `--full` | forces `pnpm build` |
+
+Modes: `run` (foreground) · `detach` · `build` · `check` · `check-stale`. `--release` switches
+to the release profile. Full flags: `./scripts/dev.sh --help`.
 
 ### How web assets are served
 
-**`--web-dir` mode (default in dev.sh)**: The server reads `web/dist/` from disk at runtime (`--web-dir web/dist`). Web rebuilds are instantly visible — **no binary rebuild needed**. This is the permanent solution to the stale-embedded-assets problem.
+- **`--web-dir` mode (what dev.sh uses)**: server reads `web/dist/` from disk at runtime, so
+  `pnpm build` alone makes UI changes visible — **no binary rebuild needed**.
+- **Embedded mode (release)**: `web/dist` baked in via `rust-embed`
+  (`src/server/dashboard/`, `#[folder = "web/dist/"]`). Requires `cargo build`.
 
-**Embedded mode (release builds)**: `web/dist/` is baked into the binary via `rust-embed` (`#[folder = "web/dist/"]`). Requires `cargo build` to pick up web changes. Used for single-binary distribution only.
+> **Never run the release binary for dev work** — stale embedded assets. dev.sh always passes
+> `--web-dir`.
 
-> **Never run the release binary for dev work** — it has stale embedded assets. Always use `dev.sh` which adds `--web-dir`.
+### Reload contract (run this yourself — never ask the user)
 
-**Presets:**
-| Change | Command | Notes |
+| Change | Command | Why |
 |---|---|---|
-| Only `web/src` | `--web-only` or `--fast detach` | Rebuild web, restart (no cargo needed) |
-| Only `src/` | `--backend-only detach` or `--fast detach` | cargo build + restart |
-| Both | `--fast detach` | ~10-20s |
-| Before push | `--full detach` | web + cargo + fmt/clippy/astro/tests |
-| Stale `web/dist` suspected | `--web-only` or `--full` | Forces `pnpm build` |
-| Lint only | `--check` | No build |
+| `src/**` Rust | `./scripts/dev.sh --fast detach` | cargo rebuild required |
+| `src/core/model/provider_catalog.json` | `./scripts/dev.sh --fast detach` | catalog is `include_str!`-embedded at compile time — **restart alone is not enough** |
+| `web/src/**` | `./scripts/dev.sh --web-only` | `--web-dir` serves disk live |
+| DB / config / model-lock only | `./scripts/restart.sh` | zero cargo rebuild, no stale-binary risk |
+| Claiming completion / pre-push | `./scripts/dev.sh --full detach` | full gate |
 
-After ANY backend change: `./scripts/dev.sh --fast detach && curl http://127.0.0.1:4623/health`. Never report a fix done without rebuild+restart — stale binary is the #1 silent regression source.
+**Never report a fix as done without a reload + health check.** `detach` runs
+`verify_fresh_binary` (confirms the listening PID's `/proc/<pid>/exe` matches the freshly built
+binary) and gates on `curl -sf http://127.0.0.1:4623/health`. If either fails, abort and report
+the mismatch — a stale binary is the #1 silent regression source here.
 
-### Agent Reload Contract (automatic — never ask the user)
-Every agent that edits backend/dashboard MUST run the correct reload automatically; never use manual `nohup`, bare `pkill`, or the deleted `start_server.sh`. Decision table:
+Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health`, `/oauth` to
+`:4623` (HMR is disabled in `web/astro.config.mjs`).
 
-| Change type | Auto-reload command (agent runs) | Why |
-|---|---|---|
-| `src/**` Rust (executor, model, combo, auth, health) | `./scripts/dev.sh --fast detach` (or `--backend-only detach`) | Cargo rebuild required (`provider_catalog.json` embedded via `include_str!`); restart verifies binary freshness |
-| `provider_catalog.json` / embedded assets | `./scripts/dev.sh --fast detach` | Catalog is compile-time embedded; restart-only is NOT enough |
-| DB/config/model-lock only (no `src/` change) | `./scripts/restart.sh` (kill → verify free → start `--web-dir`) | Zero cargo rebuild; avoids stale binary risk |
-| `web/src/**` (dashboard UI) | `./scripts/dev.sh --web-only` (no restart needed) OR `--fast detach` | `--web-dir web/dist` serves disk assets live; rebuild web allows instant visibility |
-| Before any push/commit claim | `./scripts/dev.sh --full detach` | Full web + cargo + fmt/clippy/tests + health gate + binary verification |
+### Runtime state
 
-Every reload MUST verify: `curl -sf http://127.0.0.1:4623/health` responds with `status: "ok"`, and (for detach/run) `verify_fresh_binary` in `dev.sh` confirms the running PID's `/proc/<pid>/exe` matches the rebuilt binary. If verification fails, abort and report the mismatch (stale binary or wrong port) — do not claim the fix done.
+- Port `4623`; data dir from `$DATA_DIR`, default `~/.zeroproxy`; SQLite at
+  `$DATA_DIR/zeroproxy.sqlite` (mandatory store, no fallback).
+- Logs: `~/.zeroproxy/log.txt`, or `journalctl --user -u zeroproxy -f`.
+- Release build: `cargo build --release --locked --no-default-features && ./target/release/zeroproxy --web-dir ./web/dist`.
 
-> **Never** start the server without `--web-dir web/dist` for dev work (`start_server.sh` deleted — it served frozen embedded assets, skipped health verification, and used wrong binary name / missing kill patterns). Never rely on `pkill` alone; always confirm port is free before restart.
+## Testing
 
-Full flags: `./scripts/dev.sh --help`. Raw web: `cd web && pnpm dev` (Astro `:4624` with API proxy to `:4623`).
+- **CI runs `cargo test --lib --all-features` on Linux + macOS only.** Integration tests under
+  `tests/` are intentionally excluded (3 known auth-helper failures), so a green local
+  `cargo test` on `tests/` is *not* the gate.
+- Unit tests live in `src/**` as `#[cfg(test)]` modules (~224 files) — this is why `--lib` is
+  the CI gate; parity locks need no network.
+- Web: `pnpm --dir web test` (vitest, 2 suites: `availableModels`, `providersPage`).
+- `astro check` is **advisory** everywhere (`|| true` in CI, `|| echo advisory` in dev.sh) — fix
+  new errors, don't chase the existing backlog.
+- `cargo clippy --all-targets --all-features` — no `-D warnings`; it fails only on real errors.
+- `scripts/parity-smoke.sh` is the intent, not the source of truth (see Trap 1).
 
-## Contributing & Git Hygiene
+## CI order (matters)
 
-Two linked documents govern workflow: `CONTRIBUTING.md` (workflow/standards/testing) + `docs/git-conventions.md` (enforceable rules). PRs use `.github/pull_request_template.md`; CI (`.github/workflows/ci.yml`) checks `web` → `rust` on Ubuntu+macOS.
+`lint-branch-name` → `web` (install → astro check* → vitest → `pnpm build` → upload `web/dist`)
+→ `rust` (downloads `web/dist`, then fmt → clippy → `cargo test --lib`). The Rust job
+**depends on the web artifact** because `build.rs` needs `web/dist/index.html`.
 
-## Agent Orchestration — Branch-per-Agent, Worktree Isolation
+## Git hygiene
 
-**Rule: one agent = one branch = one worktree. Never share a branch.**
+Install hooks once per clone: `./scripts/setup-hooks.sh` (copies `.githooks/*` → `.git/hooks/`).
+Re-run after pulling hook changes.
 
-- **Branch-per-agent** (`<agent>/<type>/<kebab>`). Shared-branch edits caused 26-file stashes and cross-branch cherry-picks.
-- **Worktree isolation**: `git worktree add ../wt-<agent>-<slug> -b <agent>/<type>/<kebab>`; claim with `../cipherroute/scripts/claim-branch.sh <branch>`. Hot files: `src/server/api/chat.rs`, `web/src/shared/constants/providers.ts`.
-- **Claim file** `.opencode/claims/<branch>` — check before claiming.
-- **Dirty-tree guard**: `scripts/dev.sh` warns on dirty tree; hooks block wrong-branch commits.
-- **Hooks**: `scripts/setup-hooks.sh` installs pre-commit (fmt+secret scan), commit-msg (Conventional Commits), pre-push (branch+secret scan).
-- See [`docs/agent-orchestration.md`](docs/agent-orchestration.md) for full spec + recovery.
+- **pre-commit**: `cargo fmt --check` if `.rs` staged; secret scan; **blocks staging
+  `opencode.json`, `.env`, `admin.key`, `db.json`**.
+- **commit-msg**: Conventional Commits `type(scope): imperative` — types
+  `feat|fix|docs|chore|refactor|test|build|ci|perf|revert`.
+- **pre-push**: branch-name lint, secret scan, stale-`web/dist` warning, advisory astro check.
+- **CI lints branch names**: only `main`, `dev`, `pr-*`, `<type>/<kebab>`, `<agent>/<type>/<kebab>`
+  where type ∈ the list above. A non-conforming branch fails fast.
+- Never commit: `opencode.json`, `.env`, `*.pem`, `admin.key`, API keys (`sk-…`, `Bearer …`,
+  `refresh_token` assignments). If one lands, rotate it and purge history (`git filter-repo`).
 
-## Beads / Status
+Full rules: `CONTRIBUTING.md` + `docs/git-conventions.md` (both tracked) + `.github/pull_request_template.md`.
 
-Parity work: epic `cipherroute-9router-parity-v0550-pnc` (v0.5.50 → cipherroute, 122 specs). See `br ready` / `bv --robot-next`. Parity docs: `docs/parity-9router.md`, `docs/OMNIROUTE_PROVIDER_PARITY.md`.
+## Agent Orchestration — branch-per-agent, worktree isolation
 
-Smoke test: `cargo test -p cipherroute --lib parity_tests stream_flags`.
+**Rule: one agent = one branch = one worktree. Never share a branch.** Shared-branch edits
+previously produced a 26-file stash and cross-branch cherry-picks.
 
-## Schema Stability & Secrets
+```bash
+cat .opencode/claims/* 2>/dev/null; git worktree list   # check claims first
+git worktree add ../wt-<agent>-<slug> -b <agent>/<type>/<kebab>
+./scripts/claim-branch.sh <agent>/<type>/<kebab>        # NOT ../cipherroute/... — that path is gone
+./scripts/claim-branch.sh --release <branch>           # when done
+```
 
-- `cipherroute.v1.*` envelope is **frozen, additive-only** — 13 resources (`provider`, `provider-node`, `combo`, `key`, `pool`, `settings`, `custom-model`, `model-alias`, `usage-event`, `log-event`, `chat-event`, `quota`, `oauth-status`), each schema+example enforced by tests. `cipherroute schema list/show/example/stability`.
-- **Never commit** local config: `opencode.json`, `.env`, `*.pem`, `~/.cipherroute/db.json`, API keys (`sk-`/`Bearer`/`refresh_token`). Rotate immediately + purge history (`git filter-repo`) if accidentally committed.
+- Claim files live in gitignored `.opencode/claims/<branch-with-__slashes>`; the script also
+  rejects names that already exist in git.
+- `dev.sh` warns on a dirty tree; hooks block wrong-branch commits.
+- Return to `main` when finished — don't park the repo on a feature branch.
+- Full spec + recovery: `docs/agent-orchestration.md` (tracked). Note it still contains a few
+  stale `../cipherroute` paths.
 
+## Schema stability
+
+`zeroproxy.v1` envelope namespace is **frozen, additive-only** — 13 resources (`provider`,
+`provider-node`, `combo`, `key`, `pool`, `settings`, `custom-model`, `model-alias`,
+`usage-event`, `log-event`, `chat-event`, `quota`, `oauth-status`), each with schema + example
+enforced by tests. Inspect with `zeroproxy schema list|show|example|stability`
+(`src/cli/schema.rs`). Breaking changes require a new `zeroproxy.v2` namespace.
+
+## Beads / parity status
+
+Parity work tracks 9router v0.5.55 behavior. Tracked docs: `docs/parity-9router.md`,
+`docs/parity-9router-FULL.md`, `docs/parity-9router-impl.md`, `docs/residual-gaps.md`. Beads
+epic `cipherroute-9router-parity-v0550-pnc`; the `br` / `bv` CLIs are **not on PATH** — treat
+the markdown files as the source of truth. Smoke (one filter per invocation — `cargo test` takes
+a single TESTNAME): `cargo test --lib parity_tests`.
