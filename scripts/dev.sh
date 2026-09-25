@@ -130,6 +130,11 @@ HELP
 }
 
 kill_port() {
+  # Stop systemd units FIRST — killing the process alone is not enough:
+  # Restart=always brings the release binary back within RestartSec (5s),
+  # usually mid-build, and the debug start then fails with EADDRINUSE.
+  # openproxy.service = legacy name; zeroproxy.service = current unit.
+  systemctl --user stop zeroproxy.service 2>/dev/null || true
   systemctl --user stop openproxy.service 2>/dev/null || true
   # Graceful stop first (clears pidfile cleanly).
   if [[ -n "${BIN_DEBUG:-}" && -f "${BIN_DEBUG}" ]]; then
@@ -138,10 +143,19 @@ kill_port() {
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
   fi
-  # Kill by cmdline: covers both "server start" form and bare process form (live PID 7740).
+  # Kill by cmdline: match binary path (bare service form has no port in argv)
+  # and the "server start" form. pkill -f "zeroproxy.*${PORT}" misses the unit
+  # cmdline: ".../target/release/zeroproxy --web-dir ... --no-open".
+  pkill -f 'target/(debug|release)/zeroproxy' 2>/dev/null || true
+  pkill -f 'zeroproxy.*server start' 2>/dev/null || true
   pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
   pkill -f "openproxy" 2>/dev/null || true
   pkill -f "cipherroute.*${PORT}" 2>/dev/null || true
+  # Confirm the unit is actually inactive (no crash-loop resurrection).
+  if systemctl --user is-active --quiet zeroproxy.service 2>/dev/null; then
+    echo "!! zeroproxy.service still active after stop — forcing stop" >&2
+    systemctl --user stop zeroproxy.service 2>/dev/null || true
+  fi
   sleep 0.5
 }
 
