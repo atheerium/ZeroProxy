@@ -5200,7 +5200,7 @@ mod tests {
 
     use super::{
         build_dashboard_sse_response, build_proxied_response, earliest_retry_after,
-        select_connection,
+        is_no_auth_provider, select_connection,
     };
     use crate::types::{AppDb, ProviderConnection};
 
@@ -5515,7 +5515,6 @@ mod tests {
         let providers = [
             "opencode",
             "opencode-zen",
-            "opencode-go",
             "edge-tts",
             "google-tts",
             "ollama-local",
@@ -5532,6 +5531,14 @@ mod tests {
             );
             assert_eq!(selected.unwrap().id, "noauth");
         }
+    }
+
+    #[test]
+    fn opencode_go_is_not_a_no_auth_provider() {
+        // Paid apikey provider: a virtual fallback here would bypass a stored key
+        // and earn an upstream AuthError. Re-adding it is a behaviour change, not
+        // a test fix — see the parity note in `is_no_auth_provider`.
+        assert!(!is_no_auth_provider("opencode-go"));
     }
 
     #[test]
