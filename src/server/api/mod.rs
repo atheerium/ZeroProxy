@@ -468,7 +468,13 @@ async fn api_catalog() -> Response {
         .into_response()
 }
 
-async fn get_version_api() -> Response {
+#[derive(Debug, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct VersionQuery {
+    since: Option<String>,
+}
+
+async fn get_version_api(Query(query): Query<VersionQuery>) -> Response {
     let current_version = env!("CARGO_PKG_VERSION").to_string();
     let latest_version = fetch_latest_release_version().await;
     let has_update = latest_version
@@ -478,6 +484,8 @@ async fn get_version_api() -> Response {
 
     let identity = crate::server::build_info::identity();
     let status = crate::server::build_info::status();
+    let backend_sha = crate::server::build_info::identity_sha();
+    let since = query.since;
 
     Json(json!({
         "currentVersion": current_version,
@@ -486,6 +494,18 @@ async fn get_version_api() -> Response {
         "dashboardVersion": dashboard_package_version(),
         "buildInfo": identity,
         "runtimeInfo": status,
+        "freshness": {
+            "backendSha": backend_sha,
+            "backendBuildTime": crate::server::build_info::identity_build_time(),
+            "backendCommitsBehind": backend_sha
+                .as_deref()
+                .and_then(crate::server::build_info::commits_since),
+            "repoHead": crate::server::build_info::repo_head(),
+            "sinceSha": since,
+            "sinceCommitsBehind": since
+                .as_deref()
+                .and_then(crate::server::build_info::commits_since),
+        },
     }))
     .into_response()
 }
