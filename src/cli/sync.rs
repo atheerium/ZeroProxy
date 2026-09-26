@@ -449,6 +449,18 @@ fn build_extra(
     if let Some(at) = &provider.auth_type {
         extra.insert("providerAuthType".into(), Value::String(at.clone()));
     }
+    // Omitted rather than written `false` when the snapshot has no free-tier
+    // metadata (e.g. the 9router catalog): absent must mean unknown, not paid.
+    if provider.free.is_some() || provider.no_auth.is_some() {
+        extra.insert(
+            "providerFreeTier".into(),
+            Value::Bool(provider.is_free_tier()),
+        );
+        extra.insert(
+            "providerNoAuth".into(),
+            Value::Bool(provider.no_auth.unwrap_or(false)),
+        );
+    }
     extra
 }
 
@@ -624,6 +636,8 @@ fn owned_extra_keys() -> &'static [&'static str] {
         "providerFormat",
         "providerBaseUrl",
         "providerAuthType",
+        "providerFreeTier",
+        "providerNoAuth",
     ]
 }
 
@@ -965,5 +979,66 @@ mod tests {
             "the embedded OmniRoute snapshot carries no free-tier markers; regenerate it with \
              `node scripts/sync/normalize-sources.mjs --only=omniroute`"
         );
+    }
+
+    #[test]
+    fn synced_models_record_the_free_tier_marker() {
+        let app = empty_app();
+        let plan = compute_plan(
+            &app,
+            &tier_snapshot(),
+            SyncSource::Omniroute,
+            "now",
+            false,
+            true,
+        );
+        let by_alias = |alias: &str| {
+            plan.new_models
+                .iter()
+                .find(|m| m.provider_alias == alias)
+                .unwrap_or_else(|| panic!("{alias} should have been created"))
+        };
+        assert_eq!(
+            by_alias("freegw").extra.get("providerFreeTier"),
+            Some(&Value::Bool(true))
+        );
+        assert_eq!(
+            by_alias("freegw").extra.get("providerNoAuth"),
+            Some(&Value::Bool(false))
+        );
+        assert_eq!(
+            by_alias("keyless").extra.get("providerFreeTier"),
+            Some(&Value::Bool(true))
+        );
+        assert_eq!(
+            by_alias("keyless").extra.get("providerNoAuth"),
+            Some(&Value::Bool(true))
+        );
+    }
+
+    #[test]
+    fn marker_less_snapshot_omits_the_free_tier_keys() {
+        let app = empty_app();
+        let plan = compute_plan(
+            &app,
+            &sample_snapshot(),
+            SyncSource::NineRouter,
+            "now",
+            false,
+            false,
+        );
+        let extra = &plan.new_models[0].extra;
+        assert!(
+            !extra.contains_key("providerFreeTier") && !extra.contains_key("providerNoAuth"),
+            "a snapshot with no free-tier metadata must leave the keys absent so the dashboard \
+             can tell unknown apart from paid, got {extra:?}"
+        );
+    }
+
+    #[test]
+    fn free_tier_keys_are_owned_so_a_lost_free_tier_is_cleared() {
+        let owned = owned_extra_keys();
+        assert!(owned.contains(&"providerFreeTier"));
+        assert!(owned.contains(&"providerNoAuth"));
     }
 }
