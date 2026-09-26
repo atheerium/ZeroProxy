@@ -129,6 +129,20 @@ When to use which:
 HELP
 }
 
+# Match the ADDRESS, not just the port: a `tailscale serve`/funnel socket on this
+# machine's Tailscale IP used to read as a conflict, making the documented
+# workflow unusable while a funnel was enabled. Do not revert to `:${PORT} `.
+loopback_socket_lines() {
+  ss -tlnp 2>/dev/null | grep -E "(127\.0\.0\.1|\[::1\]|0\.0\.0\.0|\[::\]):${PORT}[[:space:]]"
+}
+
+loopback_port_held() {
+  if loopback_socket_lines | grep -q .; then
+    return 0
+  fi
+  lsof -nP -iTCP@127.0.0.1:"${PORT}" -sTCP:LISTEN 2>/dev/null | grep -q LISTEN
+}
+
 kill_port() {
   # Stop systemd units FIRST — killing the process alone is not enough:
   # Restart=always brings the release binary back within RestartSec (5s),
@@ -140,7 +154,9 @@ kill_port() {
   if [[ -n "${BIN_DEBUG:-}" && -f "${BIN_DEBUG}" ]]; then
     "${BIN_DEBUG}" server stop 2>/dev/null || true
   fi
-  if command -v fuser >/dev/null 2>&1; then
+  # fuser kills by PORT, not address — the one path that can take down a
+  # non-loopback holder (e.g. tailscaled). Keep the guard; pkill above won't.
+  if command -v fuser >/dev/null 2>&1 && loopback_port_held; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
   fi
   # Kill by cmdline: match binary path (bare service form has no port in argv)
@@ -162,7 +178,7 @@ kill_port() {
 wait_for_port_free() {
   local tries=0 max=20
   while (( tries < max )); do
-    if ! (ss -tlnp 2>/dev/null | grep -q ":${PORT} ") && ! (lsof -iTCP:${PORT} 2>/dev/null | grep -q LISTEN); then
+    if ! loopback_port_held; then
       echo "== port ${PORT} is free =="
       return 0
     fi
@@ -242,7 +258,7 @@ build_backend() {
 verify_fresh_binary() {
   # Confirm the running process serving the port is the binary we just built.
   local running_pid running_bin running_mtime bin_mtime
-  running_pid=$(ss -tlnp 2>/dev/null | grep ":${PORT} " | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+  running_pid=$(loopback_socket_lines | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
   if [[ -n "$running_pid" ]] && [[ -r "/proc/${running_pid}/exe" ]]; then
     running_bin=$(readlink -f "/proc/${running_pid}/exe" 2>/dev/null || echo "")
     bin_mtime=$(stat -c '%Y' "${BIN}" 2>/dev/null || echo 0)
