@@ -24,6 +24,74 @@ be worth mirroring, so:
 to conflict with this section, this section wins, and you should say so rather than quietly
 re-scoping.
 
+## This repo is written by an AI agent — AGENTS.md is the only memory
+
+**The maintainer does not hold project state in their head and does not want to be asked for it.**
+Treat this file as the sole source of truth for anything you were not told in this conversation:
+
+- Anything learned, decided, corrected, or measured goes **here**, not into a chat reply that will
+  scroll away. "The user said it once" is not storage.
+- If you discover the maintainer misremembers something, correct the record here rather than
+  silently working around it.
+- The Mission section above is permanent. Everything else may be superseded — check `git log` on
+  this file when state looks stale.
+
+## Current state (2026-09-26) — read before planning more work
+
+**The free-tier goal is met and shipped on an unmerged branch.**
+
+- Branch `sisyphus/feat/omniroute-free-sync`, 14 commits over `main` @ `8af50d64`, pushed.
+- **Draft PR #14 is open and NOT merged: https://github.com/atheerium/ZeroProxy/pull/14.**
+  `main` is untouched. Merging is the maintainer's call — never merge to `main` unprompted.
+- Delivered: `zeroproxy sync omniroute --free-only` imports OmniRoute's free-tier providers as
+  first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
+  marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
+  across ~105 providers. Run it with `zeroproxy sync omniroute --free-only`.
+- Two supporting fixes the feature depends on: the snapshot normalizer had been **unrunnable since
+  2026-07-02** (missing `cwd` on `spawnSync` made a tsconfig alias resolve against our repo), and
+  custom models are now keyed `alias/model-id` instead of bare `model-id` (Trap 8).
+
+**Three claims that were wrong and are corrected here so they are not re-derived:**
+
+1. **The pre-push gate was not gating until `43afa7cc`.** `run_checks` was guarded by
+   `MODE == "build"` while `build` runs for `MODE=detach` too, so `--full detach` — the gate
+   AGENTS.md documents — ran *zero* checks and still printed success. Any "gate passed" statement
+   made before that commit was hollow. It is fixed and now genuinely runs fmt+clippy+astro+tests.
+2. **The correct synced-row count is 905, not 999.** 94 of the 999 free models are already
+   built-in, so 905 synced + 94 built-in = 999 covered. The pre-fix loss was **132** models, not
+   the 226 first measured.
+3. **The live db was not empty.** It held 548 `customModels` rows (529 from the background
+   `auto_sync` models.dev daemon, 11 user-created, 8 imported), already rekeyed by the Trap 8
+   migration. Do not assume a clean slate.
+
+**Open decisions, deliberately left to the maintainer:** merging PR #14; and whether to cherry-pick
+upstream's 169 substantive commits (142 touch `src/` and carry the full `openproxy::` →
+`zeroproxy::` rename cost — see Trap 7; 27 are `src/`-free and cheap). Highest-value upstream item
+is `e5db61ab` (disabled-state for custom models = our Available Models toggle), but it must be
+hand-ported, not cherry-picked.
+
+## Verification traps — each of these produced a wrong conclusion at least once
+
+- **`git grep -c` counts matching LINES, not occurrences.** Use `git grep -o <pat> <ref> | wc -l`.
+  Using `-c` reported 86/95 crate refs where the real numbers were 152/143.
+- **`git show --stat` prints the path BEFORE the pipe.** Classify with
+  `git show --name-only | grep -c '^src/'`, never `grep '| src/'` — the latter matches nothing
+  and silently classified all 171 commits as `src/`-free.
+- **`cargo clippy` aborts at the first failing integration target.** Truncated output undercounts
+  badly. Iterate until clean; never trust a single run's error list.
+- **`pnpm build` does not type-check** (Astro skips `tsc`) and the repo has ~507 pre-existing tsc
+  errors. Capture the error list, `git stash`, re-run, and `comm` the two sets — comparing totals
+  hides offsetting changes.
+- **SQLite JSON booleans:** use `json_type(value,'$.k')='true'`. `json_extract(...)='true'` never
+  matches because it returns integer `1`.
+- **Back up a live db with `sqlite3 "$DB" ".backup '$OUT'"`, never `cp`** — the server holds it
+  open and `cp` risks a torn copy.
+- **`pgrep -f 'zeroproxy.*4999'` self-matches the invoking shell** and hangs. Use `pgrep -x zeroproxy`.
+- **Grep web bundles for a distinctive literal, not a shared utility class** — `bg-green-500/10`
+  matches an unrelated "Connected" chip; `FREE` is the distinctive one.
+- **The server caches the db in memory.** A sync that writes sqlite out-of-process is invisible to
+  the API until `./scripts/restart.sh` (DB-only change ⇒ no cargo rebuild needed).
+
 ## Project lineage — all four repos are one family
 
 ```
