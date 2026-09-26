@@ -54,6 +54,14 @@ Treat this file as the sole source of truth for anything you were not told in th
   - `error_config::classify_error` let a status-only rule match *before* the "upstream returned"
     carve-out, so **a request that failed to translate took the provider out of rotation for
     120 s** instead of falling through. This is OmniRoute PR #14830; ours had the bug.
+- The 30 "translator snapshot regressions" were **not** regressions: insta derives the snapshot
+  filename from the crate name, so the rename had orphaned every reference. They were renamed, not
+  re-accepted — see Trap 10 for why `cargo insta accept` would have destroyed them.
+- **Immediately after the merge, `./scripts/dev.sh` could not start at all**, because its port check
+  matched a Tailscale funnel socket on another interface (Trap 4b). That is fixed on `main` at
+  `d5d1637f`. If the dev loop ever dies with "port 4623 still held" while `pgrep -x zeroproxy` is
+  empty, that is the cause — and note `fuser -k <port>/tcp` was on the path that would have killed
+  `tailscaled`.
 - Delivered: `zeroproxy sync omniroute --free-only` imports OmniRoute's free-tier providers as
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
@@ -227,6 +235,28 @@ other desyncs the capability gate from the fallback path.
 The systemd user unit has `Restart=always`; killing the process alone lets it return in ~5 s and
 the next start dies with `EADDRINUSE`. `dev.sh`/`restart.sh` stop the unit first. **Never** use
 bare `pkill`, `nohup`, or a hand-rolled start. `start_server.sh` is deleted on purpose.
+
+### 4b. A port held on *another* interface is not a conflict — `dev.sh` used to think it was
+`zeroproxy` binds `127.0.0.1:$PORT` (its argv literally says `--host 127.0.0.1`), so a socket on a
+different interface cannot block the bind. `dev.sh` nevertheless grepped `ss -tlnp` for the bare
+`:4623 ` in **three** places, and a `tailscale serve`/funnel listener — which the dashboard's
+"Tunnel"/"Tailscale" toggles create — sits on this machine's own Tailscale IP. Symptoms, all three
+misleading:
+- `wait_for_port_free` declared the port held and **refused to start the server**, so the documented
+  workflow was dead for as long as any funnel was enabled. This is the failure that prompted the fix.
+- `verify_fresh_binary` resolved the pid from that socket, so it compared **`tailscaled`'s**
+  `/proc/<pid>/exe` to our build and could report a bogus "running pid uses DIFFERENT binary".
+- `kill_port` ran `fuser -k "${PORT}/tcp"`, and **fuser kills by port, not address** — it would
+  have killed `tailscaled`, a system service. The neighbouring `pkill` patterns match only our own
+  cmdlines, so this was the one path that could take down a system service.
+
+All three now go through `loopback_socket_lines()` / `loopback_port_held()`, which match the
+**address** (`127.0.0.1`, `[::1]`, plus `0.0.0.0`/`[::]` because a wildcard bind genuinely does
+block us). **Do not simplify those back to `:${PORT} `** — that is the bug, and the `fuser` guard
+looks redundant until you notice what it is keeping alive.
+
+Diagnose with `ss -tlnp | grep 4623` and compare against `100.115.170.56` (this box's Tailscale
+IP). Remember `pgrep -f 'zeroproxy.*4623'` self-matches; use `pgrep -x zeroproxy`.
 
 ### 5. Docs trap — most of `docs/` is gitignored
 `.gitignore` has `docs/*` with only these allow-listed (verified via `git ls-files docs/`):
