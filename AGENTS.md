@@ -319,6 +319,13 @@ Consequences worth remembering:
 - Out of a checkout every probe returns `None`; never let a probe failure break the endpoint.
 - Probes are cached 15s because the badge polls on a 20s timer and each uncached probe spawns two
   `git` processes.
+- **Both states have been seen rendering**, so do not re-verify from scratch. Chromium screenshots
+  of the navbar chip: stale reads `● v0.3.1  1cd7344  UI+bin 3`, fresh reads `● v0.3.1  57ff7f9`
+  with no chip. Sampled dot pixels are `rgb(245,158,11)` (amber-500, stale) vs `rgb(146,229,196)`
+  (emerald, fresh) — an unmistakable hue gap, so a colour-blind or washed-out render still differs.
+  Reproduce: `pnpm build` + `./scripts/dev.sh --fast detach`, then Playwright to
+  `http://127.0.0.1:4623/dashboard`. Note the chip is in a width-constrained navbar row, so keep any
+  future label change short or it will wrap.
 
 ## Invariants (must not break)
 
