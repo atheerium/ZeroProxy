@@ -13,7 +13,7 @@ import { pathToFileURL } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
 const OUT_DIR = join(REPO_ROOT, "src", "core", "model", "sources");
-const CACHE_DIR = process.env.CIPHERROUTE_SYNC_CACHE || "/tmp/cipherroute-sync-cache";
+const CACHE_DIR = process.env.ZEROPROXY_SYNC_CACHE || "/tmp/zeroproxy-sync-cache";
 
 const SOURCES = {
   "9router": {
