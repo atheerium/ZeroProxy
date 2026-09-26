@@ -757,6 +757,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -787,6 +788,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -817,6 +819,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -838,6 +841,7 @@ mod tests {
                     r#type: "llm".into(),
                     name: None,
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 },
                 CustomModel {
                     provider_alias: "trk".into(),
@@ -845,6 +849,7 @@ mod tests {
                     r#type: "image".into(),
                     name: None,
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 },
             ],
             ..Default::default()

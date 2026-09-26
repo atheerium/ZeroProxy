@@ -455,6 +455,7 @@ mod tests {
                 provider: "openai".into(),
                 model: "gpt-4o".into(),
                 extra: BTreeMap::new(),
+                ..Default::default()
             }),
         );
         db.with_transaction(|tx| apply_app_db_diff(tx, &old, &new))
@@ -472,6 +473,7 @@ mod tests {
                 provider: "anthropic".into(),
                 model: "claude".into(),
                 extra: BTreeMap::new(),
+                ..Default::default()
             }),
         );
         db.with_transaction(|tx| apply_app_db_diff(tx, &old, &new))
@@ -504,6 +506,7 @@ mod tests {
             r#type: "llm".into(),
             name: Some("custom-1".into()),
             extra: BTreeMap::new(),
+            ..Default::default()
         });
         db.with_transaction(|tx| apply_app_db_diff(tx, &old, &new))
             .unwrap();
@@ -651,6 +654,7 @@ mod tests {
                                 provider: format!("prov{}", rng() % 4),
                                 model: format!("m{}", rng() % 10),
                                 extra: BTreeMap::new(),
+                                ..Default::default()
                             }),
                         );
                     } else {
@@ -668,6 +672,7 @@ mod tests {
                                 r#type: "llm".into(),
                                 name: Some(format!("n{}", rng() % 100)),
                                 extra: BTreeMap::new(),
+                                ..Default::default()
                             });
                         }
                     } else {
