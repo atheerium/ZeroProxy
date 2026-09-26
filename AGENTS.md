@@ -38,11 +38,11 @@ Treat this file as the sole source of truth for anything you were not told in th
 
 ## Current state (2026-09-26) — read before planning more work
 
-**The free-tier goal is met and shipped on an unmerged branch.**
+**The free-tier goal is met and shipped on `main`.**
 
-- Branch `sisyphus/feat/omniroute-free-sync`, 18 commits over `main` @ `8af50d64`, pushed.
-- **Draft PR #14 is open and NOT merged: https://github.com/atheerium/ZeroProxy/pull/14.**
-  `main` is untouched. Merging is the maintainer's call — never merge to `main` unprompted.
+- PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) merged into `main` on 2026-09-26 at the
+  maintainer's explicit request. Its 20 commits are trunk; the worktree and branch
+  `sisyphus/feat/omniroute-free-sync` are historical and can be deleted.
 - Delivered: `zeroproxy sync omniroute --free-only` imports OmniRoute's free-tier providers as
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
@@ -68,20 +68,26 @@ Treat this file as the sole source of truth for anything you were not told in th
    `auto_sync` models.dev daemon, 11 user-created, 8 imported), already rekeyed by the Trap 8
    migration. Do not assume a clean slate.
 
-**Open decisions, deliberately left to the maintainer:** merging PR #14; whether to cherry-pick
-upstream's 169 substantive commits (142 touch `src/` and carry the full `openproxy::` →
-`zeroproxy::` rename cost — see Trap 7; 27 are `src/`-free and cheap); and **whether custom models
-should be disable-able at all** (see below).
+**Decided by the maintainer (2026-09-26): PR #14 is merged into `main`.** The 19-commit
+free-tier + freshness branch is now trunk. The custom-model toggle question is also **settled** — see
+below. One decision remains open: whether to cherry-pick upstream's 169 substantive commits (142
+touch `src/` and carry the full `openproxy::` → `zeroproxy::` rename cost — see Trap 7; 27 are
+`src/`-free and cheap).
 
-**Do not "just port" `e5db61ab`.** Upstream's `fix(web): honour disabled state for custom models
-end-to-end` is the highest-value item in that set and looks like a straight bugfix for our
-Available Models toggle. It is a **product decision**, and our current behaviour may well be
-intended: `ModelRow.tsx:113` gates the disable button on `!isCustom`, and both
-`availableModels.ts:63` ("Always shown") and `:150` document it. The state is genuinely
-half-implemented — `availableModels.ts:165` computes `disabled` for custom rows and
-`ProviderDetailPageClient.tsx:1174` filters on it, but nothing can set it, and `enabledRows` (`:176`)
-plus the `kindFilter` path in `ModelSelectModal.tsx:375-380` both ignore it. Ask before changing it:
-a custom model is often a user's escape hatch when the whole catalog is disabled.
+**Settled: custom models stay permanently un-disable-able — they are the escape hatch.** The
+maintainer's call, in response to being offered the change. Do **not** port upstream's
+`e5db61ab fix(web): honour disabled state for custom models end-to-end`, and do not "complete" the
+half-implemented state: `availableModels.ts:165` computes `disabled` for custom rows and
+`ProviderDetailPageClient.tsx:1174` filters on it, but nothing can set it, and that is the intent.
+`ModelRow.tsx:113` gates the disable button on `!isCustom` deliberately.
+
+**Why, so this is not re-litigated:** when a provider's whole catalog is disabled — quota exhausted,
+an outage, a bad model — a synced custom model is the user's only way through. Making it
+disable-able would let a bulk action lock them out of their own router. An escape hatch that can be
+disabled by the same bulk operation you use to disable everything else is not an escape hatch.
+Consequence to respect: a custom model can never be hidden by the Available Models toggle, so
+"disable everything" will still leave custom models selectable. That is correct, not a bug — if you
+need it gone, delete the model.
 
 ## Verification traps — each of these produced a wrong conclusion at least once
 
