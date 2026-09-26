@@ -21,6 +21,10 @@ import {
   AI_PROVIDERS,
   isFreeTierProvider,
 } from "@/shared/constants/providers";
+import {
+  GENERATED_FREE_TIER_PROVIDERS,
+  GENERATED_OTHER_PROVIDERS,
+} from "@/shared/constants/providers.generated";
 // import Link from "next/link";  // ported: next.js -> Astro+React
 import { getErrorBadgeLabel, getErrorCode, getRelativeTime } from "@/shared/utils";
 import { useNotificationStore } from "@/store/notificationStore";
@@ -528,7 +532,14 @@ export default function ProvidersPageClient() {
   // Free-tier: registry priority first, then noAuth providers bubble up (9r parity).
   const freeTierEntries = sortNoAuthFirst(
     sortByPriority(
-      Object.entries(FREE_TIER_PROVIDERS).filter(
+      [
+        ...Object.entries(FREE_TIER_PROVIDERS),
+        // The spread must precede .filter() — concatenating after it would let
+        // generated entries skip the serviceKinds/hidden/search gates, which they
+        // rely on the `?? ["llm"]` default for. Free-tier belongs in this
+        // section, which sits above apikey: free-first is structural, not a sort.
+        ...Object.entries(GENERATED_FREE_TIER_PROVIDERS),
+      ].filter(
         ([, info]) =>
           !info.hidden &&
           (info.serviceKinds ?? ["llm"]).includes("llm") &&
@@ -540,6 +551,7 @@ export default function ProvidersPageClient() {
   // API Key: any connection (total > 0) first, then alphabetical by name.
   // OAuth keeps sortByPriority; apikey intentionally uses total>0 not connected.
   const apikeyEntries = Object.entries(APIKEY_PROVIDERS)
+    .concat(Object.entries(GENERATED_OTHER_PROVIDERS))
     .filter(
       ([, info]) =>
         !info.hidden &&

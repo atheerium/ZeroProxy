@@ -5,7 +5,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, Button, Badge, Input, Modal, CardSkeleton, OAuthModal, KiroOAuthWrapper, CursorAuthModal, IFlowCookieModal, GitLabAuthModal, Toggle, Select, EditConnectionModal, NoAuthProxyCard, FreeTierLimits } from "@/shared/components";
 import { ConfirmModal } from "@/shared/components/Modal";
 import { useNotificationStore } from "@/store/notificationStore";
-import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS, THINKING_CONFIG } from "@/shared/constants/providers";
+import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, WEB_COOKIE_PROVIDERS, getProviderAlias, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, AI_PROVIDERS, THINKING_CONFIG, lookupProvider } from "@/shared/constants/providers";
 import { getModelsByProviderId, useEnsureCatalog } from "@/shared/constants/models";
 import { useAvailableModels } from "@/shared/models/availableModels";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
@@ -120,7 +120,7 @@ export default function ProviderDetailPageClient() {
         baseUrl: providerNode.baseUrl,
         type: providerNode.type,
       }
-    : (OAUTH_PROVIDERS[providerId] || APIKEY_PROVIDERS[providerId] || FREE_PROVIDERS[providerId] || FREE_TIER_PROVIDERS[providerId] || WEB_COOKIE_PROVIDERS[providerId]);
+    : lookupProvider(providerId);
   const authModes = (providerInfo as any)?.authModes || [];
   // Dual-auth providers (e.g. xAI) declare oauth in authModes even when they
   // also appear under APIKEY_PROVIDERS for the key path.
