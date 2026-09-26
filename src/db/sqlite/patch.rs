@@ -241,12 +241,19 @@ fn kv_map_pricing(map: &PricingTable) -> HashMap<String, Value> {
         .collect()
 }
 
-/// Serialize `custom_models` (`Vec<CustomModel>`) into `id → Value`, matching
-/// the keying the `import_all` path uses (kv key = model id).
+/// Serialize `custom_models` (`Vec<CustomModel>`) into `alias/id → Value`,
+/// matching the keying the `import_all` path uses. The key must include the
+/// provider alias: model ids are only unique within a provider, and keying on
+/// the bare id made two providers offering the same id overwrite each other.
 fn custom_models_map(models: &[crate::types::CustomModel]) -> HashMap<String, Value> {
     models
         .iter()
-        .map(|m| (m.id.clone(), serde_json::to_value(m).unwrap_or(Value::Null)))
+        .map(|m| {
+            (
+                format!("{}/{}", m.provider_alias, m.id),
+                serde_json::to_value(m).unwrap_or(Value::Null),
+            )
+        })
         .collect()
 }
 
@@ -523,6 +530,44 @@ mod tests {
             .with_conn(|c| kv_repo::get_all(c, "customModels"))
             .unwrap();
         assert_eq!(all.len(), 0);
+    }
+
+    #[test]
+    fn custom_models_sharing_a_model_id_do_not_collide() {
+        let db = open();
+        let mut old = AppDb::default();
+        let mut new = AppDb::default();
+        for alias in ["groq", "openrouter", "cerebras"] {
+            new.custom_models.push(CustomModel {
+                provider_alias: alias.into(),
+                id: "deepseek-v4-flash".into(),
+                r#type: "llm".into(),
+                name: None,
+                extra: BTreeMap::new(),
+                ..Default::default()
+            });
+        }
+        db.with_transaction(|tx| apply_app_db_diff(tx, &old, &new))
+            .unwrap();
+        let all = db
+            .with_conn(|c| kv_repo::get_all(c, "customModels"))
+            .unwrap();
+        assert_eq!(all.len(), 3, "one row per provider, not one row total");
+        for alias in ["groq", "openrouter", "cerebras"] {
+            assert!(
+                all.contains_key(&format!("{alias}/deepseek-v4-flash")),
+                "missing composite key for {alias}"
+            );
+        }
+
+        old = new.clone();
+        new.custom_models.clear();
+        db.with_transaction(|tx| apply_app_db_diff(tx, &old, &new))
+            .unwrap();
+        let all = db
+            .with_conn(|c| kv_repo::get_all(c, "customModels"))
+            .unwrap();
+        assert_eq!(all.len(), 0, "all three must be deleted, not just one");
     }
 
     #[test]

@@ -163,22 +163,29 @@ brand references** — so single commits can be cherry-picked safely. One brand 
 subsystem today: `src/cli/sync.rs` emits robot envelope `openproxy.v1.sync.apply`; make it
 `zeroproxy.v1.sync.apply` (additive inside the frozen namespace).
 
-### 8. `kv` stores one model per model id — synced catalogs silently lose collisions
-Custom models live in the `kv` table under `scope = 'customModels'`, whose primary key is
-`(scope, key)` with `key` = the **model id alone**, not `alias/model-id`. Two providers offering
-the same model id therefore overwrite each other: the second sync write wins and the first
-provider silently loses that model.
+### 8. `kv` keys custom models by `alias/model-id` — never revert to a bare model id
+Custom models live in the `kv` table under `scope = 'customModels'`, primary key `(scope, key)`.
+The key is now the composite **`"{provider_alias}/{model_id}"`**, written by both
+`patch.rs::custom_models_map` and `sqlite/import.rs`. Model ids are only unique *within* a
+provider, so the earlier bare-`id` key let two providers offering the same id overwrite each other.
 
-This matters because free-tier catalogs collide heavily. In the current OmniRoute snapshot the
-**999 free `(alias, model)` pairs collapse to 773 distinct ids — 226 lost (23%)**. Worst offenders:
-`deepseek-v4-flash` (10 providers), `openai/gpt-oss-120b` (9), `gpt-oss-120b` (8), `glm-5.2` (7),
-`openai/gpt-oss-20b` (7), `gemini-3.1-pro-preview` (6). A full unfiltered sync reports 2592 models
-but only ~1281 rows exist.
+Free-tier catalogs collide hard: in the current OmniRoute snapshot 999 free `(alias, model)` pairs
+collapse to 773 distinct **ids**. Worst: `deepseek-v4-flash` (10 providers), `openai/gpt-oss-120b`
+(9), `gpt-oss-120b` (8), `glm-5.2` (7). That was 132 of 905 genuinely-lost models (23%).
 
-So `sync` reporting N created does **not** mean N rows are readable. Verify with a real row count,
-not the CLI's own diff. The fix is a composite key (`alias/model-id`), but that changes the storage
-contract read by `/v1/models`, `provider models list`, and combo resolution — it is its own change,
-not a tweak. Do not "fix" it casually.
+The key is **write-only** — `export.rs::kv_scope_to_array` selects by scope and discards the key,
+and no production path looks a model up by key — so the composite form breaks no reader, and `/`
+inside an alias or id is harmless because the key is never parsed back.
+
+`rekey_custom_models` in `sqlite/migrations.rs` converts pre-existing bare-id rows on open. It is
+**required, not redundant**: `diff_kv_scope` derives its "old" side from the in-memory `Vec`, never
+from the table, so without the migration a legacy row is invisible to the delete loop *and* is read
+back by `export_all` as a duplicate. It runs on every open alongside `add_api_keys_budget_column`,
+with no `SCHEMA_VERSION` bump.
+
+Verify with a real row count, never the CLI's diff: `sync` reports created + unchanged, and
+unchanged models are served by the built-in catalog, so the expected free-sync row count is
+**905, not 999** (94 of the 999 already exist as built-ins).
 
 ## Invariants (must not break)
 
@@ -295,7 +302,8 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
 ## Testing
 
 - **CI runs `cargo test --lib --all-features` on Linux + macOS only.** Integration tests under
-  `tests/` are intentionally excluded (3 known auth-helper failures), so a green local
+  `tests/` are intentionally excluded (their build was repaired separately — they now compile, but
+  their pass rate is unmeasured), so a green local
   `cargo test` on `tests/` is *not* the gate.
 - Unit tests live in `src/**` as `#[cfg(test)]` modules (~224 files) — this is why `--lib` is
   the CI gate; parity locks need no network.

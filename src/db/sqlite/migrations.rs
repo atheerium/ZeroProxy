@@ -48,6 +48,7 @@ pub fn apply_pending_migrations(conn: &Connection) -> rusqlite::Result<()> {
     // Ensure the apiKeys table carries the monthly_budget_usd column
     // (free-tier Feature 3). Safe to run on every open — no-op when present.
     add_api_keys_budget_column(conn)?;
+    rekey_custom_models(conn)?;
 
     let current = get_schema_version(conn)?;
     if current < SCHEMA_VERSION {
@@ -80,6 +81,70 @@ fn add_api_keys_budget_column(conn: &Connection) -> rusqlite::Result<()> {
         .unwrap_or(false);
     if !has_column {
         conn.execute("ALTER TABLE apiKeys ADD COLUMN monthly_budget_usd REAL", [])?;
+    }
+    Ok(())
+}
+
+/// Re-key `customModels` rows from the bare model id to `alias/id`.
+///
+/// Rows were originally keyed by model id alone, but a model id is only unique
+/// within a provider, so two providers offering the same id collapsed onto one
+/// row and one provider's model was silently lost. This cannot be left to
+/// `diff_kv_scope`: that derives the "old" side from the in-memory `Vec` rather
+/// than the table, so a bare-id row is never seen and never deleted, while
+/// `export_all` reads by scope alone — the orphan would come back as a
+/// duplicate `CustomModel` on the next load.
+///
+/// Idempotent: rows already keyed `alias/id` are skipped, and a row whose
+/// composite key already exists keeps that row (it was written by the current
+/// process and is therefore the authoritative copy).
+fn rekey_custom_models(conn: &Connection) -> rusqlite::Result<()> {
+    let table_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='kv'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+    if !table_exists {
+        return Ok(());
+    }
+
+    let rows: Vec<(String, String)> = {
+        let mut stmt = conn.prepare("SELECT key, value FROM kv WHERE scope = 'customModels'")?;
+        let mapped = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        let mut collected = Vec::new();
+        for row in mapped {
+            collected.push(row?);
+        }
+        collected
+    };
+
+    for (key, value) in rows {
+        let parsed: serde_json::Value = match serde_json::from_str(&value) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let (Some(alias), Some(id)) = (
+            parsed.get("providerAlias").and_then(|v| v.as_str()),
+            parsed.get("id").and_then(|v| v.as_str()),
+        ) else {
+            continue;
+        };
+        let desired = format!("{alias}/{id}");
+        if desired == key {
+            continue;
+        }
+        conn.execute(
+            "INSERT INTO kv(scope, key, value) VALUES('customModels', ?1, ?2)
+             ON CONFLICT(scope, key) DO NOTHING",
+            rusqlite::params![desired, value],
+        )?;
+        conn.execute(
+            "DELETE FROM kv WHERE scope = 'customModels' AND key = ?1",
+            rusqlite::params![key],
+        )?;
     }
     Ok(())
 }
@@ -119,5 +184,110 @@ mod tests {
         set_schema_version(&conn, SCHEMA_VERSION - 1).unwrap();
         apply_pending_migrations(&conn).unwrap();
         assert_eq!(get_schema_version(&conn).unwrap(), SCHEMA_VERSION);
+    }
+
+    fn custom_models_keys(conn: &Connection) -> Vec<String> {
+        let mut stmt = conn
+            .prepare("SELECT key FROM kv WHERE scope='customModels' ORDER BY key")
+            .unwrap();
+        let rows = stmt
+            .query_map([], |r| r.get::<_, String>(0))
+            .unwrap()
+            .collect::<Result<Vec<_>, _>>()
+            .unwrap();
+        rows
+    }
+
+    #[test]
+    fn rekey_migrates_legacy_bare_id_rows_exactly_once() {
+        let conn = fresh();
+        conn.execute_batch(
+            "CREATE TABLE _meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE kv(scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+                              PRIMARY KEY(scope, key));",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO kv(scope,key,value) VALUES('customModels','deepseek-v4-flash',
+             '{\"providerAlias\":\"cerebras\",\"id\":\"deepseek-v4-flash\"}')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO kv(scope,key,value) VALUES('customModels','grok-4',
+             '{\"providerAlias\":\"groq\",\"id\":\"grok-4\"}')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO kv(scope,key,value) VALUES('customModels','idx9','not json')",
+            [],
+        )
+        .unwrap();
+
+        apply_pending_migrations(&conn).unwrap();
+        assert_eq!(
+            custom_models_keys(&conn),
+            vec![
+                "cerebras/deepseek-v4-flash".to_string(),
+                "groq/grok-4".to_string(),
+                "idx9".to_string(),
+            ],
+            "both re-keyable rows migrate; the unparseable one is left alone"
+        );
+
+        apply_pending_migrations(&conn).unwrap();
+        assert_eq!(
+            custom_models_keys(&conn),
+            vec![
+                "cerebras/deepseek-v4-flash".to_string(),
+                "groq/grok-4".to_string(),
+                "idx9".to_string(),
+            ],
+            "second run must be a no-op"
+        );
+    }
+
+    #[test]
+    fn rekey_keeps_existing_composite_row_over_legacy_one() {
+        let conn = fresh();
+        conn.execute_batch(
+            "CREATE TABLE _meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE kv(scope TEXT NOT NULL, key TEXT NOT NULL, value TEXT NOT NULL,
+                              PRIMARY KEY(scope, key));",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO kv(scope,key,value) VALUES('customModels','groq/grok-4',
+             '{\"providerAlias\":\"groq\",\"id\":\"grok-4\",\"name\":\"current\"}')",
+            [],
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO kv(scope,key,value) VALUES('customModels','grok-4',
+             '{\"providerAlias\":\"groq\",\"id\":\"grok-4\",\"name\":\"stale\"}')",
+            [],
+        )
+        .unwrap();
+
+        rekey_custom_models(&conn).unwrap();
+        assert_eq!(custom_models_keys(&conn), vec!["groq/grok-4".to_string()]);
+        let value: String = conn
+            .query_row(
+                "SELECT value FROM kv WHERE scope='customModels' AND key='groq/grok-4'",
+                [],
+                |r| r.get(0),
+            )
+            .unwrap();
+        assert!(
+            value.contains("current"),
+            "the already-migrated row is authoritative and must not be clobbered"
+        );
+    }
+
+    #[test]
+    fn rekey_is_a_noop_without_a_kv_table() {
+        let conn = fresh();
+        assert!(rekey_custom_models(&conn).is_ok());
     }
 }
