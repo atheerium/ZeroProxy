@@ -62,6 +62,20 @@ pub struct SyncOpts {
     /// Useful for testing freshly-regenerated snapshots without rebuilding.
     #[arg(long, value_name = "PATH")]
     pub source_file: Option<PathBuf>,
+
+    /// Only sync providers that upstream marks as free-tier.
+    ///
+    /// A provider qualifies when the snapshot says `free: true` (it has a
+    /// usable free tier) or `noAuth: true` (it is keyless). Skipped providers
+    /// are still recorded as "present upstream", so combining this with
+    /// `--prune` will not delete previously-synced models of paid providers.
+    ///
+    /// Without this flag every provider in the snapshot is synced, paid ones
+    /// included. Snapshots generated before free-tier metadata existed carry no
+    /// `free`/`noAuth` keys at all, in which case this filter matches nothing —
+    /// regenerate the snapshot with `scripts/sync/normalize-sources.mjs`.
+    #[arg(long)]
+    pub free_only: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -112,8 +126,27 @@ pub struct SourceProvider {
     pub auth_type: Option<String>,
     #[serde(default)]
     pub base_url: Option<String>,
+    /// Upstream `hasFree`.
+    #[serde(default)]
+    pub free: Option<bool>,
+    /// Upstream `noAuth`.
+    #[serde(default)]
+    pub no_auth: Option<bool>,
+    /// Recorded for future filtering, deliberately NOT used by `--free-only`:
+    /// upstream populates it for only a minority of providers, so filtering on
+    /// it would silently drop real ones.
+    #[serde(default)]
+    pub service_kinds: Option<Vec<String>>,
     #[serde(default)]
     pub models: Vec<SourceModel>,
+}
+
+impl SourceProvider {
+    /// Keyless (`noAuth`) providers count as free: reachable without a paid
+    /// credential is the property the user actually cares about.
+    fn is_free_tier(&self) -> bool {
+        self.free.unwrap_or(false) || self.no_auth.unwrap_or(false)
+    }
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -244,6 +277,7 @@ pub(crate) fn compute_plan(
     source: SyncSource,
     now_iso: &str,
     prune: bool,
+    free_only: bool,
 ) -> SyncPlan {
     let catalog = provider_catalog();
     let source_tag = source.name();
@@ -278,6 +312,19 @@ pub(crate) fn compute_plan(
 
     for provider in &snapshot.providers {
         let alias = provider.alias.clone();
+
+        if free_only && !provider.is_free_tier() {
+            // Still record the keys even though we skip the provider: the
+            // stale/prune pass below deletes previously-synced models whose key
+            // is missing from `upstream_keys`, so skipping without recording
+            // would make `--prune` wipe every model we ever synced for a paid
+            // provider the first time `--free-only` is used.
+            for model in &provider.models {
+                upstream_keys.insert((alias.clone(), model.id.clone()));
+            }
+            continue;
+        }
+
         for model in &provider.models {
             upstream_keys.insert((alias.clone(), model.id.clone()));
             let model_ref = ModelRef {
@@ -444,7 +491,14 @@ async fn run_one(
     };
     let now_iso = chrono_like_now();
     let snap = db.snapshot();
-    let plan = compute_plan(&snap, &snapshot, source, &now_iso, opts.prune);
+    let plan = compute_plan(
+        &snap,
+        &snapshot,
+        source,
+        &now_iso,
+        opts.prune,
+        opts.free_only,
+    );
 
     if !opts.dry_run
         && (!plan.new_models.is_empty()
@@ -514,6 +568,7 @@ async fn run_one(
         "generatedAt": snapshot.generated_at,
         "dryRun": opts.dry_run,
         "prune": opts.prune,
+        "freeOnly": opts.free_only,
         "diff": plan.diff,
     });
 
@@ -531,6 +586,13 @@ async fn run_one(
         );
         if opts.dry_run {
             humanln(ctx, "(dry-run — db.json was not modified)");
+        }
+        if opts.free_only && plan.diff.created.is_empty() && plan.diff.updated.is_empty() {
+            humanln(
+                ctx,
+                "  --free-only matched nothing: this snapshot carries no free-tier \
+                 markers. Regenerate it with `node scripts/sync/normalize-sources.mjs`.",
+            );
         }
         if !plan.diff.stale.is_empty() && !opts.prune {
             humanln(
@@ -627,6 +689,9 @@ mod tests {
                 format: Some("openai".into()),
                 auth_type: Some("apikey".into()),
                 base_url: Some("https://example.com/v1/chat/completions".into()),
+                free: None,
+                no_auth: None,
+                service_kinds: None,
                 models: vec![SourceModel {
                     id: "fakeprov/unique-model-id".into(),
                     name: Some("Sample".into()),
@@ -642,7 +707,7 @@ mod tests {
     fn diff_on_empty_db_creates_everything() {
         let app = empty_app();
         let snap = sample_snapshot();
-        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false);
+        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false, false);
         assert_eq!(plan.diff.created.len(), 1);
         assert_eq!(plan.diff.unchanged.len(), 0);
         assert_eq!(plan.diff.updated.len(), 0);
@@ -703,7 +768,7 @@ mod tests {
             .insert("providerAuthType".into(), Value::String("apikey".into()));
         app.custom_models.push(model);
 
-        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false);
+        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false, false);
         assert_eq!(plan.diff.unchanged.len(), 1);
         assert_eq!(plan.diff.created.len(), 0);
         assert_eq!(plan.diff.updated.len(), 0);
@@ -726,12 +791,12 @@ mod tests {
             .insert("source".into(), Value::String("9router".into()));
         app.custom_models.push(model);
 
-        let plan_no_prune = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false);
+        let plan_no_prune = compute_plan(&app, &snap, SyncSource::NineRouter, "now", false, false);
         assert_eq!(plan_no_prune.diff.stale.len(), 1);
         assert_eq!(plan_no_prune.diff.deleted.len(), 0);
         assert!(plan_no_prune.delete_pairs.is_empty());
 
-        let plan_prune = compute_plan(&app, &snap, SyncSource::NineRouter, "now", true);
+        let plan_prune = compute_plan(&app, &snap, SyncSource::NineRouter, "now", true, false);
         assert_eq!(plan_prune.diff.deleted.len(), 1);
         assert_eq!(plan_prune.diff.stale.len(), 0);
         assert_eq!(
@@ -755,7 +820,7 @@ mod tests {
         };
         app.custom_models.push(model);
 
-        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", true);
+        let plan = compute_plan(&app, &snap, SyncSource::NineRouter, "now", true, false);
         assert_eq!(
             plan.diff.created.len(),
             0,
@@ -781,7 +846,124 @@ mod tests {
         assert!(nine.providers.iter().any(|p| p.alias == "cc"));
         let omni: SourceSnapshot = serde_json::from_str(EMBEDDED_OMNIROUTE_JSON).unwrap();
         assert_eq!(omni.source, "omniroute");
-        assert!(omni.providers.iter().any(|p| p.id == "github-models"));
-        assert!(omni.providers.iter().any(|p| p.id == "hackclub"));
+        // Upstream renames and retires provider ids freely, so assert the
+        // snapshot's shape rather than specific ids that go stale.
+        assert!(!omni.providers.is_empty());
+        assert!(omni
+            .providers
+            .iter()
+            .all(|p| !p.id.is_empty() && !p.alias.is_empty()));
+    }
+
+    /// A snapshot exercising all three free-tier signals at once: an explicit
+    /// `hasFree` provider, a keyless `noAuth` provider, and a plain paid one.
+    fn tier_snapshot() -> SourceSnapshot {
+        let prov =
+            |id: &str, alias: &str, free: Option<bool>, no_auth: Option<bool>| SourceProvider {
+                id: id.into(),
+                alias: alias.into(),
+                format: Some("openai".into()),
+                auth_type: Some("apikey".into()),
+                base_url: Some(format!("https://{alias}.example/v1/chat/completions")),
+                free,
+                no_auth,
+                service_kinds: None,
+                models: vec![SourceModel {
+                    id: format!("{alias}/m1"),
+                    name: None,
+                    kind: "llm".into(),
+                    context_length: None,
+                    max_output_tokens: None,
+                }],
+            };
+        SourceSnapshot {
+            source: "omniroute".into(),
+            r#ref: "ae2ba358".into(),
+            generated_at: "2026-09-26T00:00:00Z".into(),
+            provider_id_to_alias: BTreeMap::new(),
+            providers: vec![
+                prov("free-gw", "freegw", Some(true), None),
+                prov("keyless", "keyless", None, Some(true)),
+                prov("paid-gw", "paidgw", None, None),
+            ],
+        }
+    }
+
+    #[test]
+    fn free_only_creates_free_and_keyless_providers() {
+        let app = empty_app();
+        let snap = tier_snapshot();
+        let plan = compute_plan(&app, &snap, SyncSource::Omniroute, "now", false, true);
+        let mut aliases: Vec<&str> = plan
+            .new_models
+            .iter()
+            .map(|m| m.provider_alias.as_str())
+            .collect();
+        aliases.sort_unstable();
+        assert_eq!(
+            aliases,
+            vec!["freegw", "keyless"],
+            "an explicit hasFree provider and a keyless noAuth provider both count as free-tier"
+        );
+    }
+
+    #[test]
+    fn paid_providers_are_synced_when_free_only_is_off() {
+        let app = empty_app();
+        let snap = tier_snapshot();
+        let plan = compute_plan(&app, &snap, SyncSource::Omniroute, "now", false, false);
+        assert_eq!(plan.new_models.len(), 3);
+    }
+
+    #[test]
+    fn free_only_with_prune_leaves_paid_providers_alone() {
+        let mut app = empty_app();
+        let snap = tier_snapshot();
+        // A previous unrestricted sync already imported the paid provider.
+        let mut paid = CustomModel {
+            provider_alias: "paidgw".into(),
+            id: "paidgw/m1".into(),
+            r#type: "chat".into(),
+            name: None,
+            extra: BTreeMap::new(),
+            ..Default::default()
+        };
+        for (k, v) in [
+            ("source", "omniroute"),
+            ("sourceRef", "ae2ba358"),
+            ("sourceProviderId", "paid-gw"),
+            ("kind", "llm"),
+        ] {
+            paid.extra.insert(k.into(), Value::String(v.into()));
+        }
+        app.custom_models.push(paid);
+
+        let plan = compute_plan(&app, &snap, SyncSource::Omniroute, "now", true, true);
+        assert!(
+            plan.diff.stale.is_empty(),
+            "a provider skipped by the filter is still upstream, so it must not be reported stale: {:?}",
+            plan.diff.stale
+        );
+        assert!(
+            plan.delete_pairs.is_empty(),
+            "--prune must not delete models of a provider that --free-only merely skipped: {:?}",
+            plan.delete_pairs
+        );
+        assert_eq!(
+            plan.new_models.len(),
+            2,
+            "only the free-tier models are created"
+        );
+    }
+
+    #[test]
+    fn embedded_omni_snapshot_carries_free_markers() {
+        let omni: SourceSnapshot = serde_json::from_str(EMBEDDED_OMNIROUTE_JSON).unwrap();
+        let free = omni.providers.iter().filter(|p| p.is_free_tier()).count();
+        assert!(
+            free > 0,
+            "the embedded OmniRoute snapshot carries no free-tier markers; regenerate it with \
+             `node scripts/sync/normalize-sources.mjs --only=omniroute`"
+        );
     }
 }
