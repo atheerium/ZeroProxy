@@ -40,13 +40,17 @@ Treat this file as the sole source of truth for anything you were not told in th
 
 **The free-tier goal is met and shipped on an unmerged branch.**
 
-- Branch `sisyphus/feat/omniroute-free-sync`, 14 commits over `main` @ `8af50d64`, pushed.
+- Branch `sisyphus/feat/omniroute-free-sync`, 18 commits over `main` @ `8af50d64`, pushed.
 - **Draft PR #14 is open and NOT merged: https://github.com/atheerium/ZeroProxy/pull/14.**
   `main` is untouched. Merging is the maintainer's call — never merge to `main` unprompted.
 - Delivered: `zeroproxy sync omniroute --free-only` imports OmniRoute's free-tier providers as
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
   across ~105 providers. Run it with `zeroproxy sync omniroute --free-only`.
+- The navbar badge now tells you **which version you are actually running**. It previously showed
+  the backend's sha and process uptime (`0m`), which made a stale dashboard look freshly restarted.
+  It now reports the dashboard's own build identity against repo HEAD as fresh / stale / unknown,
+  names the stale layer, and gives the exact remedy command (Trap 9).
 - Two supporting fixes the feature depends on: the snapshot normalizer had been **unrunnable since
   2026-07-02** (missing `cwd` on `spawnSync` made a tsconfig alias resolve against our repo), and
   custom models are now keyed `alias/model-id` instead of bare `model-id` (Trap 8).
@@ -64,11 +68,20 @@ Treat this file as the sole source of truth for anything you were not told in th
    `auto_sync` models.dev daemon, 11 user-created, 8 imported), already rekeyed by the Trap 8
    migration. Do not assume a clean slate.
 
-**Open decisions, deliberately left to the maintainer:** merging PR #14; and whether to cherry-pick
+**Open decisions, deliberately left to the maintainer:** merging PR #14; whether to cherry-pick
 upstream's 169 substantive commits (142 touch `src/` and carry the full `openproxy::` →
-`zeroproxy::` rename cost — see Trap 7; 27 are `src/`-free and cheap). Highest-value upstream item
-is `e5db61ab` (disabled-state for custom models = our Available Models toggle), but it must be
-hand-ported, not cherry-picked.
+`zeroproxy::` rename cost — see Trap 7; 27 are `src/`-free and cheap); and **whether custom models
+should be disable-able at all** (see below).
+
+**Do not "just port" `e5db61ab`.** Upstream's `fix(web): honour disabled state for custom models
+end-to-end` is the highest-value item in that set and looks like a straight bugfix for our
+Available Models toggle. It is a **product decision**, and our current behaviour may well be
+intended: `ModelRow.tsx:113` gates the disable button on `!isCustom`, and both
+`availableModels.ts:63` ("Always shown") and `:150` document it. The state is genuinely
+half-implemented — `availableModels.ts:165` computes `disabled` for custom rows and
+`ProviderDetailPageClient.tsx:1174` filters on it, but nothing can set it, and `enabledRows` (`:176`)
+plus the `kindFilter` path in `ModelSelectModal.tsx:375-380` both ignore it. Ask before changing it:
+a custom model is often a user's escape hatch when the whole catalog is disabled.
 
 ## Verification traps — each of these produced a wrong conclusion at least once
 
@@ -91,6 +104,14 @@ hand-ported, not cherry-picked.
   matches an unrelated "Connected" chip; `FREE` is the distinctive one.
 - **The server caches the db in memory.** A sync that writes sqlite out-of-process is invisible to
   the API until `./scripts/restart.sh` (DB-only change ⇒ no cargo rebuild needed).
+- **A Vite `define` that fails to substitute is invisible to every gate.** `pnpm build` succeeds,
+  vitest passes, and `tsc` is clean — then the browser throws `__UI_GIT_SHA__ is not defined` at
+  runtime. Prove substitution by grepping the *built* bundle for a bare `__UI_*` identifier:
+  `grep -rIlE '(^|[^A-Za-z0-9_$])__UI_(BUILT_AT|GIT_SHA|COMMIT_TIME)__' web/dist/_astro/` must
+  print nothing. The navbar badge reads these (see Trap 9).
+- **`tsc` total is not proof; a per-file filter is.** A total equal to the 507 baseline can hide
+  offsetting errors. `pnpm exec tsc --noEmit -p tsconfig.json 2>&1 | grep <file>` proving *zero*
+  errors in the files you touched is the real check.
 
 ## Project lineage — all four repos are one family
 
@@ -273,6 +294,31 @@ with no `SCHEMA_VERSION` bump.
 Verify with a real row count, never the CLI's diff: `sync` reports created + unchanged, and
 unchanged models are served by the built-in catalog, so the expected free-sync row count is
 **905, not 999** (94 of the 999 already exist as built-ins).
+
+### 9. The dashboard has no identity of its own — do not read the backend's sha as the UI's
+In `--web-dir` mode (what `dev.sh` always uses) `web/dist` is read from disk per request, so a
+freshly compiled binary happily serves a days-old bundle. "Binary current, UI stale" is invisible,
+and the navbar badge used to report exactly the wrong thing: the **backend's** commit sha, plus
+process uptime (`0m`) in the position a build age belongs. Uptime resets on restart, so it renders
+an old build as newly fresh.
+
+The UI now carries its own identity, substituted at build time by `vite.define` in
+`web/astro.config.mjs`: `__UI_BUILT_AT__`, `__UI_GIT_SHA__` (a `--short` sha), `__UI_COMMIT_TIME__`
+(declared in `web/src/env.d.ts`). `/api/version` grew a purely additive `freshness` block;
+`?since=<sha>` returns that sha's distance from repo HEAD, which is how the badge measures its own
+staleness instead of guessing.
+
+Consequences worth remembering:
+- The badge shows **three** states. `unknown` (no git checkout, an older binary predating the
+  field, or a failed fetch) must **not** be styled as fresh — a release tarball reports null
+  throughout, and a green dot there would recreate the original lie.
+- `commits_since` hex-validates before shelling out; `since` is attacker-controlled, and a leading
+  `-` would otherwise be read as a git flag. Verify with
+  `curl 'localhost:4623/api/version?since=--upload-pack=touch+/tmp/pwn'` → expect
+  `sinceCommitsBehind: null` and no file created.
+- Out of a checkout every probe returns `None`; never let a probe failure break the endpoint.
+- Probes are cached 15s because the badge polls on a 20s timer and each uncached probe spawns two
+  `git` processes.
 
 ## Invariants (must not break)
 
