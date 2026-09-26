@@ -161,7 +161,7 @@ export function buildAvailableModels(
     fullModel: r.fullModel,
     source: r.source,
     type: r.type,
-    isFree: false,
+    isFree: r.isFree === true,
     disabled: disabledSet.has(r.id),
     alias: r.alias,
   }));

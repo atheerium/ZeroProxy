@@ -18,6 +18,8 @@ pub fn provider_requires_streaming(provider: &str) -> bool {
             | "codebuddy-cn"
             | "codebuddy-intl"
             | "cbai"
+            | "opencode"
+            | "oc" // 9router PR #4132: Zen free-tier gate rejects stream:false → force stream (existing SSE→JSON aggregation handles non-streaming clients)
             | "grok-cli"
             | "gcli"
             | "gb"

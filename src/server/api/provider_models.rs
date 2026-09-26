@@ -2377,6 +2377,7 @@ mod tests {
             r#type: "llm".to_string(),
             name,
             extra,
+            ..Default::default()
         };
 
         assert_eq!(custom.provider_alias, "nvidia");
@@ -2405,6 +2406,7 @@ mod tests {
             r#type: "llm".to_string(),
             name: None,
             extra: BTreeMap::new(),
+            ..Default::default()
         };
         let provider_alias = "nvidia".to_string();
         let model_id = "meta/llama-3.1-8b".to_string();

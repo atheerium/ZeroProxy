@@ -6,11 +6,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ProviderConnection};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ProviderConnection};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -24,6 +24,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -46,7 +47,7 @@ async fn seeded_state(
 
 #[tokio::test]
 async fn web_fetch_options_exposes_cors_and_post_method() {
-    let app = cipherroute::build_app(seeded_state(vec![], vec![], false).await);
+    let app = zeroproxy::build_app(seeded_state(vec![], vec![], false).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -80,8 +81,7 @@ async fn web_fetch_options_exposes_cors_and_post_method() {
 
 #[tokio::test]
 async fn web_fetch_requires_auth_when_require_login_is_true() {
-    let app =
-        cipherroute::build_app(seeded_state(vec![active_key("valid-key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("valid-key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -100,7 +100,7 @@ async fn web_fetch_requires_auth_when_require_login_is_true() {
 
 #[tokio::test]
 async fn web_fetch_allows_no_auth_when_require_login_is_false() {
-    let app = cipherroute::build_app(seeded_state(vec![], vec![], false).await);
+    let app = zeroproxy::build_app(seeded_state(vec![], vec![], false).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -123,7 +123,7 @@ async fn web_fetch_allows_no_auth_when_require_login_is_false() {
 
 #[tokio::test]
 async fn web_fetch_rejects_missing_url() {
-    let app = cipherroute::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -141,7 +141,7 @@ async fn web_fetch_rejects_missing_url() {
 
 #[tokio::test]
 async fn web_fetch_rejects_missing_provider() {
-    let app = cipherroute::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -159,7 +159,7 @@ async fn web_fetch_rejects_missing_provider() {
 
 #[tokio::test]
 async fn web_fetch_rejects_invalid_url() {
-    let app = cipherroute::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -180,7 +180,7 @@ async fn web_fetch_rejects_invalid_url() {
 
 #[tokio::test]
 async fn web_fetch_rejects_empty_provider() {
-    let app = cipherroute::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()
@@ -199,7 +199,7 @@ async fn web_fetch_rejects_empty_provider() {
 #[tokio::test]
 async fn web_fetch_model_alias_works_as_provider() {
     // UI sends "model" instead of "provider" — must work
-    let app = cipherroute::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
+    let app = zeroproxy::build_app(seeded_state(vec![active_key("key")], vec![], true).await);
     let resp = app
         .oneshot(
             Request::builder()

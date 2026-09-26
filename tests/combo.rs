@@ -1,13 +1,13 @@
 use std::collections::BTreeMap;
 
 use chrono::{Duration, Utc};
-use cipherroute::core::combo::{
+use zeroproxy::core::combo::{
     check_fallback_error, clear_combo_member_quarantine, clear_combo_quarantine,
     execute_combo_strategy, execute_combo_strategy_with_capacity, get_combo_models_from_data,
     get_quota_cooldown, get_rotated_models, mark_combo_member_quarantined, reset_combo_rotation,
     rotation_index, ComboAttemptError, ComboStrategy, ModelCapacity,
 };
-use cipherroute::types::Combo;
+use zeroproxy::types::Combo;
 
 fn combo(name: &str, models: &[&str]) -> Combo {
     Combo {
@@ -20,6 +20,7 @@ fn combo(name: &str, models: &[&str]) -> Combo {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 

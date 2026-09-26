@@ -22,11 +22,11 @@ async fn e2e_write_then_reload() {
     std::env::set_var("DATA_DIR", tmp.path());
 
     // First load: write some data
-    let db = cipherroute::db::Db::load().await.unwrap();
+    let db = zeroproxy::db::Db::load().await.unwrap();
 
     db.update(|app| {
         app.provider_connections
-            .push(cipherroute::types::ProviderConnection {
+            .push(zeroproxy::types::ProviderConnection {
                 id: "e2e-1".into(),
                 provider: "openai".into(),
                 auth_type: "apikey".into(),
@@ -39,7 +39,7 @@ async fn e2e_write_then_reload() {
     .unwrap();
 
     // Second load: reload from disk, verify SQLite has the data
-    let db2 = cipherroute::db::Db::load().await.unwrap();
+    let db2 = zeroproxy::db::Db::load().await.unwrap();
     let snap = db2.snapshot();
     let found = snap.provider_connections.iter().find(|c| c.id == "e2e-1");
     assert!(found.is_some(), "connection must persist across reload");
@@ -96,7 +96,7 @@ async fn e2e_auto_import_legacy_json() {
     .unwrap();
 
     // Load → should auto-import
-    let db = cipherroute::db::Db::load().await.unwrap();
+    let db = zeroproxy::db::Db::load().await.unwrap();
     let snap = db.snapshot();
     let found = snap
         .provider_connections
@@ -128,7 +128,7 @@ async fn e2e_integrity_check_on_startup() {
     let tmp = TempDir::new().unwrap();
     std::env::set_var("DATA_DIR", tmp.path());
 
-    let db = cipherroute::db::Db::load().await.unwrap();
+    let db = zeroproxy::db::Db::load().await.unwrap();
     let sq = db.sqlite_handle();
     assert_eq!(sq.integrity_check().unwrap(), "ok");
 }
@@ -140,7 +140,7 @@ async fn e2e_concurrent_writes() {
     let tmp = TempDir::new().unwrap();
     std::env::set_var("DATA_DIR", tmp.path());
 
-    let db = Arc::new(cipherroute::db::Db::load().await.unwrap());
+    let db = Arc::new(zeroproxy::db::Db::load().await.unwrap());
     let mut handles = Vec::new();
     for i in 0..10 {
         let db = db.clone();
@@ -149,7 +149,7 @@ async fn e2e_concurrent_writes() {
                 let id = format!("c-{i}-{j}");
                 db.update(move |app| {
                     app.provider_connections
-                        .push(cipherroute::types::ProviderConnection {
+                        .push(zeroproxy::types::ProviderConnection {
                             id: id.clone(),
                             provider: "openai".into(),
                             auth_type: "apikey".into(),
@@ -168,7 +168,7 @@ async fn e2e_concurrent_writes() {
     }
 
     // Reload from disk and verify all 100 rows present.
-    let db2 = cipherroute::db::Db::load().await.unwrap();
+    let db2 = zeroproxy::db::Db::load().await.unwrap();
     let snap = db2.snapshot();
     let count = snap
         .provider_connections
@@ -191,10 +191,10 @@ async fn e2e_export_import_roundtrip() {
     let tmp = TempDir::new().unwrap();
     std::env::set_var("DATA_DIR", tmp.path());
 
-    let db = cipherroute::db::Db::load().await.unwrap();
+    let db = zeroproxy::db::Db::load().await.unwrap();
     db.update(|app| {
         app.provider_connections
-            .push(cipherroute::types::ProviderConnection {
+            .push(zeroproxy::types::ProviderConnection {
                 id: "rt-1".into(),
                 provider: "openai".into(),
                 auth_type: "apikey".into(),
@@ -202,7 +202,7 @@ async fn e2e_export_import_roundtrip() {
                 is_active: Some(true),
                 ..Default::default()
             });
-        app.api_keys.push(cipherroute::types::ApiKey {
+        app.api_keys.push(zeroproxy::types::ApiKey {
             id: "k1".into(),
             key: "sk-machineid-12345678".into(),
             name: "test".into(),
@@ -259,9 +259,9 @@ async fn e2e_usage_persists_to_sqlite() {
     let tmp = TempDir::new().unwrap();
     std::env::set_var("DATA_DIR", tmp.path());
 
-    let db = cipherroute::db::Db::load().await.unwrap();
+    let db = zeroproxy::db::Db::load().await.unwrap();
     db.update_usage(|usage| {
-        usage.history.push(cipherroute::types::UsageEntry {
+        usage.history.push(zeroproxy::types::UsageEntry {
             model: "gpt-4o".into(),
             provider: Some("openai".into()),
             timestamp: Some("2026-01-01T00:00:00Z".into()),
@@ -277,7 +277,7 @@ async fn e2e_usage_persists_to_sqlite() {
     .unwrap();
 
     // Reload and verify
-    let db2 = cipherroute::db::Db::load().await.unwrap();
+    let db2 = zeroproxy::db::Db::load().await.unwrap();
     let usage = db2.usage_snapshot();
     assert_eq!(usage.history.len(), 1);
     assert_eq!(usage.history[0].model, "gpt-4o");
@@ -297,7 +297,7 @@ async fn e2e_high_concurrency_stress() {
     let tmp = TempDir::new().unwrap();
     std::env::set_var("DATA_DIR", tmp.path());
 
-    let db = Arc::new(cipherroute::db::Db::load().await.unwrap());
+    let db = Arc::new(zeroproxy::db::Db::load().await.unwrap());
     let mut handles = Vec::new();
     for i in 0..50 {
         let db = db.clone();
@@ -307,7 +307,7 @@ async fn e2e_high_concurrency_stress() {
                 let _ = db
                     .update(move |app| {
                         app.provider_connections
-                            .push(cipherroute::types::ProviderConnection {
+                            .push(zeroproxy::types::ProviderConnection {
                                 id: id.clone(),
                                 provider: "openai".into(),
                                 auth_type: "apikey".into(),
@@ -322,7 +322,7 @@ async fn e2e_high_concurrency_stress() {
         h.await.unwrap();
     }
 
-    let db2 = cipherroute::db::Db::load().await.unwrap();
+    let db2 = zeroproxy::db::Db::load().await.unwrap();
     let snap = db2.snapshot();
     let count = snap
         .provider_connections

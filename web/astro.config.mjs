@@ -2,6 +2,34 @@ import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import tailwind from '@astrojs/tailwind';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+
+/**
+ * Identity of THIS dashboard bundle, frozen at `pnpm build` time.
+ *
+ * The backend reports its own build identity, but that says nothing about the
+ * dashboard: in `--web-dir` mode assets are read from disk at request time, so a
+ * freshly compiled binary happily serves a `web/dist/` from days ago. The navbar
+ * badge has to name the UI layer separately, and the only value that cannot
+ * drift from the code the browser executes is one substituted at compile time.
+ *
+ * Any git failure yields `undefined` — a missing checkout must not break a build.
+ */
+function git(...args) {
+  try {
+    return execFileSync('git', args, {
+      cwd: path.resolve(import.meta.dirname, '..'),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim();
+  } catch {
+    return undefined;
+  }
+}
+
+const uiBuiltAt = new Date().toISOString();
+const uiGitSha = git('rev-parse', '--short', 'HEAD');
+const uiCommitTime = git('show', '-s', '--format=%cI', 'HEAD');
 
 export default defineConfig({
   integrations: [
@@ -27,6 +55,14 @@ export default defineConfig({
     inlineStylesheets: 'auto', // Better for caching
   },
   vite: {
+    // Compile-time constants for the navbar build-freshness badge. See the
+    // comment above `uiBuiltAt` for why these live in the bundle rather than
+    // being read from the API.
+    define: {
+      __UI_BUILT_AT__: JSON.stringify(uiBuiltAt),
+      __UI_GIT_SHA__: JSON.stringify(uiGitSha ?? 'unknown'),
+      __UI_COMMIT_TIME__: JSON.stringify(uiCommitTime ?? 'unknown'),
+    },
     server: {
       hmr: false,
       // Dev-only: forward backend API + asset routes to the Rust server on :4623

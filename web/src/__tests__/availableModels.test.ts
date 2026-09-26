@@ -82,6 +82,24 @@ describe("buildAvailableModels", () => {
     expect(r.enabledCoreRows[0].fullModel).toBe("xai/grok-4");
   });
 
+  it("custom model with providerFreeTier: true produces isFree row", () => {
+    const r = buildAvailableModels({
+      catalogModels: [] as any,
+      customModels: [{ id: "my-free", providerAlias: "openai", providerFreeTier: true } as any],
+      providerAlias: "openai",
+    });
+    expect(r.customRows[0].isFree).toBe(true);
+  });
+
+  it("custom model without providerFreeTier produces isFree false", () => {
+    const r = buildAvailableModels({
+      catalogModels: [] as any,
+      customModels: [{ id: "my-paid", providerAlias: "openai" } as any],
+      providerAlias: "openai",
+    });
+    expect(r.customRows[0].isFree).toBe(false);
+  });
+
   it("ModelSelectModal and ProviderDetail mirror: same buildAvailableModels result for same inputs", () => {
     const input = {
       catalogModels: catalog as any,

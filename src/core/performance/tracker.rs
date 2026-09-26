@@ -288,6 +288,7 @@ mod tests {
                 cache_read_input_tokens: None,
                 cache_creation_input_tokens: None,
                 extra: Default::default(),
+                ..Default::default()
             }),
             connection_id: Some("test".to_string()),
             api_key: Some("test".to_string()),
@@ -303,6 +304,7 @@ mod tests {
             bytes_saved: 0,
             image_prompts: 0,
             extra: Default::default(),
+            ..Default::default()
         }
     }
 

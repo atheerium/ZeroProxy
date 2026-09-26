@@ -252,7 +252,21 @@ pub enum ErrorClassification {
 /// the caller does not burn through combo members on client errors.
 pub fn classify_error(message: Option<&str>, status: Option<u16>) -> ErrorClassification {
     let lowered = message.map(|m| m.to_lowercase());
+    // Provider-originated rejections ("upstream returned 400 …") are not
+    // client errors on *our* surface: the next combo/auto member may accept
+    // a differently translated body (e.g. Gemini rejecting a stream shape
+    // OpenAI-compatible providers accept). Never classify them Permanent, and
+    // never let a bare status rule cool the account over one — a mistranslated
+    // body would otherwise take a healthy provider out of rotation. Text rules
+    // still win, so a genuine "upstream returned 429 … rate limit" backs off.
+    let upstream_rejection = lowered
+        .as_deref()
+        .map(|m| m.contains("upstream returned"))
+        .unwrap_or(false);
     for rule in ERROR_RULES {
+        if upstream_rejection && rule.text.is_none() {
+            continue;
+        }
         let matched = match (rule.text, rule.status) {
             (Some(needle), _) => lowered
                 .as_deref()
@@ -270,6 +284,9 @@ pub fn classify_error(message: Option<&str>, status: Option<u16>) -> ErrorClassi
         if let Some(d) = rule.cooldown {
             return ErrorClassification::Cooldown(d);
         }
+    }
+    if upstream_rejection {
+        return ErrorClassification::NoMatch;
     }
     // Permanent errors (400, 401, 403) that matched no rule at all
     // should not trigger fallback — the error is client-side, not
@@ -417,6 +434,21 @@ mod tests {
         assert_eq!(
             classify_error(Some("weird payload"), Some(400)),
             ErrorClassification::Permanent
+        );
+    }
+
+    #[test]
+    fn classify_upstream_400_is_fallback_eligible() {
+        // Provider rejected the translated body — next combo member must run.
+        let msg =
+            "upstream returned 400 for URL https://example/v1/stream: Unknown name \"stream\"";
+        assert_eq!(
+            classify_error(Some(msg), Some(400)),
+            ErrorClassification::NoMatch
+        );
+        assert_eq!(
+            classify_error(Some("upstream returned 401 for URL https://x"), Some(401)),
+            ErrorClassification::NoMatch
         );
     }
 

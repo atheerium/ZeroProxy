@@ -1201,7 +1201,7 @@ export default function ProviderDetailPageClient() {
             onTest={connections.length > 0 || isFreeNoAuth ? () => handleTestModel(model.id) : undefined}
             isTesting={testingModelIds.has(model.id)}
             isCustom
-            isFree={false}
+            isFree={model.isFree}
             caps={getCaps(`${providerId}/${model.id}`)}
             thinkingSuffix={resolveThinkingSuffix(model.id)}
             isFavorite={am.isFavorite(model.id)}

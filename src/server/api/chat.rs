@@ -31,7 +31,7 @@ use crate::core::combo::{
     ModelCapacity, TtftConfig,
 };
 use crate::core::executor::UpstreamResponse;
-use crate::core::model::{get_model_info, ModelRouteKind};
+use crate::core::model::{get_model_info, ModelRouteKind, ResolvedModel};
 use crate::core::proxy::resolve_proxy_target;
 use crate::core::rtk::headroom::{compress_with_headroom_diag, HeadroomConfig};
 use crate::core::rtk::{apply_request_preprocessing, compress_messages};
@@ -313,6 +313,23 @@ async fn chat_completions_impl(
     let snapshot = state.db.snapshot();
     let resolved = get_model_info(model_str, &snapshot);
 
+    // Smart-auto presets ("auto", "auto/best-coding", "auto/best-free"):
+    // claim the bare preset ids for the dynamic selector, then run the
+    // standard Combo execution arm. The RAW model_str is matched (not the
+    // `combo:`-stripped name), so explicit `combo:auto` still resolves to a
+    // user-persisted combo named "auto" (parse_preset("combo:auto") is None)
+    // while bare "auto" is claimed by the selector even when such a user
+    // combo exists.
+    let auto_preset = crate::core::auto::parse_preset(model_str);
+    let resolved = match &auto_preset {
+        Some(_) => ResolvedModel {
+            provider: None,
+            model: model_str.to_string(),
+            route_kind: ModelRouteKind::Combo,
+        },
+        None => resolved,
+    };
+
     // Stale-snapshot recovery: if the model name looks like a combo (no '/')
     // but wasn't found, reload from SQLite and try once more. This handles
     // combos created by the CLI process that bypasses the server's snapshot.
@@ -441,32 +458,73 @@ async fn chat_completions_impl(
     let response = match resolved.route_kind {
         ModelRouteKind::Combo => {
             let combo_name = resolved.model;
-            let Some(combo_models) = get_combo_models_from_data(&combo_name, &snapshot.combos)
-            else {
-                return json_error_response(StatusCode::BAD_REQUEST, "Unknown combo model");
-            };
 
             // Capability auto-switch is applied AFTER round-robin rotation
             // inside execute_combo_strategy_with_capacity (9router order:
-            // rotate first, then reorderByCapabilities).
+            // rotate first, then reorderByCapabilities). Computed before
+            // member load so the smart-auto selector can filter on it.
             let required_caps = detect_required_capabilities(&body);
-            let disabled_members = get_disabled_members_for_combo(&combo_name, &snapshot.combos);
+
+            // Smart-auto preset: the dynamic selector owns the member list
+            // (a user combo that happens to be named "auto" is ignored here;
+            // it stays reachable via explicit `combo:auto`, which never sets
+            // auto_preset). Empty selection is a 503, not a silent fallback.
+            let combo_models: Vec<String> = if let Some(preset) = auto_preset.as_ref() {
+                let models = crate::core::auto::select_candidates(
+                    *preset,
+                    &snapshot,
+                    &required_caps,
+                    &state.circuit_breaker,
+                );
+                if models.is_empty() {
+                    return json_error_response(
+                        StatusCode::SERVICE_UNAVAILABLE,
+                        "no eligible models for auto routing",
+                    );
+                }
+                models
+            } else {
+                let Some(combo_models) = get_combo_models_from_data(&combo_name, &snapshot.combos)
+                else {
+                    return json_error_response(StatusCode::BAD_REQUEST, "Unknown combo model");
+                };
+                combo_models
+            };
+
+            // Auto presets: the selector already excluded disabled and
+            // quarantined members, so there is nothing further to filter.
+            let disabled_members: Vec<String> = if auto_preset.is_some() {
+                Vec::new()
+            } else {
+                get_disabled_members_for_combo(&combo_name, &snapshot.combos)
+            };
 
             // 9router parity (chat.js): augment the combo member list with
             // capacity-adapter pool models when no member satisfies the
             // request's hard capabilities, and remember which models were
             // added so history stripping only ever applies to them.
-            let augmented_models = augment_models_with_capacity_adapter(
-                &combo_models,
-                &required_caps,
-                &snapshot.settings.capacity_adapter,
-            );
-            let adapter_added: HashSet<String> = augmented_models
-                .iter()
-                .filter(|m| !combo_models.contains(m))
-                .cloned()
-                .collect();
+            // Skipped for auto presets: the selector owns the full list.
+            let (augmented_models, adapter_added): (Vec<String>, HashSet<String>) =
+                if auto_preset.is_some() {
+                    (combo_models.clone(), HashSet::new())
+                } else {
+                    let augmented_models = augment_models_with_capacity_adapter(
+                        &combo_models,
+                        &required_caps,
+                        &snapshot.settings.capacity_adapter,
+                    );
+                    let adapter_added: HashSet<String> = augmented_models
+                        .iter()
+                        .filter(|m| !combo_models.contains(m))
+                        .cloned()
+                        .collect();
+                    (augmented_models, adapter_added)
+                };
             let mut strategy = strategy_for_combo(&snapshot, &combo_name);
+            // Smart-auto always follows scored order with try-next-on-failure.
+            if auto_preset.is_some() {
+                strategy = ComboStrategy::Fallback;
+            }
             // Solo-augmented path: an adapter model was prepended to a
             // single-member combo — use the adapter pool's strategy.
             if !adapter_added.is_empty() && combo_models.len() == 1 {
@@ -517,7 +575,15 @@ async fn chat_completions_impl(
             // same broken member and making the CLI agent hang.
             let attempted_members: std::sync::Arc<parking_lot::Mutex<Vec<String>>> =
                 std::sync::Arc::new(parking_lot::Mutex::new(Vec::new()));
-            let combo_name_for_quarantine = combo_name.clone();
+            // Smart-auto failures share the single AUTO quarantine namespace
+            // so the selector's quarantined-members filter observes them
+            // (per-preset names like "auto/best-coding" would fragment it).
+            let quarantine_name = if auto_preset.is_some() {
+                crate::core::auto::AUTO_QUARANTINE_KEY.to_string()
+            } else {
+                combo_name.clone()
+            };
+            let combo_name_for_quarantine = quarantine_name.clone();
             let ttft_for_combo = ttft_config;
             // Clone for the combo closure: the closure is `move`, but the outer
             // scope needs the original afterwards for the auto-quarantine pass.
@@ -677,6 +743,9 @@ async fn chat_completions_impl(
                 let attempted_members = attempted_members.clone();
                 let combo_headers = headers_map.clone();
                 let combo_tl = combo_thinking_level.clone();
+                // Preset / combo id for usage extra — clone before the move
+                // closure so each attempt stamps the same tag (auto vs combo).
+                let combo_name_for_usage = combo_name.clone();
                 execute_combo_strategy_full(
                     &augmented_models,
                     Some(&combo_name),
@@ -749,6 +818,9 @@ async fn chat_completions_impl(
                             RequestPlan::new(endpoint, &body, &combo_provider_str, &resolved_model);
                         combo_plan.passthrough =
                             is_native_passthrough(client_tool_for_combo, &combo_provider_str);
+                        // Tag usage rows with the outer combo/preset id so
+                        // /api/usage/auto can group by preset, not member.
+                        combo_plan.combo_name = Some(combo_name_for_usage.clone());
                         // Accept header not available inside combo closure — use body only
                         apply_stream_plan(
                             &mut combo_plan,
@@ -2446,6 +2518,7 @@ async fn forward_with_provider_fallback(
                             Some(connection.id.as_str()),
                             api_key,
                             endpoint,
+                            plan.combo_name.as_deref(),
                             compression.clone(),
                             request_start,
                             request_body_len,
@@ -2731,6 +2804,7 @@ async fn proxy_dashboard_sse_with_usage_tracking(
     connection_id: Option<&str>,
     api_key: Option<&str>,
     endpoint: Option<&str>,
+    combo_name: Option<&str>,
     compression: Option<CompressionStats>,
     request_start: std::time::Instant,
     request_body_len: usize,
@@ -2785,7 +2859,7 @@ async fn proxy_dashboard_sse_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            combo_name,
             None,
             None,
             None,
@@ -2967,8 +3041,12 @@ fn is_no_auth_provider(provider: &str) -> bool {
     matches!(
         provider,
         "opencode"
+            // 9router parity (openproxy-sewn / PR 51837411): opencode (Free,
+            // noAuth:true) keeps virtual fallback; opencode-go (paid apikey,
+            // NO noAuth flag) must NOT — else a valid stored key is bypassed
+            // and upstream returns AuthError "Missing API key." (note the
+            // period — upstream's text, not ours).
             | "opencode-zen"
-            | "opencode-go"
             | "edge-tts"
             | "google-tts"
             | "local-device"
@@ -3356,7 +3434,7 @@ async fn proxy_sse_to_json_response(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            plan.combo_name.as_deref(),
             None,
             None,
             None,
@@ -3468,7 +3546,7 @@ async fn proxy_response_with_usage_tracking(
             Some(latency_ms),
             usage_status,
             classify_status_error(status),
-            None,
+            plan.combo_name.as_deref(),
             None,
             None,
             None,
@@ -3624,6 +3702,7 @@ async fn proxy_response_with_pending_tracking(
     // Capture an owned copy of api_key for usage recording inside the stream
     // (the SSE stream requires 'static lifetimes; &str borrows can't escape).
     let api_key = api_key.map(|s| s.to_string());
+    let combo_name = plan.combo_name.clone();
     // Extract formats before stream closure to avoid lifetime issues
     let needs_stream_translation = plan.needs_translation();
     let stream_source_format = plan.source_format;
@@ -3740,7 +3819,7 @@ async fn proxy_response_with_pending_tracking(
                             );
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3801,7 +3880,7 @@ async fn proxy_response_with_pending_tracking(
                         Ok(Err(_)) => {
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3838,7 +3917,7 @@ async fn proxy_response_with_pending_tracking(
                 }
                 let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                 record_streaming_usage(&state, &provider, &model,
-                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                 state
                     .usage_live
                     .finish_request(&model, &provider, connection_id.as_deref(), false)
@@ -3880,7 +3959,7 @@ async fn proxy_response_with_pending_tracking(
                             );
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3937,7 +4016,7 @@ async fn proxy_response_with_pending_tracking(
                         Err(_) => {
                             let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                             record_streaming_usage(&state, &provider, &model,
-                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                                connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                             state
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
@@ -3974,7 +4053,7 @@ async fn proxy_response_with_pending_tracking(
                 }
                 let latency_ms = Some(request_start.elapsed().as_millis() as u64);
                 record_streaming_usage(&state, &provider, &model,
-                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class).await;
+                    connection_id.as_deref(), api_key.as_deref(), endpoint, &accumulated_usage, compression.clone(), latency_ms, ttft_ms, request_body_len, Some(response_bytes), usage_status, error_class, combo_name.as_deref()).await;
                 state
                     .usage_live
                     .finish_request(&model, &provider, connection_id.as_deref(), false)
@@ -4019,6 +4098,7 @@ async fn record_streaming_usage(
     response_body_len: Option<usize>,
     status: Option<&str>,
     error_class: Option<&str>,
+    combo_name: Option<&str>,
 ) {
     // F4: estimate when upstream omitted usage data (per-field fill for partial usage)
     let usage = match accumulated_usage {
@@ -4041,7 +4121,7 @@ async fn record_streaming_usage(
         ttft_ms,
         status,
         error_class,
-        None,
+        combo_name,
         None,
         None,
         None,
@@ -5120,7 +5200,7 @@ mod tests {
 
     use super::{
         build_dashboard_sse_response, build_proxied_response, earliest_retry_after,
-        select_connection,
+        is_no_auth_provider, select_connection,
     };
     use crate::types::{AppDb, ProviderConnection};
 
@@ -5435,7 +5515,6 @@ mod tests {
         let providers = [
             "opencode",
             "opencode-zen",
-            "opencode-go",
             "edge-tts",
             "google-tts",
             "ollama-local",
@@ -5452,6 +5531,14 @@ mod tests {
             );
             assert_eq!(selected.unwrap().id, "noauth");
         }
+    }
+
+    #[test]
+    fn opencode_go_is_not_a_no_auth_provider() {
+        // Paid apikey provider: a virtual fallback here would bypass a stored key
+        // and earn an upstream AuthError. Re-adding it is a behaviour change, not
+        // a test fix — see the parity note in `is_no_auth_provider`.
+        assert!(!is_no_auth_provider("opencode-go"));
     }
 
     #[test]

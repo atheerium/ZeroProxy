@@ -294,6 +294,7 @@ mod tests {
             created_at: None,
             updated_at: None,
             extra: BTreeMap::new(),
+            ..Default::default()
         }
     }
 

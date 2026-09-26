@@ -123,6 +123,7 @@ pub fn routes() -> Router<AppState> {
         .route("/api/usage/logs", routing::get(get_usage_logs))
         .route("/api/usage/request-logs", routing::get(get_usage_logs))
         .route("/api/usage/daily-quota", routing::get(get_daily_quota))
+        .route("/api/usage/auto", routing::get(get_auto_usage))
         .route("/api/compression/stats", routing::get(compression_stats))
 }
 
@@ -134,6 +135,389 @@ async fn get_usage(State(state): State<AppState>, headers: HeaderMap) -> Respons
     let tracker = UsageTracker::new(state.db.clone());
     let summary = tracker.summarize();
     Json(summary).into_response()
+}
+
+/// GET /api/usage/auto?period= — preset-level performance breakdown for the
+/// smart-auto virtual models (`auto`, `auto/best-coding`, `auto/best-free`).
+///
+/// Groups in-memory `usageHistory` by `extra.combo_name` (the preset id
+/// stamped by the combo path in chat.rs) then by member provider/model.
+/// Returns summary, per-preset buckets with member tables, current quarantine
+/// under `AUTO_QUARANTINE_KEY`, and a count of auto rows that pre-date tagging.
+async fn get_auto_usage(
+    State(state): State<AppState>,
+    Query(query): Query<StatsQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = require_usage_access(&headers, &state) {
+        return response;
+    }
+
+    let period = match query.period.as_deref().unwrap_or("today") {
+        value @ ("today" | "24h" | "7d" | "30d" | "60d" | "all") => {
+            UsagePeriod::parse(value).expect("validated usage period must parse")
+        }
+        _ => {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "Invalid period. Use one of: today, 24h, 7d, 30d, 60d, all"
+                })),
+            )
+                .into_response()
+        }
+    };
+
+    let tracker = UsageTracker::new(state.db.clone());
+    let usage_db = tracker.get_usage_db();
+
+    // Cutoff for period filter (mirrors build_usage_stats).
+    let now = Utc::now();
+    let cutoff = match period {
+        UsagePeriod::Today => {
+            let local_now = Local::now();
+            let midnight = local_now.date_naive().and_hms_opt(0, 0, 0).unwrap();
+            midnight
+                .and_local_timezone(Local)
+                .single()
+                .map(|dt| dt.with_timezone(&Utc))
+        }
+        UsagePeriod::Last24Hours => Some(now - ChronoDuration::hours(24)),
+        UsagePeriod::Last7Days => Some(now - ChronoDuration::days(7)),
+        UsagePeriod::Last30Days => Some(now - ChronoDuration::days(30)),
+        UsagePeriod::Last60Days => Some(now - ChronoDuration::days(60)),
+        UsagePeriod::All => None,
+    };
+
+    let in_period = |entry: &UsageEntry| -> bool {
+        let Some(cutoff) = cutoff else { return true };
+        match entry
+            .timestamp
+            .as_deref()
+            .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+        {
+            Some(ts) => ts >= cutoff,
+            // Undated rows: keep them so "all"/today still shows history.
+            None => true,
+        }
+    };
+
+    #[derive(Default, Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct MemberStats {
+        member: String,
+        provider: String,
+        model: String,
+        requests: u64,
+        errors: u64,
+        ttft_sum: u64,
+        ttft_count: u64,
+        cost_sum: f64,
+        #[serde(skip)]
+        success: u64,
+        #[serde(skip)]
+        fallback_hits: u64,
+    }
+
+    #[derive(Default, Clone, serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PresetStats {
+        preset: String,
+        requests: u64,
+        errors: u64,
+        ttft_sum: u64,
+        ttft_count: u64,
+        cost_sum: f64,
+        total_cost: f64,
+        fallback_hits: u64,
+        error_classes: BTreeMap<String, u64>,
+        members: Vec<MemberStats>,
+        #[serde(skip)]
+        success: u64,
+    }
+
+    let mut presets: BTreeMap<String, PresetStats> = BTreeMap::new();
+    let mut ungrouped = 0u64;
+
+    for entry in &usage_db.history {
+        if !in_period(entry) {
+            continue;
+        }
+        let preset_id = match entry.extra.get("combo_name").and_then(Value::as_str) {
+            Some(name) if crate::core::auto::parse_preset(name).is_some() => name.to_string(),
+            _ => continue,
+        };
+        let provider = entry.provider.clone().unwrap_or_default();
+        let model = entry.model.clone();
+        let is_success = entry.status.as_deref() == Some("success");
+        let cost = entry.cost.unwrap_or(0.0);
+        let (_, ttft) = extract_latency(entry);
+        let fallbacks = entry
+            .extra
+            .get("combo_fallbacks")
+            .and_then(Value::as_u64)
+            .unwrap_or(0);
+        let error_class = entry
+            .extra
+            .get("error_class")
+            .and_then(Value::as_str)
+            .map(str::to_string);
+
+        let bucket = presets.entry(preset_id.clone()).or_default();
+        bucket.preset = preset_id;
+        bucket.requests += 1;
+        if is_success {
+            bucket.success += 1;
+        } else {
+            bucket.errors += 1;
+            if let Some(ec) = error_class {
+                *bucket.error_classes.entry(ec).or_insert(0) += 1;
+            }
+        }
+        if ttft > 0 {
+            bucket.ttft_sum += ttft;
+            bucket.ttft_count += 1;
+        }
+        bucket.cost_sum += cost;
+        bucket.total_cost += cost;
+        if fallbacks > 0 {
+            bucket.fallback_hits += 1;
+        }
+
+        let member_key = format!("{provider}/{model}");
+        let member_idx = bucket
+            .members
+            .iter()
+            .position(|m| m.member == member_key)
+            .unwrap_or_else(|| {
+                bucket.members.push(MemberStats {
+                    member: member_key.clone(),
+                    provider: provider.clone(),
+                    model: model.clone(),
+                    ..Default::default()
+                });
+                bucket.members.len() - 1
+            });
+        let member = &mut bucket.members[member_idx];
+        member.requests += 1;
+        if is_success {
+            member.success += 1;
+        } else {
+            member.errors += 1;
+        }
+        if ttft > 0 {
+            member.ttft_sum += ttft;
+            member.ttft_count += 1;
+        }
+        member.cost_sum += cost;
+        if fallbacks > 0 {
+            member.fallback_hits += 1;
+        }
+    }
+
+    for bucket in presets.values_mut() {
+        bucket.members.sort_by(|a, b| b.requests.cmp(&a.requests));
+    }
+
+    // Ungrouped = rows whose model IS a preset id but that never received the
+    // combo_name tag (history from before this feature shipped).
+    for entry in &usage_db.history {
+        if !in_period(entry) {
+            continue;
+        }
+        if entry.extra.contains_key("combo_name") {
+            continue;
+        }
+        if crate::core::auto::parse_preset(&entry.model).is_none()
+            && !entry.model.starts_with("auto/")
+        {
+            continue;
+        }
+        ungrouped += 1;
+    }
+
+    let quarantine: Vec<Value> =
+        crate::core::combo::combo_quarantine_for(crate::core::auto::AUTO_QUARANTINE_KEY)
+            .into_iter()
+            .map(|(model, until)| {
+                let remaining = until.saturating_duration_since(std::time::Instant::now());
+                json!({
+                    "model": model,
+                    "remainingSeconds": remaining.as_secs(),
+                })
+            })
+            .collect();
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct Summary {
+        requests: u64,
+        success_rate: f64,
+        avg_ttft_ms: f64,
+        avg_cost: f64,
+        fallback_rate: f64,
+        total_cost: f64,
+    }
+
+    let total_requests: u64 = presets.values().map(|p| p.requests).sum();
+    let total_success: u64 = presets.values().map(|p| p.success).sum();
+    let total_ttft_sum: u64 = presets.values().map(|p| p.ttft_sum).sum();
+    let total_ttft_count: u64 = presets.values().map(|p| p.ttft_count).sum();
+    let total_cost: f64 = presets.values().map(|p| p.total_cost).sum();
+    let total_fallback: u64 = presets.values().map(|p| p.fallback_hits).sum();
+    let summary = Summary {
+        requests: total_requests,
+        success_rate: if total_requests > 0 {
+            total_success as f64 / total_requests as f64
+        } else {
+            0.0
+        },
+        avg_ttft_ms: if total_ttft_count > 0 {
+            total_ttft_sum as f64 / total_ttft_count as f64
+        } else {
+            0.0
+        },
+        avg_cost: if total_requests > 0 {
+            total_cost / total_requests as f64
+        } else {
+            0.0
+        },
+        fallback_rate: if total_requests > 0 {
+            total_fallback as f64 / total_requests as f64
+        } else {
+            0.0
+        },
+        total_cost,
+    };
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct PresetOut {
+        preset: String,
+        requests: u64,
+        success_rate: f64,
+        avg_ttft_ms: f64,
+        avg_cost: f64,
+        fallback_rate: f64,
+        top_error_class: Option<String>,
+        members: Vec<MemberOut>,
+    }
+
+    #[derive(serde::Serialize)]
+    #[serde(rename_all = "camelCase")]
+    struct MemberOut {
+        member: String,
+        provider: String,
+        model: String,
+        requests: u64,
+        success_rate: f64,
+        avg_ttft_ms: f64,
+        avg_cost: f64,
+    }
+
+    let presets_out: Vec<PresetOut> = presets
+        .into_values()
+        .map(|p| {
+            let top_error_class = p
+                .error_classes
+                .iter()
+                .max_by_key(|(_, count)| *count)
+                .map(|(name, _)| name.clone());
+            let success_rate = if p.requests > 0 {
+                p.success as f64 / p.requests as f64
+            } else {
+                0.0
+            };
+            let avg_ttft = if p.ttft_count > 0 {
+                p.ttft_sum as f64 / p.ttft_count as f64
+            } else {
+                0.0
+            };
+            let avg_cost = if p.requests > 0 {
+                p.cost_sum / p.requests as f64
+            } else {
+                0.0
+            };
+            let fallback_rate = if p.requests > 0 {
+                p.fallback_hits as f64 / p.requests as f64
+            } else {
+                0.0
+            };
+            let members = p
+                .members
+                .into_iter()
+                .map(|m| {
+                    let m_success_rate = if m.requests > 0 {
+                        m.success as f64 / m.requests as f64
+                    } else {
+                        0.0
+                    };
+                    let m_avg_ttft = if m.ttft_count > 0 {
+                        m.ttft_sum as f64 / m.ttft_count as f64
+                    } else {
+                        0.0
+                    };
+                    let m_avg_cost = if m.requests > 0 {
+                        m.cost_sum / m.requests as f64
+                    } else {
+                        0.0
+                    };
+                    MemberOut {
+                        member: m.member,
+                        provider: m.provider,
+                        model: m.model,
+                        requests: m.requests,
+                        success_rate: m_success_rate,
+                        avg_ttft_ms: m_avg_ttft,
+                        avg_cost: m_avg_cost,
+                    }
+                })
+                .collect();
+            PresetOut {
+                preset: p.preset,
+                requests: p.requests,
+                success_rate,
+                avg_ttft_ms: avg_ttft,
+                avg_cost,
+                fallback_rate,
+                top_error_class,
+                members,
+            }
+        })
+        .collect();
+
+    Json(json!({
+        "summary": summary,
+        "presets": presets_out,
+        "quarantine": { "members": quarantine },
+        "ungroupedPresetRequests": ungrouped,
+    }))
+    .into_response()
+}
+
+/// TTFT for an entry: prefer extra.latency.ttft, fall back to ttft_ms column.
+fn extract_latency(entry: &UsageEntry) -> (u64, u64) {
+    if let Some(latency) = entry.extra.get("latency") {
+        if let Some(obj) = latency.as_object() {
+            let total = obj
+                .get("total")
+                .and_then(Value::as_u64)
+                .or_else(|| obj.get("totalMs").and_then(Value::as_u64))
+                .unwrap_or(0);
+            let ttft = obj
+                .get("ttft")
+                .and_then(Value::as_u64)
+                .or_else(|| obj.get("ttftMs").and_then(Value::as_u64))
+                .unwrap_or(0);
+            if total > 0 || ttft > 0 {
+                return (total, ttft);
+            }
+        }
+    }
+    let total = entry.latency_ms.unwrap_or(0).max(0) as u64;
+    let ttft = entry.ttft_ms.unwrap_or(0).max(0) as u64;
+    (total, ttft)
 }
 
 #[derive(Debug, Deserialize)]

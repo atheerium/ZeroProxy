@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{header::SET_COOKIE, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -16,7 +16,7 @@ async fn app_state() -> AppState {
 
 #[tokio::test]
 async fn locale_post_sets_cookie_and_matches_js_payload() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let response = app
         .oneshot(
@@ -61,7 +61,7 @@ async fn locale_post_sets_cookie_and_matches_js_payload() {
 
 #[tokio::test]
 async fn locale_post_rejects_unsupported_locale_like_js() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let response = app
         .oneshot(

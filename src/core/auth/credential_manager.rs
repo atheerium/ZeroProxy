@@ -461,16 +461,12 @@ mod tests {
             consecutive_errors: Some(0),
             proxy_url: Some("http://proxy".into()),
             proxy_label: Some("proxy".into()),
-            use_connection_proxy: Some(false),
             ttft_ms: Some(100),
             client_app: Some("test-app".into()),
             pinned: Some(true),
             saved_usd: Some(12.50),
             error_class: Some("rate_limit".into()),
             latency_ms: Some(500),
-            runtime_transport: Some(crate::types::RuntimeTransport {
-                base_url: Some("https://custom.url".into()),
-            }),
             provider_specific_data: {
                 let mut m = std::collections::BTreeMap::new();
                 m.insert("key".into(), serde_json::json!("val"));
@@ -496,13 +492,6 @@ mod tests {
                 .get("key")
                 .and_then(|v| v.as_str()),
             Some("val")
-        );
-        assert_eq!(
-            built
-                .runtime_transport
-                .as_ref()
-                .and_then(|rt| rt.base_url.as_deref()),
-            Some("https://custom.url")
         );
     }
 
@@ -545,8 +534,6 @@ mod tests {
             consecutive_errors: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             ttft_ms: None,
             client_app: None,
             pinned: None,

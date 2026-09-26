@@ -4,8 +4,6 @@ use std::sync::{Arc, Mutex};
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -13,6 +11,8 @@ use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_json, body_string_contains, header, method, path, query_param};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -45,7 +45,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "nonpkce-mgmt-key".into(),
@@ -56,6 +56,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -119,7 +120,7 @@ fn cline_code(payload: serde_json::Value) -> String {
 
 #[tokio::test]
 async fn gemini_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/gemini-cli/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback",
@@ -149,7 +150,7 @@ async fn gemini_authorize_matches_cipherroute_response_shape() {
 
 #[tokio::test]
 async fn antigravity_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/antigravity/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback",
@@ -174,7 +175,7 @@ async fn antigravity_authorize_matches_cipherroute_response_shape() {
 
 #[tokio::test]
 async fn iflow_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/iflow/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback",
@@ -199,7 +200,7 @@ async fn iflow_authorize_matches_cipherroute_response_shape() {
 
 #[tokio::test]
 async fn cline_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/cline/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback",
@@ -284,7 +285,7 @@ async fn gemini_exchange_matches_cipherroute_and_saves_connection() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/gemini-cli/exchange",
@@ -386,7 +387,7 @@ async fn antigravity_exchange_matches_cipherroute_and_saves_connection() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/antigravity/exchange",
@@ -504,7 +505,7 @@ async fn iflow_exchange_matches_cipherroute_and_saves_connection() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/iflow/exchange",
@@ -539,7 +540,7 @@ async fn iflow_exchange_matches_cipherroute_and_saves_connection() {
 #[tokio::test]
 async fn cline_exchange_accepts_base64_code_without_pkce() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/cline/exchange",

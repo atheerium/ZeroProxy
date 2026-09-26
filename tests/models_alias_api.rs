@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ModelAliasTarget, ProviderModelRef};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ModelAliasTarget, ProviderModelRef};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -22,6 +22,7 @@ fn active_key(key: &str) -> ApiKey {
         daily_budget_usd: None,
         daily_request_limit: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -71,13 +72,14 @@ async fn models_alias_get_returns_wrapped_string_aliases() {
                     provider: "openai".into(),
                     model: "gpt-4o-realtime-preview".into(),
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 }),
             );
         })
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -102,7 +104,7 @@ async fn models_alias_get_returns_wrapped_string_aliases() {
 
 #[tokio::test]
 async fn models_alias_put_requires_model_and_alias() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::PUT,
@@ -120,7 +122,7 @@ async fn models_alias_put_requires_model_and_alias() {
 #[tokio::test]
 async fn models_alias_put_persists_path_alias() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(authorized_request(
             Method::PUT,
@@ -150,7 +152,7 @@ async fn models_alias_put_persists_path_alias() {
 
 #[tokio::test]
 async fn models_alias_delete_requires_alias_query() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::DELETE,
@@ -183,7 +185,7 @@ async fn models_alias_delete_removes_only_requested_alias() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(authorized_request(
             Method::DELETE,

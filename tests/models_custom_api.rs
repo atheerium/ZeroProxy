@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, CustomModel};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, CustomModel};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -22,6 +22,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -67,12 +68,13 @@ async fn models_custom_get_returns_wrapped_models() {
                 r#type: "llm".into(),
                 name: Some("Custom".into()),
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
         })
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -99,7 +101,7 @@ async fn models_custom_get_returns_wrapped_models() {
 
 #[tokio::test]
 async fn models_custom_post_requires_provider_alias_and_id() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::POST,
@@ -117,7 +119,7 @@ async fn models_custom_post_requires_provider_alias_and_id() {
 #[tokio::test]
 async fn models_custom_post_returns_added_true_then_false_for_duplicate() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let first = app
         .clone()
@@ -151,7 +153,7 @@ async fn models_custom_post_returns_added_true_then_false_for_duplicate() {
 
 #[tokio::test]
 async fn models_custom_delete_requires_provider_alias_and_id() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::DELETE,
@@ -178,6 +180,7 @@ async fn models_custom_delete_query_removes_matching_model_only() {
                 r#type: "llm".into(),
                 name: Some("Custom".into()),
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
             db.custom_models.push(CustomModel {
                 provider_alias: "oa".into(),
@@ -185,12 +188,13 @@ async fn models_custom_delete_query_removes_matching_model_only() {
                 r#type: "embedding".into(),
                 name: Some("Embedding".into()),
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
         })
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(authorized_request(
             Method::DELETE,

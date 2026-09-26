@@ -14,6 +14,7 @@ export interface CustomModelRow {
   fullModel: string;
   source: "custom" | "legacyAlias";
   type: string;
+  isFree?: boolean;
 }
 
 function modelType(model: CustomModelEntry | null | undefined): string {
@@ -62,6 +63,7 @@ export function getProviderCustomModelRows({
       fullModel,
       source: "custom",
       type: rowType,
+      isFree: model.providerFreeTier === true,
     });
   }
 

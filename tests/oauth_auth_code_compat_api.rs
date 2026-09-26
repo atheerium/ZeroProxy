@@ -4,8 +4,6 @@ use std::sync::{Arc, Mutex};
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use sha2::{Digest, Sha256};
@@ -13,6 +11,8 @@ use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_json, body_string_contains, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -45,7 +45,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: TEST_MGMT_KEY.into(),
@@ -56,6 +56,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -116,7 +117,7 @@ fn make_codex_id_token(email: &str, account_id: &str, plan_type: &str) -> String
 
 #[tokio::test]
 async fn claude_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/claude/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback",
@@ -153,7 +154,7 @@ async fn claude_authorize_matches_cipherroute_response_shape() {
 
 #[tokio::test]
 async fn codex_authorize_matches_cipherroute_response_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/codex/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A1455%2Fauth%2Fcallback",
@@ -183,7 +184,7 @@ async fn codex_authorize_matches_cipherroute_response_shape() {
 
 #[tokio::test]
 async fn exchange_compat_rejects_missing_required_fields() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(post_request("/api/oauth/claude/exchange", json!({})))
         .await
@@ -223,7 +224,7 @@ async fn claude_exchange_matches_cipherroute_and_saves_connection() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/claude/exchange",
@@ -244,7 +245,7 @@ async fn claude_exchange_matches_cipherroute_and_saves_connection() {
     assert!(json["connection"].get("email").is_none());
 
     let snapshot = state.db.snapshot();
-    let expected_count = openproxy::core::model::catalog::provider_catalog()
+    let expected_count = zeroproxy::core::model::catalog::provider_catalog()
         .provider_ids()
         .count()
         + 1;
@@ -298,7 +299,7 @@ async fn codex_exchange_matches_cipherroute_and_maps_id_token() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/codex/exchange",
@@ -319,7 +320,7 @@ async fn codex_exchange_matches_cipherroute_and_maps_id_token() {
     assert!(json["connection"].get("displayName").is_none());
 
     let snapshot = state.db.snapshot();
-    let expected_count = openproxy::core::model::catalog::provider_catalog()
+    let expected_count = zeroproxy::core::model::catalog::provider_catalog()
         .provider_ids()
         .count()
         + 1;

@@ -5,10 +5,6 @@ use std::time::{Duration, Instant};
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::api::providers;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ProviderConnection, ProviderNode};
 use once_cell::sync::Lazy;
 use serde_json::json;
 use tempfile::tempdir;
@@ -17,6 +13,10 @@ use wiremock::{
     matchers::{body_partial_json, header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
+use zeroproxy::db::Db;
+use zeroproxy::server::api::providers;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ProviderConnection, ProviderNode};
 
 const TEST_KEY: &str = "providers-api-test-key";
 static PORT_ENV_LOCK: Lazy<tokio::sync::Mutex<()>> = Lazy::new(|| tokio::sync::Mutex::new(()));
@@ -87,10 +87,9 @@ fn connection_with_id(provider: &str, id: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
         provider_specific_data,
         extra: BTreeMap::new(),
-        runtime_transport: None,
+        ..Default::default()
     }
 }
 
@@ -105,6 +104,7 @@ fn compatible_provider_node(id: &str, base_url: &str) -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -124,6 +124,7 @@ async fn test_state(connections: Vec<ProviderConnection>) -> AppState {
             monthly_budget_usd: None,
             daily_budget_usd: None,
             daily_request_limit: None,
+            ..Default::default()
         }];
     })
     .await
@@ -861,6 +862,7 @@ async fn test_client_info_provider_from_settings() {
             monthly_budget_usd: None,
             daily_budget_usd: None,
             daily_request_limit: None,
+            ..Default::default()
         }];
     })
     .await
@@ -1259,12 +1261,13 @@ async fn import_catalog_skips_pre_existing_models() {
     state
         .db
         .update(|db| {
-            db.custom_models.push(cipherroute::types::CustomModel {
+            db.custom_models.push(zeroproxy::types::CustomModel {
                 provider_alias: alias.clone(),
                 id: "gpt-4.1-mini".to_string(),
                 r#type: "llm".to_string(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
         })
         .await

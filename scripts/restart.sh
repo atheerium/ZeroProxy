@@ -10,15 +10,27 @@ PIDFILE="${HOME}/.zeroproxy/zeroproxy.pid"
 
 kill_robust() {
   echo "== stopping server on port ${PORT} =="
+  # Stop systemd units FIRST — killing the process alone is not enough:
+  # Restart=always brings the release binary back within RestartSec (5s).
+  # openproxy.service = legacy name; zeroproxy.service = current unit.
+  systemctl --user stop zeroproxy.service 2>/dev/null || true
+  systemctl --user stop openproxy.service 2>/dev/null || true
   # Try graceful stop first (clears pidfile + frees socket cleanly).
   "${BIN_DEBUG}" server stop 2>/dev/null || true
-  # Kill by cmdline pattern used by dev.sh detach (handles both "server start" and bare forms).
+  # Kill by cmdline: match binary path (bare service form has no port in argv).
+  pkill -f 'target/(debug|release)/zeroproxy' 2>/dev/null || true
+  pkill -f 'zeroproxy.*server start' 2>/dev/null || true
   pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
   # Kill leftover cipherroute references (legacy binary name in some environments).
   pkill -f "cipherroute.*${PORT}" 2>/dev/null || true
   # Last resort: fuser kills anything holding the TCP port.
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true
+  fi
+  # Confirm the unit is actually inactive (no crash-loop resurrection).
+  if systemctl --user is-active --quiet zeroproxy.service 2>/dev/null; then
+    echo "!! zeroproxy.service still active after stop — forcing stop" >&2
+    systemctl --user stop zeroproxy.service 2>/dev/null || true
   fi
   sleep 0.5
 }

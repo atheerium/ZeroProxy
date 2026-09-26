@@ -118,7 +118,8 @@ impl Default for TtftConfig {
 }
 
 impl TtftConfig {
-    /// Disabled unless `ttftTimeoutMs` is present and > 0.
+    /// Off when `timeout_ms` is 0. The default is 5000ms, so TTFT fallback is
+    /// active unless a combo explicitly sets `ttftTimeoutMs: 0`.
     pub fn is_enabled(&self) -> bool {
         self.timeout_ms > 0
     }
@@ -128,14 +129,14 @@ impl TtftConfig {
         self.adaptive.is_some()
     }
 
-    /// Read `ttftTimeoutMs`, `tthtQuarantineSecs`, and `ttftAdaptive` from a JSON
+    /// Read `ttftTimeoutMs`, `ttftQuarantineSecs`, and `ttftAdaptive` from a JSON
     /// map (either a combo's `extra` or a settings entry's flattened extra).
     pub fn from_value(extra: &std::collections::BTreeMap<String, Value>) -> Self {
         let mut s = Self::default();
-        if let Some(v) = extra.get("tthtTimeoutMs") {
+        if let Some(v) = extra.get("ttftTimeoutMs") {
             s.timeout_ms = v.as_u64().unwrap_or(0).min(u64::from(u32::MAX));
         }
-        if let Some(v) = extra.get("tthtQuarantineSecs") {
+        if let Some(v) = extra.get("ttftQuarantineSecs") {
             s.quarantine_secs = v.as_u64().unwrap_or(60);
         }
         if let Some(v) = extra.get("ttftAdaptive") {
@@ -1488,11 +1489,21 @@ mod tests {
     }
 
     #[test]
-    fn ttft_config_disabled_by_default() {
+    fn ttft_config_enabled_by_default() {
+        // The default became 5000ms in 5b6a2c88; an explicit 0 is the opt-out.
         let cfg = TtftConfig::default();
-        assert_eq!(cfg.timeout_ms, 0);
+        assert_eq!(cfg.timeout_ms, 5000);
         assert_eq!(cfg.quarantine_secs, 60);
-        assert!(!cfg.is_enabled(), "no timeout => feature off");
+        assert!(cfg.is_enabled());
+    }
+
+    #[test]
+    fn ttft_config_explicit_zero_disables() {
+        let mut extra = std::collections::BTreeMap::new();
+        extra.insert("ttftTimeoutMs".to_string(), Value::from(0));
+        let cfg = TtftConfig::from_value(&extra);
+        assert_eq!(cfg.timeout_ms, 0);
+        assert!(!cfg.is_enabled(), "0 is the explicit opt-out");
     }
 
     #[test]

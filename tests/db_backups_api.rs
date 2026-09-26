@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 const TEST_KEY: &str = "db-backups-api-test-key";
 
@@ -24,6 +24,7 @@ fn active_key() -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -50,7 +51,7 @@ async fn drain_body(body: Body) -> Value {
 #[tokio::test]
 async fn list_requires_auth() {
     let temp = tempdir().unwrap();
-    let app = cipherroute::build_app(app_state_with(temp.path()).await);
+    let app = zeroproxy::build_app(app_state_with(temp.path()).await);
     let res = app
         .oneshot(
             Request::builder()
@@ -66,7 +67,7 @@ async fn list_requires_auth() {
 #[tokio::test]
 async fn put_then_list_then_delete_round_trip() {
     let temp = tempdir().unwrap();
-    let app = cipherroute::build_app(app_state_with(temp.path()).await);
+    let app = zeroproxy::build_app(app_state_with(temp.path()).await);
 
     // PUT: create manual backup
     let put = app
@@ -144,7 +145,7 @@ async fn put_then_list_then_delete_round_trip() {
 #[tokio::test]
 async fn restore_takes_pre_restore_snapshot_and_swaps_db() {
     let temp = tempdir().unwrap();
-    let app = cipherroute::build_app(app_state_with(temp.path()).await);
+    let app = zeroproxy::build_app(app_state_with(temp.path()).await);
 
     // Create first snapshot with 1 api key.
     let snap = app
@@ -225,7 +226,7 @@ async fn restore_takes_pre_restore_snapshot_and_swaps_db() {
 #[tokio::test]
 async fn export_returns_attachment() {
     let temp = tempdir().unwrap();
-    let app = cipherroute::build_app(app_state_with(temp.path()).await);
+    let app = zeroproxy::build_app(app_state_with(temp.path()).await);
     let res = app
         .oneshot(
             Request::builder()
@@ -253,7 +254,7 @@ async fn export_returns_attachment() {
 #[tokio::test]
 async fn restore_rejects_path_traversal() {
     let temp = tempdir().unwrap();
-    let app = cipherroute::build_app(app_state_with(temp.path()).await);
+    let app = zeroproxy::build_app(app_state_with(temp.path()).await);
     let res = app
         .oneshot(
             Request::builder()

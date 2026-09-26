@@ -13,7 +13,7 @@ import { pathToFileURL } from "node:url";
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..");
 const OUT_DIR = join(REPO_ROOT, "src", "core", "model", "sources");
-const CACHE_DIR = process.env.CIPHERROUTE_SYNC_CACHE || "/tmp/cipherroute-sync-cache";
+const CACHE_DIR = process.env.ZEROPROXY_SYNC_CACHE || "/tmp/zeroproxy-sync-cache";
 
 const SOURCES = {
   "9router": {
@@ -29,6 +29,30 @@ const SOURCES = {
     loader: loadOmniroute,
   },
 };
+
+// OmniRoute splits provider metadata by family under
+// src/shared/constants/providers/. This is the ONLY place free-tier
+// information lives (`hasFree` = has a usable free tier, `noAuth` = keyless);
+// the provider registry has no notion of "free". Paths are relative to that
+// directory. A missing entry is skipped at runtime, so adding a new family
+// upstream degrades gracefully instead of breaking the refresh.
+const OMNIROUTE_META_FILES = [
+  "apikey/gateways",
+  "apikey/frontier-labs",
+  "apikey/inference-hosts",
+  "apikey/enterprise-cloud",
+  "apikey/regional",
+  "apikey/specialty-media",
+  "noauth",
+  "oauth",
+  "web-cookie",
+  "local",
+  "search",
+  "audio",
+  "upstream-proxy",
+  "cloud-agent",
+  "system",
+];
 
 function parseArgs(argv) {
   const args = { only: null, refs: {}, srcs: {} };
@@ -177,10 +201,20 @@ async function load9router(rootDir) {
 async function loadOmniroute(rootDir) {
   const ref = describeRef(rootDir);
   const moduleAbs = join(rootDir, "open-sse", "config", "providerRegistry.ts");
+  const metaFiles = OMNIROUTE_META_FILES.map((rel) => join(rootDir, "src", "shared", "constants", "providers", rel));
   const result = spawnSync(
     "npx",
-    ["--yes", "tsx@4", "-e", omnirouteLoaderSource(moduleAbs)],
-    { stdio: ["ignore", "pipe", "inherit"], encoding: "utf8", maxBuffer: 32 * 1024 * 1024 },
+    ["--yes", "tsx@4", "-e", omnirouteLoaderSource(moduleAbs, metaFiles)],
+    {
+      stdio: ["ignore", "pipe", "inherit"],
+      encoding: "utf8",
+      maxBuffer: 32 * 1024 * 1024,
+      // Must run with cwd inside the OmniRoute checkout: the registry and its
+      // transitive imports use the `@/*` tsconfig path alias, and tsx only
+      // resolves those against the nearest tsconfig.json. Running from our
+      // repo root fails with "Cannot find module '@/shared/constants/...'".
+      cwd: rootDir,
+    },
   );
   if (result.status !== 0) {
     throw new Error(`omniroute loader failed (exit ${result.status})`);
@@ -189,6 +223,7 @@ async function loadOmniroute(rootDir) {
   const providers = [];
   for (const id of Object.keys(data.registry).sort()) {
     const entry = data.registry[id];
+    const meta = data.meta[id] || {};
     const alias = entry.alias || id;
     const models = (entry.models || []).map((m) => ({
       id: m.id,
@@ -203,6 +238,14 @@ async function loadOmniroute(rootDir) {
       ...(entry.format ? { format: entry.format } : {}),
       ...(entry.authType ? { authType: entry.authType } : {}),
       ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+      // Free-tier markers come from the metadata module, NOT the registry:
+      // `hasFree` marks "this provider has a usable free tier", `noAuth`
+      // marks keyless providers. Both are needed to answer "is this free?".
+      ...(meta.hasFree ? { free: true } : {}),
+      ...(meta.noAuth ? { noAuth: true } : {}),
+      ...(Array.isArray(meta.serviceKinds) && meta.serviceKinds.length
+        ? { serviceKinds: meta.serviceKinds }
+        : {}),
       models,
     });
   }
@@ -215,26 +258,67 @@ async function loadOmniroute(rootDir) {
   };
 }
 
-function omnirouteLoaderSource(moduleAbs) {
-  // String we hand to tsx. Loads providerRegistry, serialises only the
-  // fields we care about so import shape doesn't leak.
+function omnirouteLoaderSource(moduleAbs, metaFiles) {
+  // String we hand to tsx. Loads providerRegistry (wire config: format,
+  // authType, baseUrl, models) plus the 15 provider-metadata family modules,
+  // then joins them by provider id so free-tier markers survive
+  // normalisation. Free markers live ONLY in the metadata modules — the
+  // registry has no notion of "free".
+  //
+  // We deliberately import the family modules directly instead of the
+  // `constants/providers.ts` barrel: that barrel does not re-export the
+  // provider records, and its own `FREE_PROVIDERS` export is an empty object.
+  // Each family module is optional — a new/renamed family upstream degrades to
+  // "no free information for that family" instead of failing the refresh.
   return `
 import * as mod from ${JSON.stringify(moduleAbs)};
 const reg = mod.REGISTRY || mod.PROVIDERS || {};
 const aliasMap = (typeof mod.generateAliasMap === "function") ? mod.generateAliasMap() : {};
-const out = { registry: {}, aliasMap };
-for (const id of Object.keys(reg)) {
-  const e = reg[id];
-  if (!e || typeof e !== "object") continue;
-  out.registry[id] = {
-    alias: e.alias,
-    format: e.format,
-    authType: e.authType,
-    baseUrl: e.baseUrl,
-    models: Array.isArray(e.models) ? e.models : [],
-  };
-}
-process.stdout.write(JSON.stringify(out));
+
+// Async IIFE, not top-level await: tsx emits CJS for -e, which rejects it.
+(async () => {
+  const metaFiles = ${JSON.stringify(metaFiles)};
+  const meta = {};
+  for (const file of metaFiles) {
+    let family = {};
+    try {
+      family = await import(file);
+    } catch (e) {
+      process.stderr.write("[omniroute] metadata module skipped (" + file + "): " + (e && e.message) + "\\n");
+      continue;
+    }
+    // Don't hardcode export names: iterate every export and keep the ones that
+    // are records carrying a string \`id\`. This survives upstream renames of
+    // APIKEY_PROVIDERS_GATEWAYS & friends. Sets and helper functions are
+    // skipped naturally — they have no own enumerable record values.
+    for (const exported of Object.values(family)) {
+      if (!exported || typeof exported !== "object" || Array.isArray(exported)) continue;
+      for (const entry of Object.values(exported)) {
+        if (!entry || typeof entry !== "object" || typeof entry.id !== "string") continue;
+        const prev = meta[entry.id] || {};
+        meta[entry.id] = {
+          hasFree: prev.hasFree || entry.hasFree === true,
+          noAuth: prev.noAuth || entry.noAuth === true,
+          serviceKinds: entry.serviceKinds || prev.serviceKinds,
+        };
+      }
+    }
+  }
+
+  const out = { registry: {}, aliasMap, meta };
+  for (const id of Object.keys(reg)) {
+    const e = reg[id];
+    if (!e || typeof e !== "object") continue;
+    out.registry[id] = {
+      alias: e.alias,
+      format: e.format,
+      authType: e.authType,
+      baseUrl: e.baseUrl,
+      models: Array.isArray(e.models) ? e.models : [],
+    };
+  }
+  process.stdout.write(JSON.stringify(out));
+})();
 `;
 }
 

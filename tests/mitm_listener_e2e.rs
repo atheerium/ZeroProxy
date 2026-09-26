@@ -61,7 +61,7 @@ async fn mitm_tls_e2e_round_trip() {
     let capture_dir = tmp.path().join("captures");
 
     // ── 2. Generate CA ──
-    let ca = cipherroute::core::mitm::cert::generate_ca().expect("CA generation");
+    let ca = zeroproxy::core::mitm::cert::generate_ca().expect("CA generation");
     let ca_cert = Arc::new(ca.cert);
     let ca_key = Arc::new(ca.key);
     let ca_cert_pem = ca.cert_pem.as_bytes().to_vec();
@@ -71,8 +71,8 @@ async fn mitm_tls_e2e_round_trip() {
     let (_router, state) = common::boot_test_app().await;
 
     // ── 4. Start MITM proxy ──
-    let mut handle = cipherroute::core::mitm::server::start_mitm_proxy(
-        cipherroute::core::mitm::server::MitmProxyConfig {
+    let mut handle = zeroproxy::core::mitm::server::start_mitm_proxy(
+        zeroproxy::core::mitm::server::MitmProxyConfig {
             ca_cert: ca_cert.clone(),
             ca_key: ca_key.clone(),
             ca_cert_pem: ca_cert_pem.clone(),

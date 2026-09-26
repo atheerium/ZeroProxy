@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::executor::ClientPool;
-use cipherroute::types::{ProviderConnection, ProviderNode};
 use serde_json::json;
+use zeroproxy::core::executor::ClientPool;
+use zeroproxy::types::{ProviderConnection, ProviderNode};
 
-use cipherroute::core::executor::{
+use zeroproxy::core::executor::{
     convert_openai_sse_to_standard, CodexExecutionRequest, CodexExecutor, CodexExecutorError,
 };
 
@@ -43,10 +43,9 @@ fn connection(provider: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -68,6 +67,7 @@ fn provider_node() -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -200,10 +200,9 @@ async fn codex_executor_execute_missing_credentials_fails() {
             consecutive_errors: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             provider_specific_data: BTreeMap::new(),
             extra: BTreeMap::new(),
+            ..Default::default()
         },
         proxy: None,
     };

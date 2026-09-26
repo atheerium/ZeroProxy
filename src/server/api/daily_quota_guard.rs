@@ -271,6 +271,7 @@ mod tests {
                 cache_read_input_tokens: None,
                 cache_creation_input_tokens: None,
                 extra: Default::default(),
+                ..Default::default()
             }),
             cost: Some(cost),
             status: None,
@@ -280,6 +281,7 @@ mod tests {
             bytes_saved: 0,
             image_prompts: 0,
             extra: Default::default(),
+            ..Default::default()
         }
     }
 

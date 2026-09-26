@@ -1,16 +1,12 @@
-use cipherroute::core::tls::ensure_rustls_provider;
 use std::path::PathBuf;
 use std::sync::Arc;
+use zeroproxy::core::tls::ensure_rustls_provider;
 
 use arc_swap::ArcSwap;
 use aws_sigv4::{http_request::SigningSettings, SignatureVersion};
 use axum::{body::Body, routing::get, Router};
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use cipherroute::cli::Cli;
-use cipherroute::core::rtk::CompressionLevel;
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use clap::Parser;
 use http_body_util::Full;
 use hyper::Request;
@@ -25,6 +21,10 @@ use tower_http::cors::CorsLayer;
 use tracing_subscriber::EnvFilter;
 use url::Url;
 use uuid::Uuid;
+use zeroproxy::cli::Cli;
+use zeroproxy::core::rtk::CompressionLevel;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Claims {
@@ -169,7 +169,7 @@ async fn db_loader_creates_initial_files() {
     let db = Db::load_from(temp.path()).await.expect("db loads");
     let snapshot = db.snapshot();
 
-    assert!(db.data_dir.join("cipherroute.sqlite").exists());
+    assert!(db.data_dir.join("zeroproxy.sqlite").exists());
     assert!(snapshot.provider_connections.is_empty());
     assert!(snapshot.settings.rtk_enabled);
 

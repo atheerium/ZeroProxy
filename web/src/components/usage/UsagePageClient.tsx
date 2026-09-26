@@ -5,6 +5,7 @@ import RequestHistoryTable from "@/components/usage/RequestHistoryTable";
 import ProviderBreakdownTable from "@/components/usage/ProviderBreakdownTable";
 import UsageAnalyticsGrid from "@/components/usage/UsageAnalyticsGrid";
 import CompressionStats from "@/components/usage/CompressionStats";
+import AutoBreakdown from "@/components/usage/AutoBreakdown";
 
 const PERIODS = [
   { value: "today", label: "Today" },
@@ -45,7 +46,9 @@ function UsageContent() {
   const tabFromUrl = searchParams.get("tab");
   const activeTab =
     tabFromUrl &&
-    ["overview", "logs", "details", "providers", "analytics", "compression"].includes(tabFromUrl)
+    ["overview", "logs", "details", "providers", "analytics", "compression", "auto"].includes(
+      tabFromUrl
+    )
       ? tabFromUrl
       : "overview";
 
@@ -67,6 +70,7 @@ function UsageContent() {
             { value: "overview", label: "Overview" },
             { value: "providers", label: "Providers" },
             { value: "analytics", label: "Analytics" },
+            { value: "auto", label: "Auto" },
             { value: "compression", label: "Compression" },
             { value: "details", label: "Details" },
           ]}
@@ -74,7 +78,7 @@ function UsageContent() {
           onChange={handleTabChange}
           className="w-full sm:w-auto"
         />
-        {activeTab === "overview" && (
+        {(activeTab === "overview" || activeTab === "auto") && (
           <SegmentedControl
             options={PERIODS}
             value={period}
@@ -97,6 +101,7 @@ function UsageContent() {
           {activeTab === "logs" && <RequestLogger />}
           {activeTab === "providers" && <ProviderBreakdownTable period={period} />}
           {activeTab === "analytics" && <UsageAnalyticsGrid period={period} />}
+          {activeTab === "auto" && <AutoBreakdown period={period} />}
           {activeTab === "compression" && <CompressionStats period={period} />}
           {activeTab === "details" && <RequestHistoryTable showFilters pageSize={20} />}
         </>

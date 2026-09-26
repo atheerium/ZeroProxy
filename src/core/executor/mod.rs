@@ -66,7 +66,7 @@ pub use deepseek_web::{
     extract_user_token, DeepSeekWebExecutionRequest, DeepSeekWebExecutor, DeepSeekWebExecutorError,
     DeepSeekWebExecutorResponse,
 };
-pub(crate) use default::provider_config_for;
+pub(crate) use default::{cline_access_token, provider_config_for};
 pub use default::{
     provider_config_base_url, DefaultExecutor, ExecutionRequest, ExecutionResponse, ExecutorError,
     ProviderConfig, TransportKind, UpstreamResponse,

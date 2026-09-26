@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -21,6 +21,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -37,7 +38,7 @@ async fn seeded_state() -> AppState {
 
 #[tokio::test]
 async fn public_v1_endpoints_expose_cors_preflight() {
-    let app = cipherroute::build_app(seeded_state().await);
+    let app = zeroproxy::build_app(seeded_state().await);
 
     for (path, methods, status) in [
         // JS OPTIONS handlers use `new Response(null, {headers})` — the
@@ -86,7 +87,7 @@ async fn public_v1_endpoints_expose_cors_preflight() {
 
 #[tokio::test]
 async fn missing_model_errors_keep_cors_headers_on_public_v1_routes() {
-    let app = cipherroute::build_app(seeded_state().await);
+    let app = zeroproxy::build_app(seeded_state().await);
 
     for path in [
         "/v1/chat/completions",

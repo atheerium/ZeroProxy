@@ -144,6 +144,22 @@ async fn build_models_list(
         ));
     }
 
+    // Smart-auto presets: dynamic selector entries surfaced as routable
+    // models. Listed unconditionally (the ids are the contract) alongside
+    // combos so clients can discover them with no combos configured.
+    if kind_filter.contains(&LLM_KIND) {
+        for preset_id in ["auto", "auto/best-coding", "auto/best-free"] {
+            models.push(model_card(
+                preset_id.to_string(),
+                "auto".to_string(),
+                created,
+                None,
+                None,
+                None,
+            ));
+        }
+    }
+
     if active_connections.is_empty() {
         for provider_entry in catalog.iter_provider_models() {
             let provider_id = alias_to_provider_id
@@ -741,6 +757,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -771,6 +788,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -801,6 +819,7 @@ mod tests {
                 r#type: String::new(),
                 name: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             }],
             ..Default::default()
         };
@@ -822,6 +841,7 @@ mod tests {
                     r#type: "llm".into(),
                     name: None,
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 },
                 CustomModel {
                     provider_alias: "trk".into(),
@@ -829,6 +849,7 @@ mod tests {
                     r#type: "image".into(),
                     name: None,
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 },
             ],
             ..Default::default()

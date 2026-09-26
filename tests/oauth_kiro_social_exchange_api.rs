@@ -4,14 +4,14 @@ use std::sync::{Arc, Mutex};
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_json, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -44,7 +44,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "kiro-mgmt-key".into(),
@@ -55,6 +55,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -118,7 +119,7 @@ async fn kiro_social_exchange_matches_cipherroute_success_flow() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(request(Body::from(
             json!({
@@ -167,7 +168,7 @@ async fn kiro_social_exchange_matches_cipherroute_success_flow() {
 
 #[tokio::test]
 async fn kiro_social_exchange_validates_inputs_like_cipherroute() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let missing = app
         .clone()
@@ -206,7 +207,7 @@ async fn kiro_social_exchange_wraps_exchange_failure_like_cipherroute() {
         .mount(&server)
         .await;
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(Body::from(
             json!({

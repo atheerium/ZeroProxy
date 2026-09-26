@@ -1,12 +1,12 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use openproxy::db::Db;
-use openproxy::server::state::AppState;
-use openproxy::types::*;
 use tempfile::tempdir;
 #[allow(unused_imports)]
 use wiremock::MockServer;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::*;
 
 #[allow(dead_code)]
 pub async fn boot_test_app() -> (axum::Router, AppState) {
@@ -19,7 +19,7 @@ pub async fn boot_test_app() -> (axum::Router, AppState) {
     .await
     .expect("seed db");
     let state = AppState::new(db);
-    (openproxy::build_app(state.clone()), state)
+    (zeroproxy::build_app(state.clone()), state)
 }
 
 #[allow(dead_code)]
@@ -39,6 +39,7 @@ pub fn test_api_key() -> ApiKey {
         error_class: None,
         latency_ms: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -76,8 +77,6 @@ pub fn test_connection(provider: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         ttft_ms: None,
         client_app: None,

@@ -27,8 +27,8 @@ use tower::util::ServiceExt;
 use wiremock::matchers::{method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
 
-use cipherroute::server::auth::oidc::OidcClient;
-use cipherroute::server::state::AppState;
+use zeroproxy::server::auth::oidc::OidcClient;
+use zeroproxy::server::state::AppState;
 
 const KID: &str = "test-kid-1";
 const ISSUER: &str = "https://issuer.example.com";
@@ -56,13 +56,9 @@ fn client_for(mock: &MockServer) -> OidcClient {
 /// the router and the state.
 async fn boot_with_oidc(oidc: Option<Arc<OidcClient>>) -> (axum::Router, AppState) {
     let temp = tempfile::tempdir().expect("tempdir");
-    let db = Arc::new(
-        cipherroute::db::Db::load_from(temp.path())
-            .await
-            .expect("db"),
-    );
+    let db = Arc::new(zeroproxy::db::Db::load_from(temp.path()).await.expect("db"));
     let state = AppState::new(db).with_oidc_client(oidc);
-    (cipherroute::build_app(state.clone()), state)
+    (zeroproxy::build_app(state.clone()), state)
 }
 
 /// Generate a keypair, sign a JWT with the given claims, and return
@@ -238,7 +234,7 @@ async fn oidc_verify_id_token_rejects_expired_token() {
     assert!(
         matches!(
             err,
-            cipherroute::server::auth::oidc::OidcError::InvalidIdToken(_)
+            zeroproxy::server::auth::oidc::OidcError::InvalidIdToken(_)
         ),
         "wrong error variant: {err}"
     );
@@ -265,7 +261,7 @@ async fn oidc_verify_id_token_rejects_wrong_audience() {
     assert!(
         matches!(
             err,
-            cipherroute::server::auth::oidc::OidcError::InvalidIdToken(_)
+            zeroproxy::server::auth::oidc::OidcError::InvalidIdToken(_)
         ),
         "wrong error variant: {err}"
     );

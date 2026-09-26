@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 const TEST_KEY: &str = "payload-rules-api-test-key";
 
@@ -24,6 +24,7 @@ fn active_key() -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -45,7 +46,7 @@ async fn app_state() -> AppState {
 
 #[tokio::test]
 async fn get_payload_rules_requires_auth() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let unauthenticated = app
         .oneshot(
@@ -61,7 +62,7 @@ async fn get_payload_rules_requires_auth() {
 
 #[tokio::test]
 async fn put_payload_rules_persists_and_normalizes() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let put = app
         .clone()
@@ -138,7 +139,7 @@ async fn put_payload_rules_persists_and_normalizes() {
 
 #[tokio::test]
 async fn system_prompt_round_trip() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let put = app
         .clone()

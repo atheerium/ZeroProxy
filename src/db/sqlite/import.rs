@@ -188,13 +188,17 @@ fn import_all(conn: &Connection, payload: &Value) -> rusqlite::Result<usize> {
     if let Some(arr) = payload.get("customModels").and_then(Value::as_array) {
         for (idx, item) in arr.iter().enumerate() {
             let fallback_key = format!("idx{idx}");
-            let key = item
-                .get("id")
-                .and_then(Value::as_str)
-                .unwrap_or(&fallback_key);
+            let key = match (
+                item.get("providerAlias").and_then(Value::as_str),
+                item.get("id").and_then(Value::as_str),
+            ) {
+                (Some(alias), Some(id)) => format!("{alias}/{id}"),
+                _ => fallback_key,
+            };
             let val_str = serde_json::to_string(item).unwrap_or_else(|_| "null".into());
             conn.execute(
-                "INSERT INTO kv(scope, key, value) VALUES('customModels', ?1, ?2)",
+                "INSERT INTO kv(scope, key, value) VALUES('customModels', ?1, ?2)
+                 ON CONFLICT(scope, key) DO UPDATE SET value = excluded.value",
                 rusqlite::params![key, val_str],
             )?;
         }

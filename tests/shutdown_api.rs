@@ -1,7 +1,7 @@
-use cipherroute::core::tls::ensure_rustls_provider;
 use std::net::TcpListener;
 use std::process::Stdio;
 use std::time::{Duration, Instant};
+use zeroproxy::core::tls::ensure_rustls_provider;
 
 use reqwest::StatusCode;
 use serde_json::json;

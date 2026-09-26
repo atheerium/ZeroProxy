@@ -27,13 +27,13 @@ mod platform {
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use once_cell::sync::Lazy;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -49,6 +49,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -149,7 +150,7 @@ async fn claude_settings_get_reports_not_installed_without_binary_or_config() {
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -194,7 +195,7 @@ async fn claude_settings_post_get_and_delete_match_cipherroute_behavior() {
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -281,7 +282,7 @@ async fn hermes_settings_get_reports_not_installed_without_binary_or_config() {
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -315,7 +316,7 @@ async fn hermes_settings_post_get_and_delete_preserve_other_files() {
     std::fs::create_dir_all(config_path.parent().unwrap()).unwrap();
     std::fs::write(&config_path, "foo: bar\n").unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -402,7 +403,7 @@ async fn codex_settings_get_reports_not_installed_without_binary_or_config() {
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -449,7 +450,7 @@ async fn codex_settings_post_get_and_delete_match_cipherroute_file_behavior() {
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -523,7 +524,7 @@ async fn codex_settings_post_get_and_delete_match_cipherroute_file_behavior() {
         json,
         json!({
             "success": true,
-            "message": "CipherRoute settings removed successfully"
+            "message": "ZeroProxy settings removed successfully"
         })
     );
 
@@ -547,7 +548,7 @@ async fn copilot_settings_get_reports_installed_without_existing_config() {
     let home = tempdir().unwrap();
     let _home = EnvVarGuard::set_path("HOME", home.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -589,7 +590,7 @@ async fn copilot_settings_post_get_and_delete_match_cipherroute_file_behavior() 
                 "models": [{ "id": "other/model" }]
             },
             {
-                "name": "CipherRoute",
+                "name": "ZeroProxy",
                 "vendor": "azure",
                 "models": [{ "id": "old/model", "url": "https://old.example.com/chat/completions#models.ai.azure.com" }]
             }
@@ -598,7 +599,7 @@ async fn copilot_settings_post_get_and_delete_match_cipherroute_file_behavior() 
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -626,7 +627,7 @@ async fn copilot_settings_post_get_and_delete_match_cipherroute_file_behavior() 
     let saved_array = saved.as_array().unwrap();
     assert_eq!(saved_array.len(), 2);
     assert_eq!(saved_array[0]["name"], "Other");
-    assert_eq!(saved_array[1]["name"], "CipherRoute");
+    assert_eq!(saved_array[1]["name"], "ZeroProxy");
     assert_eq!(saved_array[1]["vendor"], "azure");
     assert_eq!(saved_array[1]["apiKey"], "sk-cipherroute");
     assert_eq!(saved_array[1]["models"][0]["id"], "oa/gpt-4.1");
@@ -676,7 +677,7 @@ async fn copilot_settings_post_get_and_delete_match_cipherroute_file_behavior() 
         json,
         json!({
             "success": true,
-            "message": "CipherRoute removed from Copilot config"
+            "message": "ZeroProxy removed from Copilot config"
         })
     );
 
@@ -702,7 +703,7 @@ async fn droid_settings_get_reports_not_installed_without_binary_or_config() {
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -745,7 +746,7 @@ async fn droid_settings_post_get_and_delete_match_cipherroute_file_behavior() {
                     "index": 99
                 },
                 {
-                    "id": "custom:CipherRoute-old",
+                    "id": "custom:ZeroProxy-old",
                     "model": "old/model"
                 }
             ]
@@ -754,7 +755,7 @@ async fn droid_settings_post_get_and_delete_match_cipherroute_file_behavior() {
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -782,14 +783,14 @@ async fn droid_settings_post_get_and_delete_match_cipherroute_file_behavior() {
     assert_eq!(saved["theme"], "keep");
     let custom_models = saved["customModels"].as_array().unwrap();
     assert_eq!(custom_models.len(), 3);
-    assert_eq!(custom_models[0]["id"], "custom:CipherRoute-0");
+    assert_eq!(custom_models[0]["id"], "custom:ZeroProxy-0");
     assert_eq!(custom_models[0]["model"], "oa/gpt-4.1");
     assert_eq!(custom_models[0]["index"], 0);
     assert_eq!(custom_models[0]["baseUrl"], "https://proxy.example.com/v1");
     assert_eq!(custom_models[0]["apiKey"], "sk-cipherroute");
     assert_eq!(custom_models[1]["id"], "custom:other-0");
     assert_eq!(custom_models[1]["index"], 1);
-    assert_eq!(custom_models[2]["id"], "custom:CipherRoute-1");
+    assert_eq!(custom_models[2]["id"], "custom:ZeroProxy-1");
     assert_eq!(custom_models[2]["model"], "oa/gpt-4.1-mini");
     assert_eq!(custom_models[2]["index"], 2);
 
@@ -827,7 +828,7 @@ async fn droid_settings_post_get_and_delete_match_cipherroute_file_behavior() {
         json,
         json!({
             "success": true,
-            "message": "CipherRoute settings removed successfully"
+            "message": "ZeroProxy settings removed successfully"
         })
     );
 
@@ -856,7 +857,7 @@ async fn opencode_settings_get_reports_not_installed_without_binary_or_config() 
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -919,7 +920,7 @@ async fn opencode_settings_post_patch_and_delete_match_cipherroute_file_behavior
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -1078,7 +1079,7 @@ async fn opencode_settings_post_patch_and_delete_match_cipherroute_file_behavior
         json,
         json!({
             "success": true,
-            "message": "CipherRoute settings removed from OpenCode"
+            "message": "ZeroProxy settings removed from OpenCode"
         })
     );
 
@@ -1098,7 +1099,7 @@ async fn openclaw_settings_get_reports_not_installed_without_binary_or_config() 
     let _home = EnvVarGuard::set_path("HOME", home.path());
     let _path = EnvVarGuard::set_path("PATH", path.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -1184,7 +1185,7 @@ async fn openclaw_settings_post_get_and_delete_match_cipherroute_file_behavior()
     )
     .unwrap();
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post = app
         .clone()
         .oneshot(authorized_request(
@@ -1302,7 +1303,7 @@ async fn openclaw_settings_post_get_and_delete_match_cipherroute_file_behavior()
         json,
         json!({
             "success": true,
-            "message": "CipherRoute settings removed successfully"
+            "message": "ZeroProxy settings removed successfully"
         })
     );
 

@@ -3,11 +3,11 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -15,7 +15,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "cursor-import-mgmt-key".into(),
@@ -26,6 +26,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -66,7 +67,7 @@ fn make_cursor_jwt(email: &str, user_id: &str) -> String {
 
 #[tokio::test]
 async fn cursor_import_get_matches_cipherroute_instructions() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(
             Method::GET,
@@ -124,7 +125,7 @@ async fn cursor_import_get_matches_cipherroute_instructions() {
 async fn cursor_import_post_matches_cipherroute_success_flow() {
     let access_token = make_cursor_jwt("me@example.com", "user-123");
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(request(
             Method::POST,
@@ -184,7 +185,7 @@ async fn cursor_import_post_matches_cipherroute_success_flow() {
 #[tokio::test]
 async fn cursor_import_post_validates_inputs_like_cipherroute() {
     let valid_token = make_cursor_jwt("me@example.com", "user-123");
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let missing_access_token = app
         .clone()

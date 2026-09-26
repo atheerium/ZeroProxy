@@ -7,10 +7,6 @@ use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use jsonwebtoken::{encode, EncodingKey, Header as JwtHeader};
 use once_cell::sync::Lazy;
-use openproxy::db::Db;
-use openproxy::server::auth::jwt_secret;
-use openproxy::server::state::AppState;
-use openproxy::types::{ApiKey, ProviderConnection, ProxyPool};
 use serde::Serialize;
 use serde_json::{json, Value};
 use tempfile::tempdir;
@@ -19,6 +15,10 @@ use wiremock::{
     matchers::{body_json, header, method, path},
     Mock, MockServer, ResponseTemplate,
 };
+use zeroproxy::db::Db;
+use zeroproxy::server::auth::jwt_secret;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ProviderConnection, ProxyPool};
 
 const TEST_KEY: &str = "proxy-pools-api-test-key";
 const VERCEL_RELAY_FUNCTION_CODE: &str = r#"
@@ -65,17 +65,17 @@ struct VercelApiEnvGuard {
 impl Drop for VercelApiEnvGuard {
     fn drop(&mut self) {
         if let Some(previous) = self.previous.as_deref() {
-            std::env::set_var("OPENPROXY_VERCEL_API_BASE_URL", previous);
+            std::env::set_var("CIPHERROUTE_VERCEL_API_BASE_URL", previous);
         } else {
-            std::env::remove_var("OPENPROXY_VERCEL_API_BASE_URL");
+            std::env::remove_var("CIPHERROUTE_VERCEL_API_BASE_URL");
         }
     }
 }
 
 async fn set_vercel_api_base_url(base_url: &str) -> VercelApiEnvGuard {
     let lock = VERCEL_API_ENV_LOCK.lock().await;
-    let previous = std::env::var("OPENPROXY_VERCEL_API_BASE_URL").ok();
-    std::env::set_var("OPENPROXY_VERCEL_API_BASE_URL", base_url);
+    let previous = std::env::var("CIPHERROUTE_VERCEL_API_BASE_URL").ok();
+    std::env::set_var("CIPHERROUTE_VERCEL_API_BASE_URL", base_url);
     VercelApiEnvGuard {
         previous,
         _lock: lock,
@@ -97,6 +97,7 @@ fn active_key() -> ApiKey {
         error_class: None,
         latency_ms: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -137,7 +138,6 @@ fn provider_connection(id: &str, proxy_pool_id: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
         provider_specific_data,
         ttft_ms: None,
         client_app: None,
@@ -146,7 +146,6 @@ fn provider_connection(id: &str, proxy_pool_id: &str) -> ProviderConnection {
         error_class: None,
         latency_ms: None,
         extra: BTreeMap::new(),
-        runtime_transport: None,
     }
 }
 
@@ -246,7 +245,7 @@ async fn list_proxy_pools_filters_sorts_and_counts_usage() {
         ],
     )
     .await;
-    let app = openproxy::build_app(state);
+    let app = zeroproxy::build_app(state);
 
     let response = app
         .oneshot(
@@ -276,7 +275,7 @@ async fn list_proxy_pools_filters_sorts_and_counts_usage() {
 #[tokio::test]
 async fn create_proxy_pool_matches_js_defaults_and_shape() {
     let state = app_state(vec![], vec![]).await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
@@ -337,7 +336,7 @@ async fn update_proxy_pool_matches_js_normalization() {
         vec![],
     )
     .await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
@@ -402,7 +401,7 @@ async fn test_proxy_pool_vercel_matches_js_payload_and_dashboard_cookie_auth() {
     pool.r#type = "vercel".into();
     pool.proxy_url = relay.uri();
     let state = app_state_with_login(vec![pool], vec![], true).await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
@@ -446,7 +445,7 @@ async fn test_proxy_pool_failure_matches_js_response_shape_and_updates_db() {
     let mut pool = proxy_pool("pool-1", "Broken", true, "2026-05-05T10:00:00Z");
     pool.proxy_url = "http://127.0.0.1:1".into();
     let state = app_state(vec![pool], vec![]).await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
@@ -543,7 +542,7 @@ async fn vercel_deploy_matches_js_flow_and_dashboard_cookie_auth() {
         .await;
 
     let state = app_state_with_login(vec![], vec![], true).await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
@@ -613,7 +612,7 @@ async fn vercel_deploy_returns_upstream_error_shape_without_creating_pool() {
         .await;
 
     let state = app_state(vec![], vec![]).await;
-    let app = openproxy::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .oneshot(
