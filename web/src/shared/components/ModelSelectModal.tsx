@@ -18,6 +18,7 @@ interface Model {
   type?: string;
   isPlaceholder?: boolean;
   isCustom?: boolean;
+  isFree?: boolean;
 }
 
 interface ModelGroup {
@@ -706,11 +707,13 @@ export default function ModelSelectModal({
                       <span className="flex items-center gap-1">
                         {model.name}
                         <span className="text-[9px] opacity-60 font-normal">custom</span>
+                        {model.isFree && <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">FREE</span>}
                         <CapacityBadges caps={getCaps(model.value)} size={12} colorOverride={isMultiSelected || isSingleSelected ? "text-white/80" : undefined} />
                       </span>
                     ) : (
                       <span className="flex items-center gap-1">
                         {model.name}
+                        {model.isFree && <span className="text-[10px] font-bold text-green-500 bg-green-500/10 px-1.5 py-0.5 rounded">FREE</span>}
                         <CapacityBadges caps={getCaps(model.value)} size={12} colorOverride={isMultiSelected || isSingleSelected ? "text-white/80" : undefined} />
                       </span>
                     )}
