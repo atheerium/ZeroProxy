@@ -3,11 +3,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -15,7 +15,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: pricing routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "pricing-mgmt-key".into(),
@@ -26,6 +26,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
         state.pricing = BTreeMap::from([(
             "openai".to_string(),
@@ -55,7 +56,7 @@ fn request(method: Method, uri: &str, body: Body) -> Request<Body> {
 
 #[tokio::test]
 async fn pricing_get_merges_defaults_with_user_pricing() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(Method::GET, "/api/pricing", Body::empty()))
         .await
@@ -76,7 +77,7 @@ async fn pricing_get_merges_defaults_with_user_pricing() {
 #[tokio::test]
 async fn pricing_patch_validates_and_returns_user_pricing_only() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(request(
             Method::PATCH,
@@ -119,7 +120,7 @@ async fn pricing_patch_validates_and_returns_user_pricing_only() {
 
 #[tokio::test]
 async fn pricing_patch_rejects_invalid_field() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(
             Method::PATCH,
@@ -166,7 +167,7 @@ async fn pricing_delete_resets_model_and_returns_merged_pricing() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(request(
             Method::DELETE,

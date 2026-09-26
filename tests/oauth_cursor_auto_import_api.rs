@@ -4,13 +4,13 @@ use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use once_cell::sync::Lazy;
 use rusqlite::Connection;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -49,7 +49,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "cursor-mgmt-key".into(),
@@ -60,6 +60,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -227,7 +228,7 @@ async fn cursor_auto_import_returns_missing_database_error_like_cipherroute() {
     let _home = EnvVarGuard::set("HOME", home.path());
     let _path = EnvVarGuard::set_str("PATH", home.path().to_string_lossy().as_ref());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app.oneshot(request()).await.unwrap();
     let (status, json) = response_json(response).await;
 
@@ -255,7 +256,7 @@ async fn cursor_auto_import_returns_not_installed_error_on_linux_like_cipherrout
         Some("\"machine-id\""),
     );
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app.oneshot(request()).await.unwrap();
     let (status, json) = response_json(response).await;
 
@@ -282,7 +283,7 @@ async fn cursor_auto_import_reads_tokens_from_local_db_like_cipherroute() {
         Some("\"550e8400-e29b-41d4-a716-446655440000\""),
     );
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app.oneshot(request()).await.unwrap();
     let (status, json) = response_json(response).await;
 
@@ -306,7 +307,7 @@ async fn cursor_auto_import_falls_back_to_manual_mode_when_tokens_missing() {
     install_cursor_desktop_file(home.path());
     create_cursor_db(&cursor_db_path(home.path()), None, None);
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app.oneshot(request()).await.unwrap();
     let (status, json) = response_json(response).await;
 

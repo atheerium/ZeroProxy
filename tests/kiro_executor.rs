@@ -12,11 +12,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::executor::{AwsCredentials, ClientPool, KiroExecutionRequest, KiroExecutor};
-use cipherroute::types::{ProviderConnection, ProviderNode};
 use serde_json::json;
 use wiremock::matchers::{header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::core::executor::{AwsCredentials, ClientPool, KiroExecutionRequest, KiroExecutor};
+use zeroproxy::types::{ProviderConnection, ProviderNode};
 
 fn kiro_connection_with_aws_credentials(access_key: &str, secret_key: &str) -> ProviderConnection {
     let credentials = json!({
@@ -56,10 +56,9 @@ fn kiro_connection_with_aws_credentials(access_key: &str, secret_key: &str) -> P
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -106,10 +105,9 @@ fn kiro_connection_with_session_token(
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -124,6 +122,7 @@ fn kiro_provider_node() -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -376,7 +375,7 @@ async fn kiro_executor_sign_request_with_session_token() {
 
 #[test]
 fn event_stream_decoder_empty_input() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     let events = EventStreamDecoder::decode_chunk(&[]).expect("should decode empty");
     assert!(events.is_empty());
@@ -385,7 +384,7 @@ fn event_stream_decoder_empty_input() {
 #[test]
 #[ignore = "EventStream format requires real AWS EventStream encoding - decoder expects prelude bytes"]
 fn event_stream_decoder_single_sse_event() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     let frame = build_eventstream_frame("assistantResponseEvent", r#"{"content":"test event"}"#);
     let events = EventStreamDecoder::decode_chunk(&frame).expect("should decode");
@@ -397,7 +396,7 @@ fn event_stream_decoder_single_sse_event() {
 #[test]
 #[ignore = "EventStream format requires real AWS EventStream encoding - decoder expects prelude bytes"]
 fn event_stream_decoder_multiple_sse_events() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     let mut chunk =
         build_eventstream_frame("assistantResponseEvent", r#"{"content":"first event"}"#);
@@ -445,7 +444,7 @@ fn build_eventstream_frame(event_type: &str, payload_json: &str) -> Vec<u8> {
 
 #[test]
 fn event_stream_decoder_handles_partial_prelude() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     // Send only partial prelude bytes
     let chunk = vec![0xFF, 0x00, 0x00];
@@ -455,7 +454,7 @@ fn event_stream_decoder_handles_partial_prelude() {
 
 #[test]
 fn event_stream_decoder_handles_truncated_payload() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     // A frame whose declared total length exceeds the available bytes must
     // yield no events (partial frame — buffered for the next chunk).
@@ -467,7 +466,7 @@ fn event_stream_decoder_handles_truncated_payload() {
 
 #[test]
 fn event_stream_decoder_malformed_prelude_errors() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     // A `data: [DONE]` SSE text blob is not a valid EventStream binary frame;
     // the decoder must reject it rather than decode garbage.
@@ -478,7 +477,7 @@ fn event_stream_decoder_malformed_prelude_errors() {
 #[test]
 #[ignore = "EventStream format requires real AWS EventStream encoding - decoder expects prelude bytes"]
 fn event_stream_decoder_ignores_non_prelude_bytes() {
-    use cipherroute::core::executor::EventStreamDecoder;
+    use zeroproxy::core::executor::EventStreamDecoder;
 
     // Garbage prefix bytes are not a valid prelude; the decoder must not
     // panic and must return no decoded events from a malformed buffer.
@@ -537,7 +536,7 @@ async fn kiro_executor_execute_request_success() {
     );
     assert_eq!(
         response.transport,
-        cipherroute::core::executor::TransportKind::Reqwest
+        zeroproxy::core::executor::TransportKind::Reqwest
     );
 }
 
@@ -662,7 +661,7 @@ async fn kiro_executor_execute_request_empty_credentials() {
 
 #[test]
 fn kiro_executor_error_debug() {
-    use cipherroute::core::executor::KiroExecutorError;
+    use zeroproxy::core::executor::KiroExecutorError;
 
     let err = KiroExecutorError::MissingCredentials("kiro".to_string());
     let debug = format!("{:?}", err);
@@ -679,7 +678,7 @@ fn kiro_executor_error_debug() {
 
 #[test]
 fn kiro_event_clone() {
-    use cipherroute::core::executor::KiroEvent;
+    use zeroproxy::core::executor::KiroEvent;
 
     let event = KiroEvent {
         message_type: "event".to_string(),
@@ -694,7 +693,7 @@ fn kiro_event_clone() {
 
 #[test]
 fn kiro_event_debug() {
-    use cipherroute::core::executor::KiroEvent;
+    use zeroproxy::core::executor::KiroEvent;
 
     let event = KiroEvent {
         message_type: "event".to_string(),

@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ModelAliasTarget, ProviderConnection, ProviderModelRef};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ModelAliasTarget, ProviderConnection, ProviderModelRef};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -22,6 +22,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -59,10 +60,9 @@ fn connection(provider: &str, active: bool) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -88,6 +88,7 @@ async fn app_state() -> AppState {
                 provider: "openai".into(),
                 model: "gpt-4o-realtime-preview".into(),
                 extra: BTreeMap::new(),
+                ..Default::default()
             }),
         );
     })
@@ -117,7 +118,7 @@ async fn response_json(response: axum::response::Response) -> (StatusCode, serde
 
 #[tokio::test]
 async fn cloud_auth_matches_cipherroute_payload() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::POST,
@@ -176,7 +177,7 @@ async fn cloud_routes_require_authorization_bearer_like_cipherroute() {
             .body(Body::empty())
             .unwrap(),
     ] {
-        let app = cipherroute::build_app(app_state().await);
+        let app = zeroproxy::build_app(app_state().await);
         let response = app.oneshot(request).await.unwrap();
         let (status, json) = response_json(response).await;
         eprintln!("CLOUDCASE status={status} json={json}");
@@ -184,7 +185,7 @@ async fn cloud_routes_require_authorization_bearer_like_cipherroute() {
         assert_eq!(json, json!({ "error": "Missing API key" }));
     }
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -205,7 +206,7 @@ async fn cloud_routes_require_authorization_bearer_like_cipherroute() {
 #[tokio::test]
 async fn cloud_credentials_update_matches_cipherroute_and_persists_tokens() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .clone()
         .oneshot(authorized_request(
@@ -252,7 +253,7 @@ async fn cloud_credentials_update_matches_cipherroute_and_persists_tokens() {
 
 #[tokio::test]
 async fn cloud_credentials_update_matches_cipherroute_errors() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .clone()
         .oneshot(authorized_request(
@@ -297,7 +298,7 @@ async fn cloud_credentials_update_matches_cipherroute_errors() {
 
 #[tokio::test]
 async fn cloud_model_resolve_matches_cipherroute_contract() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .clone()
         .oneshot(authorized_request(
@@ -351,7 +352,7 @@ async fn cloud_model_resolve_matches_cipherroute_contract() {
 #[tokio::test]
 async fn cloud_models_alias_routes_match_cipherroute_contract() {
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
 
     let response = app
         .clone()
@@ -437,7 +438,7 @@ async fn cloud_models_alias_routes_match_cipherroute_contract() {
 
 #[tokio::test]
 async fn cloud_credentials_route_is_not_exposed() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,

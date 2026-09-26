@@ -25,7 +25,7 @@ async fn boot_server() -> MockServer {
 }
 
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
-    Command::cargo_bin("cipherroute")
+    Command::cargo_bin("zeroproxy")
         .expect("locate cipherroute binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
@@ -46,7 +46,7 @@ fn op_stdin(server: &MockServer, args: &[&str], stdin: &str) -> std::process::Ou
     use std::io::Write;
     use std::process::Stdio;
 
-    let mut child = Command::cargo_bin("cipherroute")
+    let mut child = Command::cargo_bin("zeroproxy")
         .expect("locate cipherroute binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
@@ -102,7 +102,7 @@ async fn mitm_status_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.mitm.status");
+    assert_eq!(env["schema"], "zeroproxy.v1.mitm.status");
     assert_eq!(env["ok"], true);
     assert_eq!(env["data"]["enabled"], true);
     assert_eq!(env["data"]["routes"], 1);
@@ -124,7 +124,7 @@ async fn mitm_start_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.mitm.start");
+    assert_eq!(env["schema"], "zeroproxy.v1.mitm.start");
     assert_eq!(env["data"]["started"], true);
 }
 
@@ -140,7 +140,7 @@ async fn mitm_cert_generate_emits_envelope() {
     let out = op(&server, &["--robot", "mitm", "cert", "generate"]);
     assert!(out.status.success());
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.mitm.cert.generate");
+    assert_eq!(env["schema"], "zeroproxy.v1.mitm.cert.generate");
     assert_eq!(env["data"]["fingerprint"], "deadbeef");
 }
 
@@ -165,7 +165,7 @@ async fn mitm_config_apply_reads_stdin() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.mitm.config.apply");
+    assert_eq!(env["schema"], "zeroproxy.v1.mitm.config.apply");
 }
 
 // ─── tunnel (runtime) ───────────────────────────────────────────────────────
@@ -186,7 +186,7 @@ async fn tunnel_enable_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.tunnel.enable");
+    assert_eq!(env["schema"], "zeroproxy.v1.tunnel.enable");
     assert_eq!(env["data"]["enabled"], true);
 }
 
@@ -210,7 +210,7 @@ async fn tunnel_tailscale_check_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.tunnel.tailscale.check");
+    assert_eq!(env["schema"], "zeroproxy.v1.tunnel.tailscale.check");
     assert_eq!(env["data"]["installed"], true);
     assert_eq!(env["data"]["loggedIn"], false);
 }
@@ -238,7 +238,7 @@ async fn tool_list_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.tool.list");
+    assert_eq!(env["schema"], "zeroproxy.v1.tool.list");
     assert_eq!(env["data"]["tools"].as_array().map(Vec::len), Some(2));
 }
 
@@ -269,7 +269,7 @@ async fn tool_apply_dry_run_does_not_call_server() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.tool.apply.dry_run");
+    assert_eq!(env["schema"], "zeroproxy.v1.tool.apply.dry_run");
     assert_eq!(env["data"]["path"], "/api/cli-tools/claude-settings");
     assert_eq!(
         env["data"]["body"]["env"]["ANTHROPIC_BASE_URL"],
@@ -297,7 +297,7 @@ async fn tool_revert_calls_delete() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.tool.revert");
+    assert_eq!(env["schema"], "zeroproxy.v1.tool.revert");
 }
 
 // ─── translator ─────────────────────────────────────────────────────────────
@@ -321,7 +321,7 @@ async fn translator_formats_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.translator.formats");
+    assert_eq!(env["schema"], "zeroproxy.v1.translator.formats");
     assert_eq!(env["data"].as_array().map(Vec::len), Some(2));
 }
 
@@ -345,7 +345,7 @@ async fn translator_preset_save_posts_to_translator_save() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.translator.preset.save");
+    assert_eq!(env["schema"], "zeroproxy.v1.translator.preset.save");
 }
 
 // ─── media ──────────────────────────────────────────────────────────────────
@@ -372,7 +372,7 @@ async fn media_providers_list_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.media.providers.list");
+    assert_eq!(env["schema"], "zeroproxy.v1.media.providers.list");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -393,7 +393,7 @@ async fn media_tts_voices_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.media.tts.voices");
+    assert_eq!(env["schema"], "zeroproxy.v1.media.tts.voices");
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -465,6 +465,6 @@ async fn media_web_fetch_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let env = parse_robot(&out.stdout);
-    assert_eq!(env["schema"], "cipherroute.v1.media.web.fetch");
+    assert_eq!(env["schema"], "zeroproxy.v1.media.web.fetch");
     assert_eq!(env["data"]["content"], "# Page title\n");
 }

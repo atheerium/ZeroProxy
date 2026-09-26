@@ -3,14 +3,14 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_string_contains, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -18,7 +18,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "gitlab-mgmt-key".into(),
@@ -29,6 +29,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -66,7 +67,7 @@ async fn response_json(response: axum::response::Response) -> (StatusCode, serde
 
 #[tokio::test]
 async fn gitlab_authorize_matches_cipherroute_query_shape() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(get_request(
             "/api/oauth/gitlab/authorize?redirect_uri=http%3A%2F%2Flocalhost%3A4624%2Fcallback&baseUrl=https%3A%2F%2Fgitlab.example.com&clientId=gitlab-client",
@@ -129,7 +130,7 @@ async fn gitlab_exchange_matches_cipherroute_meta_and_saves_connection() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(post_request(
             "/api/oauth/gitlab/exchange",

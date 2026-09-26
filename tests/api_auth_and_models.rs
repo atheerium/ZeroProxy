@@ -3,11 +3,6 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{
-    ApiKey, Combo, CustomModel, ModelAliasTarget, ProviderConnection, ProviderModelRef,
-};
 use hmac::digest::KeyInit;
 use hmac::{Hmac, Mac};
 use serde_json::json;
@@ -17,6 +12,11 @@ use tower::util::ServiceExt;
 use wiremock::{
     matchers::{method, path},
     Mock, MockServer, ResponseTemplate,
+};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{
+    ApiKey, Combo, CustomModel, ModelAliasTarget, ProviderConnection, ProviderModelRef,
 };
 
 fn active_key(key: &str) -> ApiKey {
@@ -31,6 +31,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -46,7 +47,7 @@ fn cli_token(machine_id: &str, key_id: &str) -> String {
 
     // Must match the server's resolved HMAC secret (env or per-install
     // persisted secret), never a hardcoded default.
-    let secret = cipherroute::core::auth::api_key_secret();
+    let secret = zeroproxy::core::auth::api_key_secret();
     let mut mac = HmacSha256::new_from_slice(secret.as_bytes()).unwrap();
     mac.update(machine_id.as_bytes());
     mac.update(key_id.as_bytes());
@@ -106,10 +107,9 @@ fn connection(
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
         provider_specific_data,
         extra: BTreeMap::new(),
-        runtime_transport: None,
+        ..Default::default()
     }
 }
 
@@ -135,6 +135,7 @@ async fn app_state() -> AppState {
             created_at: None,
             updated_at: None,
             extra: BTreeMap::new(),
+            ..Default::default()
         }];
         state.provider_connections = vec![
             connection("openai", Some("gpt-4.1"), &[], true),
@@ -148,6 +149,7 @@ async fn app_state() -> AppState {
                 r#type: "llm".into(),
                 name: Some("Custom".into()),
                 extra: BTreeMap::new(),
+                ..Default::default()
             },
             CustomModel {
                 provider_alias: "openai".into(),
@@ -155,6 +157,7 @@ async fn app_state() -> AppState {
                 r#type: "embedding".into(),
                 name: Some("Embedding".into()),
                 extra: BTreeMap::new(),
+                ..Default::default()
             },
         ];
     })
@@ -165,7 +168,7 @@ async fn app_state() -> AppState {
 
 #[tokio::test]
 async fn valid_bearer_key_allows_models_request() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -182,7 +185,7 @@ async fn valid_bearer_key_allows_models_request() {
 
 #[tokio::test]
 async fn bearer_scheme_is_case_insensitive() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -199,7 +202,7 @@ async fn bearer_scheme_is_case_insensitive() {
 
 #[tokio::test]
 async fn valid_x_api_key_allows_models_request() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -232,7 +235,7 @@ async fn missing_invalid_and_inactive_keys_return_unauthorized() {
             .body(Body::empty())
             .unwrap(),
     ] {
-        let app = cipherroute::build_app(app_state().await);
+        let app = zeroproxy::build_app(app_state().await);
         let response = app.oneshot(request).await.unwrap();
         assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
     }
@@ -240,7 +243,7 @@ async fn missing_invalid_and_inactive_keys_return_unauthorized() {
 
 #[tokio::test]
 async fn bearer_takes_precedence_over_x_api_key() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -259,7 +262,7 @@ async fn bearer_takes_precedence_over_x_api_key() {
 
 #[tokio::test]
 async fn valid_cli_token_allows_models_request() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -288,7 +291,7 @@ async fn cli_token_machine_id_mismatch_is_unauthorized() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -320,7 +323,7 @@ async fn valid_key_still_resolves_with_many_stored_keys() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -337,7 +340,7 @@ async fn valid_key_still_resolves_with_many_stored_keys() {
 
 #[tokio::test]
 async fn models_endpoint_returns_combo_active_connection_and_custom_llm_models() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -385,7 +388,7 @@ async fn models_endpoint_dedupes_duplicate_model_ids() {
         })
         .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -425,7 +428,7 @@ async fn models_endpoint_falls_back_to_static_models_when_no_active_connections(
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -459,7 +462,7 @@ async fn models_endpoint_falls_back_to_static_models_when_no_active_connections(
 /// Verifies that GET /v1 returns the expected API metadata (version + endpoint list).
 #[tokio::test]
 async fn v1_root_returns_api_metadata() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let response = app
         .clone()
@@ -488,7 +491,7 @@ async fn v1_root_returns_api_metadata() {
 
 #[tokio::test]
 async fn models_by_kind_returns_tts_models_from_provider_subconfig() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -536,6 +539,7 @@ async fn models_by_kind_returns_web_combos_and_provider_entries() {
                 created_at: None,
                 updated_at: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
             db.combos.push(Combo {
                 id: "combo-fetch".into(),
@@ -547,6 +551,7 @@ async fn models_by_kind_returns_web_combos_and_provider_entries() {
                 created_at: None,
                 updated_at: None,
                 extra: BTreeMap::new(),
+                ..Default::default()
             });
             db.provider_connections
                 .push(connection("perplexity", None, &[], true));
@@ -556,7 +561,7 @@ async fn models_by_kind_returns_web_combos_and_provider_entries() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -620,13 +625,14 @@ async fn models_endpoint_normalizes_prefix_enabled_models_and_alias_targets() {
                     provider: "openai".into(),
                     model: "gpt-4o-realtime-preview".into(),
                     extra: BTreeMap::new(),
+                    ..Default::default()
                 }),
             );
         })
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -690,7 +696,7 @@ async fn models_endpoint_fetches_remote_models_for_openai_compatible_connections
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -723,7 +729,7 @@ async fn models_endpoint_fetches_remote_models_for_openai_compatible_connections
 
 #[tokio::test]
 async fn models_by_kind_rejects_unknown_kind() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -775,7 +781,7 @@ async fn models_availability_get_matches_js_issue_payload() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -840,7 +846,7 @@ async fn models_availability_post_clears_cooldown_like_js() {
         .await
         .unwrap();
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(
             Request::builder()
@@ -896,7 +902,7 @@ async fn models_availability_post_clears_cooldown_like_js() {
 
 #[tokio::test]
 async fn models_availability_post_rejects_invalid_request() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()

@@ -7,8 +7,8 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::executor::{provider_config_base_url, ClientPool, DefaultExecutor};
-use cipherroute::types::ProviderConnection;
+use zeroproxy::core::executor::{provider_config_base_url, ClientPool, DefaultExecutor};
+use zeroproxy::types::ProviderConnection;
 
 fn conn(provider: &str) -> ProviderConnection {
     ProviderConnection {
@@ -44,10 +44,9 @@ fn conn(provider: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 

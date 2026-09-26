@@ -3,14 +3,14 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ProviderConnection, ProviderNode};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ProviderConnection, ProviderNode};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -24,6 +24,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -38,6 +39,7 @@ fn provider_node(id: &str, prefix: &str, base_url: &str) -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -75,8 +77,6 @@ fn connection(id: &str, provider: &str, api_key: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         ttft_ms: None,
         client_app: None,
         pinned: None,
@@ -103,7 +103,7 @@ async fn seeded_state(nodes: Vec<ProviderNode>, connections: Vec<ProviderConnect
 
 #[tokio::test]
 async fn compat_count_tokens_matches_js_estimate_and_sets_cors_headers() {
-    let app = cipherroute::build_app(seeded_state(Vec::new(), Vec::new()).await);
+    let app = zeroproxy::build_app(seeded_state(Vec::new(), Vec::new()).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -209,7 +209,7 @@ async fn messages_route_promotes_system_field_before_forwarding() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -283,7 +283,7 @@ async fn responses_compact_normalizes_input_and_sets_compact_flag() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()

@@ -3,14 +3,14 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, ProviderConnection, ProviderNode};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, ProviderConnection, ProviderNode};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -24,6 +24,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -38,6 +39,7 @@ fn provider_node(id: &str, prefix: &str, base_url: &str) -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -75,10 +77,9 @@ fn connection(id: &str, provider: &str, api_key: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -97,7 +98,7 @@ async fn seeded_state(nodes: Vec<ProviderNode>, connections: Vec<ProviderConnect
 
 #[tokio::test]
 async fn v1_api_chat_options_exposes_cors_headers() {
-    let app = cipherroute::build_app(seeded_state(Vec::new(), Vec::new()).await);
+    let app = zeroproxy::build_app(seeded_state(Vec::new(), Vec::new()).await);
 
     let response = app
         .oneshot(
@@ -149,7 +150,7 @@ async fn v1_api_chat_defaults_to_streaming_and_returns_ollama_ndjson() {
         .mount(&upstream)
         .await;
 
-    let app = cipherroute::build_app(
+    let app = zeroproxy::build_app(
         seeded_state(
             vec![provider_node(
                 "node-openai",
@@ -245,7 +246,7 @@ async fn v1_api_chat_non_streaming_converts_openai_json_to_ollama_json() {
         .mount(&upstream)
         .await;
 
-    let app = cipherroute::build_app(
+    let app = zeroproxy::build_app(
         seeded_state(
             vec![provider_node(
                 "node-openai",

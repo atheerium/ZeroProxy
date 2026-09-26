@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{header, Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -14,7 +14,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: tags routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "tags-mgmt-key".into(),
@@ -25,6 +25,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -46,7 +47,7 @@ async fn response_json(
 
 #[tokio::test]
 async fn tags_get_matches_cipherroute_payload_and_cors_headers() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -121,7 +122,7 @@ async fn tags_get_matches_cipherroute_payload_and_cors_headers() {
 
 #[tokio::test]
 async fn tags_options_returns_cors_headers() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()
@@ -162,7 +163,7 @@ async fn tags_options_returns_cors_headers() {
 
 #[tokio::test]
 async fn tags_legacy_subroutes_are_not_exposed() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(
             Request::builder()

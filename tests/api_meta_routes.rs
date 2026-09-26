@@ -2,11 +2,11 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 const TEST_KEY: &str = "api-meta-test-key";
 
@@ -25,12 +25,13 @@ async fn build_test_app() -> axum::Router {
             monthly_budget_usd: None,
             daily_budget_usd: None,
             daily_request_limit: None,
+            ..Default::default()
         }];
         state.settings.require_login = false;
     })
     .await
     .expect("seed auth");
-    cipherroute::build_app(AppState::new(db))
+    zeroproxy::build_app(AppState::new(db))
 }
 
 #[tokio::test]

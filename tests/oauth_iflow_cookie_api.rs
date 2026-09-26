@@ -3,14 +3,14 @@ use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -43,7 +43,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "iflow-mgmt-key".into(),
@@ -54,6 +54,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -114,7 +115,7 @@ async fn iflow_cookie_route_matches_cipherroute_success_flow() {
         .await;
 
     let state = app_state().await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(request(Body::from(
             json!({ "cookie": "  BXAuth=abc123; session=1" }).to_string(),
@@ -151,7 +152,7 @@ async fn iflow_cookie_route_matches_cipherroute_success_flow() {
 
 #[tokio::test]
 async fn iflow_cookie_route_validates_cookie_input_like_cipherroute() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let missing_cookie = app
         .clone()
@@ -185,7 +186,7 @@ async fn iflow_cookie_route_propagates_get_failure_status_and_message() {
         .mount(&server)
         .await;
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(Body::from(
             json!({ "cookie": "BXAuth=abc123;" }).to_string(),
@@ -227,7 +228,7 @@ async fn iflow_cookie_route_propagates_refresh_failure_message() {
         .mount(&server)
         .await;
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request(Body::from(
             json!({ "cookie": "BXAuth=abc123;" }).to_string(),

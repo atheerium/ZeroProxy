@@ -1,17 +1,17 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use openproxy::core::model::{
+use serde_json::json;
+use tempfile::tempdir;
+use zeroproxy::core::model::{
     get_model_info, parse_model, resolve_model_alias_from_map, resolve_provider_alias,
     ModelRouteKind,
 };
-use openproxy::db::Db;
-use openproxy::types::{
+use zeroproxy::db::Db;
+use zeroproxy::types::{
     ApiKey, AppDb, Combo, DailySummary, ModelAliasTarget, ProviderConnection, ProviderModelRef,
     ProviderNode, Settings, SummaryCounter, TokenUsage, UsageDb, UsageEntry,
 };
-use serde_json::json;
-use tempfile::tempdir;
 
 #[test]
 fn app_db_round_trips_through_serde() {
@@ -49,8 +49,6 @@ fn app_db_round_trips_through_serde() {
             consecutive_errors: None,
             proxy_url: None,
             proxy_label: None,
-            use_connection_proxy: None,
-            runtime_transport: None,
             provider_specific_data: BTreeMap::new(),
             extra: BTreeMap::new(),
             ttft_ms: None,
@@ -95,6 +93,7 @@ fn app_db_round_trips_through_serde() {
             saved_usd: None,
             error_class: None,
             latency_ms: None,
+            ..Default::default()
         }],
         model_aliases: BTreeMap::from([
             (
@@ -130,6 +129,7 @@ fn app_db_round_trips_through_serde() {
             saved_usd: None,
             error_class: None,
             latency_ms: None,
+            ..Default::default()
         }],
         settings: Settings::default(),
         pricing: BTreeMap::new(),
@@ -179,6 +179,7 @@ fn usage_db_round_trips_through_serde() {
             saved_usd: None,
             error_class: None,
             latency_ms: None,
+            ..Default::default()
         }],
         total_requests_lifetime: 1,
         daily_summary: BTreeMap::from([(
@@ -214,6 +215,10 @@ fn usage_db_round_trips_through_serde() {
                         saved_usd: None,
                         error_class: None,
                         latency_ms: None,
+                        failed_requests: 0,
+                        latency_total_sum: 0,
+                        latency_ttft_sum: 0,
+                        latency_count: 0,
                     },
                 )]),
                 by_model: BTreeMap::new(),
@@ -227,6 +232,10 @@ fn usage_db_round_trips_through_serde() {
                 saved_usd: None,
                 error_class: None,
                 latency_ms: None,
+                failed_requests: 0,
+                latency_total_sum: 0,
+                latency_ttft_sum: 0,
+                latency_count: 0,
             },
         )]),
         extra: BTreeMap::new(),
@@ -236,6 +245,7 @@ fn usage_db_round_trips_through_serde() {
         saved_usd: None,
         error_class: None,
         latency_ms: None,
+        ..Default::default()
     };
 
     let encoded = serde_json::to_value(&usage).expect("encode usage db");
@@ -303,7 +313,7 @@ async fn db_loads_normalizes_and_persists_json_files() {
     assert!(snapshot.api_keys[0].is_active());
     assert!(snapshot.settings.outbound_proxy_enabled);
     assert_eq!(usage.total_requests_lifetime, 1);
-    assert!(db.data_dir.join("openproxy.sqlite").exists());
+    assert!(db.data_dir.join("zeroproxy.sqlite").exists());
 
     db.update(|state| {
         state.model_aliases.insert(
@@ -344,6 +354,7 @@ async fn db_updates_are_serialized_and_snapshots_remain_lock_free() {
                     saved_usd: None,
                     error_class: None,
                     latency_ms: None,
+                    ..Default::default()
                 });
             })
             .await
@@ -500,6 +511,7 @@ async fn usage_updates_persist_and_migrate_daily_summary() {
             saved_usd: None,
             error_class: None,
             latency_ms: None,
+            ..Default::default()
         });
     })
     .await
@@ -574,6 +586,7 @@ fn model_resolution_supports_aliases_nodes_and_combos() {
             saved_usd: None,
             error_class: None,
             latency_ms: None,
+            ..Default::default()
         }],
         ..AppDb::default()
     };

@@ -2,7 +2,7 @@
 //! stability` envelopes. Pattern matches `cli_m5_robot_envelopes.rs`: spin
 //! up a wiremock server, drive the `cipherroute` binary against it with
 //! `CIPHERROUTE_URL` + `CIPHERROUTE_API_KEY`, and assert the resulting
-//! `cipherroute.v1.*` envelopes on stdout.
+//! `zeroproxy.v1.*` envelopes on stdout.
 
 #![cfg(test)]
 
@@ -25,7 +25,7 @@ async fn boot_server() -> MockServer {
 }
 
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
-    Command::cargo_bin("cipherroute")
+    Command::cargo_bin("zeroproxy")
         .expect("locate cipherroute binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
@@ -70,7 +70,7 @@ async fn settings_get_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.get");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.get");
     assert_eq!(v["data"]["comboStrategy"], "fallback");
     assert_eq!(v["data"]["rtkEnabled"], true);
 }
@@ -93,7 +93,7 @@ async fn settings_get_with_key_extracts_dotted_field() {
     );
     assert!(out.status.success());
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.get");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.get");
     assert_eq!(v["data"]["key"], "outboundProxy.url");
     assert_eq!(v["data"]["value"], "http://proxy.example.com");
 }
@@ -127,7 +127,7 @@ async fn settings_set_patches_and_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.set");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.set");
     assert_eq!(v["data"]["updated"][0], "comboStrategy");
     assert_eq!(v["data"]["settings"]["comboStrategy"], "round-robin");
 }
@@ -162,7 +162,7 @@ async fn settings_proxy_test_passes_through_be_response() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.proxy_test");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.proxy_test");
     assert_eq!(v["data"]["ok"], true);
     assert_eq!(v["data"]["elapsedMs"], 42);
 }
@@ -186,7 +186,7 @@ async fn settings_locale_set_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.locale.set");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.locale.set");
     assert_eq!(v["data"]["locale"], "vi");
 }
 
@@ -210,7 +210,7 @@ async fn settings_version_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.version");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.version");
     assert_eq!(v["data"]["currentVersion"], "1.0.0");
     assert_eq!(v["data"]["hasUpdate"], true);
 }
@@ -235,7 +235,7 @@ async fn settings_update_check_uses_version_endpoint() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.settings.update.check");
+    assert_eq!(v["schema"], "zeroproxy.v1.settings.update.check");
     assert_eq!(v["data"]["hasUpdate"], false);
 }
 
@@ -260,7 +260,7 @@ async fn db_export_emits_full_snapshot() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.export");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.export");
     assert_eq!(v["data"]["providerConnections"][0]["name"], "openai-main");
 }
 
@@ -291,7 +291,7 @@ async fn db_export_with_out_writes_file_and_reports_bytes() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.export");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.export");
     assert!(v["data"]["bytes"].as_u64().unwrap() > 0);
 
     let written = std::fs::read_to_string(&out_path).unwrap();
@@ -321,7 +321,7 @@ async fn db_dump_extracts_single_resource() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.dump");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.dump");
     assert_eq!(v["data"]["resource"], "providers");
     assert_eq!(v["data"]["data"].as_array().unwrap().len(), 2);
 }
@@ -349,7 +349,7 @@ async fn db_import_merge_posts_to_settings_database() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.import");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.import");
     assert_eq!(v["data"]["mode"], "merge");
     assert_eq!(v["data"]["result"]["success"], true);
 }
@@ -364,7 +364,7 @@ async fn db_migrate_is_noop_but_emits_envelope() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.migrate");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.migrate");
     assert_eq!(v["data"]["applied"], 0);
 }
 
@@ -389,7 +389,7 @@ async fn db_cloud_auth_returns_connections_and_aliases() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.cloud.auth");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.cloud.auth");
     assert_eq!(v["data"]["modelAliases"]["fast"], "openai/gpt-4o-mini");
 }
 
@@ -416,7 +416,7 @@ async fn db_cloud_resolve_maps_alias_to_provider_model() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.cloud.resolve");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.cloud.resolve");
     assert_eq!(v["data"]["provider"], "openai");
     assert_eq!(v["data"]["model"], "gpt-4o-mini");
 }
@@ -439,7 +439,7 @@ async fn db_cloud_alias_list_passes_through_be_payload() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.cloud.alias.list");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.cloud.alias.list");
     assert_eq!(v["data"]["aliases"]["fast"], "openai/gpt-4o-mini");
 }
 
@@ -476,7 +476,7 @@ async fn db_cloud_alias_set_puts_to_be_and_echoes() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.db.cloud.alias.set");
+    assert_eq!(v["schema"], "zeroproxy.v1.db.cloud.alias.set");
     assert_eq!(v["data"]["alias"], "fast");
 }
 
@@ -492,8 +492,8 @@ async fn schema_stability_emits_v1_promise() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.schema.stability");
-    assert_eq!(v["data"]["namespace"], "cipherroute.v1");
+    assert_eq!(v["schema"], "zeroproxy.v1.schema.stability");
+    assert_eq!(v["data"]["namespace"], "zeroproxy.v1");
     assert_eq!(v["data"]["stability"], "stable");
 }
 
@@ -507,8 +507,8 @@ async fn schema_list_includes_namespace_and_stability() {
         String::from_utf8_lossy(&out.stderr)
     );
     let v = parse_robot(&out.stdout);
-    assert_eq!(v["schema"], "cipherroute.v1.schema.list");
-    assert_eq!(v["data"]["namespace"], "cipherroute.v1");
+    assert_eq!(v["schema"], "zeroproxy.v1.schema.list");
+    assert_eq!(v["data"]["namespace"], "zeroproxy.v1");
     assert_eq!(v["data"]["stability"], "stable");
     assert!(!v["data"]["resources"].as_array().unwrap().is_empty());
 }

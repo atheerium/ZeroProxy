@@ -7,17 +7,17 @@ use std::sync::Barrier;
 use std::thread;
 use std::time::Duration;
 
-use cipherroute::core::executor::{
-    provider_config_base_url, ClientPool, DefaultExecutor, ExecutionRequest, ExecutorError,
-    TransportKind, CLIENT_POOL_IDLE_TIMEOUT, CLIENT_POOL_MAX_IDLE_PER_HOST,
-    CLIENT_POOL_TCP_KEEPALIVE,
-};
-use cipherroute::core::proxy::{normalize, resolve_proxy_target, ProxyTarget};
-use cipherroute::types::{AppDb, ProviderConnection, ProviderNode, ProxyPool, Settings};
 use serde_json::json;
 use tokio::sync::oneshot;
 use wiremock::matchers::{body_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::core::executor::{
+    provider_config_base_url, ClientPool, DefaultExecutor, ExecutionRequest, ExecutorError,
+    TransportKind, CLIENT_POOL_IDLE_TIMEOUT, CLIENT_POOL_MAX_IDLE_PER_HOST,
+    CLIENT_POOL_TCP_KEEPALIVE,
+};
+use zeroproxy::core::proxy::{normalize, resolve_proxy_target, ProxyTarget};
+use zeroproxy::types::{AppDb, ProviderConnection, ProviderNode, ProxyPool, Settings};
 
 fn connection(provider: &str) -> ProviderConnection {
     ProviderConnection {
@@ -53,10 +53,9 @@ fn connection(provider: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -94,6 +93,7 @@ fn default_executor_builds_static_and_compatible_urls() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let compatible = DefaultExecutor::new("node-openai", pool.clone(), Some(compatible_node))
         .expect("compatible");
@@ -144,6 +144,7 @@ fn default_executor_builds_static_and_compatible_urls() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let anthropic = DefaultExecutor::new("node-anthropic", pool.clone(), Some(anthropic_node))
         .expect("anthropic");
@@ -720,6 +721,7 @@ fn default_executor_builds_expected_headers() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let anthropic =
         DefaultExecutor::new("anthropic-node", pool, Some(compatible_node)).expect("anthropic");
@@ -949,6 +951,7 @@ async fn default_executor_execute_posts_expected_request() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     let executor = DefaultExecutor::new(
@@ -1007,6 +1010,7 @@ async fn default_executor_execute_uses_reqwest_when_proxy_present() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     let executor = DefaultExecutor::new(
@@ -1065,6 +1069,7 @@ async fn default_executor_execute_uses_reqwest_for_responses_api() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let mut credentials = connection("node-openai");
     credentials.provider_specific_data.insert(
@@ -1132,6 +1137,7 @@ fn default_executor_reports_missing_credentials_and_invalid_headers() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let anthropic = DefaultExecutor::new(
         "anthropic-node",
@@ -1584,6 +1590,7 @@ async fn default_executor_reuses_hyper_connection_for_sequential_requests() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let pool = Arc::new(ClientPool::new());
     let executor = DefaultExecutor::new("node-openai", pool.clone(), Some(provider_node))
@@ -1745,6 +1752,7 @@ fn proxy_resolution_prefers_connection_override_then_pool_then_settings() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     });
     let settings = Settings {
         outbound_proxy_enabled: true,
@@ -1754,7 +1762,6 @@ fn proxy_resolution_prefers_connection_override_then_pool_then_settings() {
     };
 
     let mut conn = connection("openai");
-    conn.use_connection_proxy = Some(true);
     conn.provider_specific_data.insert(
         "connectionProxyEnabled".into(),
         serde_json::Value::Bool(true),
@@ -1779,7 +1786,6 @@ fn proxy_resolution_prefers_connection_override_then_pool_then_settings() {
     assert_eq!(resolved.pool_id.as_deref(), Some("pool-1"));
 
     let mut legacy_conn = connection("openai");
-    legacy_conn.use_connection_proxy = Some(true);
     legacy_conn.provider_specific_data.insert(
         "connectionProxyEnabled".into(),
         serde_json::Value::Bool(true),
@@ -1826,10 +1832,10 @@ fn proxy_pool_type_drives_scheme_for_schemeless_urls() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     });
 
     let mut conn = connection("openai");
-    conn.use_connection_proxy = Some(true);
     conn.provider_specific_data.insert(
         "connectionProxyEnabled".into(),
         serde_json::Value::Bool(true),

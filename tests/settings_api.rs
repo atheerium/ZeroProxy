@@ -3,12 +3,12 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use serde_json::{json, Value};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 const TEST_KEY: &str = "settings-api-test-key";
 
@@ -24,6 +24,7 @@ fn active_key() -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -45,7 +46,7 @@ async fn app_state() -> AppState {
 
 #[tokio::test]
 async fn get_settings_requires_auth_and_redacts_password() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let unauthenticated = app
         .clone()
@@ -84,7 +85,7 @@ async fn get_settings_requires_auth_and_redacts_password() {
 
 #[tokio::test]
 async fn patch_settings_updates_values_and_rejects_password_fields() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let updated = app
         .clone()
@@ -157,7 +158,7 @@ async fn patch_settings_updates_values_and_rejects_password_fields() {
 
 #[tokio::test]
 async fn settings_database_import_and_require_login_round_trip() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let imported = app
         .clone()

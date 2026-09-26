@@ -3,13 +3,13 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::core::auth::parse_api_key;
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::core::auth::parse_api_key;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 const TEST_KEY: &str = "keys-api-test-key";
 
@@ -25,6 +25,7 @@ fn active_key() -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -45,7 +46,7 @@ async fn app_state(keys: Vec<ApiKey>) -> AppState {
 #[tokio::test]
 async fn create_key_returns_machine_bound_key_shape() {
     let state = app_state(vec![]).await;
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(
             Request::builder()
@@ -95,7 +96,7 @@ async fn create_key_returns_machine_bound_key_shape() {
 
 #[tokio::test]
 async fn create_key_rejects_missing_name() {
-    let app = cipherroute::build_app(app_state(vec![]).await);
+    let app = zeroproxy::build_app(app_state(vec![]).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -119,7 +120,7 @@ async fn create_key_rejects_missing_name() {
 
 #[tokio::test]
 async fn create_key_with_existing_keys_requires_auth_and_keeps_response_shape() {
-    let app = cipherroute::build_app(app_state(vec![active_key()]).await);
+    let app = zeroproxy::build_app(app_state(vec![active_key()]).await);
     let response = app
         .oneshot(
             Request::builder()

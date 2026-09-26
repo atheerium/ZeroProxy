@@ -1,11 +1,11 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::executor::{
+use zeroproxy::core::executor::{
     parse_cursor_sse_events, ClientPool, CursorExecutionRequest, CursorExecutor,
     CursorExecutorError, SseEvent,
 };
-use cipherroute::types::{ProviderConnection, ProviderNode};
+use zeroproxy::types::{ProviderConnection, ProviderNode};
 
 fn cursor_connection() -> ProviderConnection {
     ProviderConnection {
@@ -41,10 +41,9 @@ fn cursor_connection() -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -89,6 +88,7 @@ fn cursor_executor_accepts_provider_node() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     let executor = CursorExecutor::new(pool, Some(node));
@@ -268,10 +268,9 @@ async fn cursor_executor_missing_access_token_fails() {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     let request = CursorExecutionRequest {
@@ -348,6 +347,7 @@ fn provider_node_cursor_type() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
 
     assert_eq!(node.r#type, "cursor");

@@ -1,7 +1,7 @@
 //! Budget caps & hard kill-switch tests (free-tier Feature 3).
 //!
 //! Exercises `budget_guard::enforce_budget` directly:
-//! - over budget  → 429 with `X-Budget-Remaining: 0` + `cipherroute.v1.budget.exceeded`
+//! - over budget  → 429 with `X-Budget-Remaining: 0` + `zeroproxy.v1.budget.exceeded`
 //! - under budget → `Ok(Some(remaining))`
 //! - no budget     → `Ok(None)` (unlimited)
 //! - no key presented → `Ok(None)` (nothing to enforce)
@@ -12,13 +12,13 @@ use std::sync::Arc;
 use axum::body::to_bytes;
 use axum::http::{header::HeaderValue, StatusCode};
 use axum::response::IntoResponse;
-use cipherroute::db::Db;
-use cipherroute::server::api::budget_guard::{
+use tempfile::tempdir;
+use zeroproxy::db::Db;
+use zeroproxy::server::api::budget_guard::{
     enforce_budget, with_budget_header, BUDGET_EXCEEDED_SCHEMA, BUDGET_REMAINING_HEADER,
 };
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, TokenUsage, UsageEntry};
-use tempfile::tempdir;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, TokenUsage, UsageEntry};
 
 const BUDGET_KEY: &str = "budget-key";
 
@@ -34,6 +34,7 @@ fn key_with_budget(budget: Option<f64>) -> ApiKey {
         daily_budget_usd: None,
         daily_request_limit: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -55,6 +56,7 @@ fn usage_entry(api_key: &str, cost: f64) -> UsageEntry {
             cache_read_input_tokens: None,
             cache_creation_input_tokens: None,
             extra: BTreeMap::new(),
+            ..Default::default()
         }),
         cost: Some(cost),
         status: None,
@@ -64,6 +66,7 @@ fn usage_entry(api_key: &str, cost: f64) -> UsageEntry {
         bytes_saved: 0,
         image_prompts: 0,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 

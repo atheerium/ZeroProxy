@@ -3,12 +3,12 @@ use std::sync::Arc;
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
 use serde_json::json;
 use sha2::{Digest, Sha256};
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
 
 async fn app_state() -> AppState {
     let temp = tempdir().expect("tempdir");
@@ -16,7 +16,7 @@ async fn app_state() -> AppState {
     db.update(|state| {
         // Management key: oauth proxy routes sit in the admin tier now that
         // requireLogin defaults to true (9router parity).
-        state.api_keys.push(cipherroute::types::ApiKey {
+        state.api_keys.push(zeroproxy::types::ApiKey {
             id: "mgmt-1".into(),
             name: "Management".into(),
             key: "kiro-mgmt-key".into(),
@@ -27,6 +27,7 @@ async fn app_state() -> AppState {
             daily_budget_usd: None,
             daily_request_limit: None,
             extra: Default::default(),
+            ..Default::default()
         });
     })
     .await
@@ -60,7 +61,7 @@ fn is_base64url_no_pad(value: &str) -> bool {
 
 #[tokio::test]
 async fn kiro_social_authorize_matches_cipherroute_google_response() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request("/api/oauth/kiro/social-authorize?provider=google"))
         .await
@@ -94,7 +95,7 @@ async fn kiro_social_authorize_matches_cipherroute_google_response() {
 
 #[tokio::test]
 async fn kiro_social_authorize_uses_github_idp_name_like_cipherroute() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(request("/api/oauth/kiro/social-authorize?provider=github"))
         .await
@@ -110,7 +111,7 @@ async fn kiro_social_authorize_uses_github_idp_name_like_cipherroute() {
 
 #[tokio::test]
 async fn kiro_social_authorize_rejects_missing_or_invalid_provider() {
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
 
     let missing = app
         .clone()

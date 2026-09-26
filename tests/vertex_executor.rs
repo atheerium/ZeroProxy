@@ -1,9 +1,9 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use cipherroute::core::executor::ClientPool;
-use cipherroute::types::{ProviderConnection, ProviderNode};
 use serde_json::json;
+use zeroproxy::core::executor::ClientPool;
+use zeroproxy::types::{ProviderConnection, ProviderNode};
 
 fn connection(provider: &str) -> ProviderConnection {
     ProviderConnection {
@@ -39,8 +39,6 @@ fn connection(provider: &str) -> ProviderConnection {
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         ttft_ms: None,
         client_app: None,
@@ -55,7 +53,7 @@ fn connection(provider: &str) -> ProviderConnection {
 #[test]
 fn vertex_executor_new_succeeds_with_valid_pool() {
     let pool = Arc::new(ClientPool::new());
-    let executor = cipherroute::core::executor::VertexExecutor::new(pool.clone(), None);
+    let executor = zeroproxy::core::executor::VertexExecutor::new(pool.clone(), None);
     assert!(executor.is_ok());
     assert!(Arc::ptr_eq(executor.as_ref().unwrap().pool(), &pool));
 }
@@ -73,8 +71,9 @@ fn vertex_executor_new_succeeds_with_provider_node() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
-    let executor = cipherroute::core::executor::VertexExecutor::new(pool, Some(provider_node));
+    let executor = zeroproxy::core::executor::VertexExecutor::new(pool, Some(provider_node));
     assert!(executor.is_ok());
 }
 
@@ -92,7 +91,7 @@ async fn vertex_executor_execute_request_missing_credentials() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -102,7 +101,7 @@ async fn vertex_executor_execute_request_missing_credentials() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -115,7 +114,7 @@ async fn vertex_executor_execute_request_missing_credentials() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingCredentials(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingCredentials(_)
     ));
 }
 
@@ -133,7 +132,7 @@ async fn vertex_executor_execute_request_invalid_service_account_json() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -143,7 +142,7 @@ async fn vertex_executor_execute_request_invalid_service_account_json() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -156,7 +155,7 @@ async fn vertex_executor_execute_request_invalid_service_account_json() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
     ));
 }
 
@@ -174,7 +173,7 @@ async fn vertex_executor_execute_request_wrong_service_account_type() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -184,7 +183,7 @@ async fn vertex_executor_execute_request_wrong_service_account_type() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -197,7 +196,7 @@ async fn vertex_executor_execute_request_wrong_service_account_type() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
     ));
 }
 
@@ -215,7 +214,7 @@ async fn vertex_executor_execute_request_empty_private_key() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -225,7 +224,7 @@ async fn vertex_executor_execute_request_empty_private_key() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -238,7 +237,7 @@ async fn vertex_executor_execute_request_empty_private_key() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
     ));
 }
 
@@ -256,7 +255,7 @@ async fn vertex_executor_execute_request_empty_client_email() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -266,7 +265,7 @@ async fn vertex_executor_execute_request_empty_client_email() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -279,7 +278,7 @@ async fn vertex_executor_execute_request_empty_client_email() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
     ));
 }
 
@@ -297,7 +296,7 @@ async fn vertex_executor_execute_request_empty_token_uri() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -307,7 +306,7 @@ async fn vertex_executor_execute_request_empty_token_uri() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -320,7 +319,7 @@ async fn vertex_executor_execute_request_empty_token_uri() {
     let err = result.unwrap_err();
     assert!(matches!(
         err,
-        cipherroute::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
+        zeroproxy::core::executor::VertexExecutorError::MissingServiceAccountJson(_)
     ));
 }
 
@@ -338,7 +337,7 @@ async fn vertex_executor_execute_request_network_error() {
         std::env::set_var("HOME", &adc_home_path);
     }
     let executor =
-        cipherroute::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
+        zeroproxy::core::executor::VertexExecutor::new(Arc::new(ClientPool::new()), None)
             .expect("vertex executor");
 
     let mut conn = connection("vertex");
@@ -348,7 +347,7 @@ async fn vertex_executor_execute_request_network_error() {
     let body = json!({"contents": []});
 
     let result = executor
-        .execute_request(cipherroute::core::executor::VertexExecutionRequest {
+        .execute_request(zeroproxy::core::executor::VertexExecutionRequest {
             model: "vertex/gemini-2.5-flash".to_string(),
             body,
             stream: false,
@@ -362,30 +361,28 @@ async fn vertex_executor_execute_request_network_error() {
 
 #[test]
 fn vertex_executor_error_display() {
-    let err = cipherroute::core::executor::VertexExecutorError::MissingCredentials(
+    let err = zeroproxy::core::executor::VertexExecutorError::MissingCredentials(
         "test message".to_string(),
     );
     let debug_fmt = format!("{:?}", err);
     assert!(debug_fmt.contains("MissingCredentials"));
 
-    let err2 = cipherroute::core::executor::VertexExecutorError::JwtGenerationFailed(
+    let err2 = zeroproxy::core::executor::VertexExecutorError::JwtGenerationFailed(
         "jwt failed".to_string(),
     );
     let debug_fmt2 = format!("{:?}", err2);
     assert!(debug_fmt2.contains("JwtGenerationFailed"));
 
-    let err3 =
-        cipherroute::core::executor::VertexExecutorError::RequestFailed("failed".to_string());
+    let err3 = zeroproxy::core::executor::VertexExecutorError::RequestFailed("failed".to_string());
     let debug_fmt3 = format!("{:?}", err3);
     assert!(debug_fmt3.contains("RequestFailed"));
 
     let err4 =
-        cipherroute::core::executor::VertexExecutorError::RsaPemParse("parse error".to_string());
+        zeroproxy::core::executor::VertexExecutorError::RsaPemParse("parse error".to_string());
     let debug_fmt4 = format!("{:?}", err4);
     assert!(debug_fmt4.contains("RsaPemParse"));
 
-    let err5 =
-        cipherroute::core::executor::VertexExecutorError::InvalidToken("invalid".to_string());
+    let err5 = zeroproxy::core::executor::VertexExecutorError::InvalidToken("invalid".to_string());
     let debug_fmt5 = format!("{:?}", err5);
     assert!(debug_fmt5.contains("InvalidToken"));
 }

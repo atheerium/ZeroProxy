@@ -3,15 +3,15 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::core::rtk::CompressionLevel;
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, Combo, ProviderConnection, ProviderNode, Settings};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
 use wiremock::matchers::{body_partial_json, header, method, path};
 use wiremock::{Mock, MockServer, ResponseTemplate};
+use zeroproxy::core::rtk::CompressionLevel;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, Combo, ProviderConnection, ProviderNode, Settings};
 
 fn active_key(key: &str) -> ApiKey {
     ApiKey {
@@ -25,6 +25,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -39,6 +40,7 @@ fn provider_node(id: &str, prefix: &str, base_url: &str) -> ProviderNode {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -76,10 +78,9 @@ fn connection(id: &str, provider: &str, priority: u32, api_key: &str) -> Provide
         consecutive_errors: None,
         proxy_url: None,
         proxy_label: None,
-        use_connection_proxy: None,
-        runtime_transport: None,
         provider_specific_data: BTreeMap::new(),
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -146,7 +147,7 @@ async fn chat_completions_streams_openai_compatible_response() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -223,7 +224,7 @@ async fn chat_completions_injects_caveman_prompt_for_long_requests() {
     .await;
     let long_prompt = "Need concise summary of massive transcript. ".repeat(220);
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -305,7 +306,7 @@ async fn chat_completions_skips_caveman_prompt_for_short_requests() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -386,7 +387,7 @@ async fn chat_completions_preserves_chat_content_part_schema_when_injecting_cave
     .await;
     let long_prompt = "Need concise summary of massive transcript. ".repeat(220);
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -485,7 +486,7 @@ async fn chat_completions_falls_back_to_next_account_on_retryable_error() {
     )
     .await;
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let response = app
         .oneshot(
             Request::builder()
@@ -563,6 +564,7 @@ async fn chat_completions_uses_combo_fallback_across_models() {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     };
     let mut combo_connection = connection("conn-1", "node-openai", 1, "upstream-key");
     combo_connection.default_model = None;
@@ -581,7 +583,7 @@ async fn chat_completions_uses_combo_fallback_across_models() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -653,7 +655,7 @@ async fn chat_completions_skips_accounts_that_do_not_advertise_requested_model()
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -718,7 +720,7 @@ async fn chat_completions_returns_retry_after_while_model_is_cooling_down() {
     })
     .to_string();
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let first = app
         .oneshot(
             Request::builder()
@@ -747,7 +749,7 @@ async fn chat_completions_returns_retry_after_while_model_is_cooling_down() {
     let first_retry_after: i64 = retry_hdr.unwrap().to_str().unwrap().parse().unwrap();
     assert!(first_retry_after >= 100);
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let second = app
         .oneshot(
             Request::builder()
@@ -828,7 +830,7 @@ async fn chat_completions_does_not_cool_down_entire_connection_for_model_specifi
     )
     .await;
 
-    let app = cipherroute::build_app(state.clone());
+    let app = zeroproxy::build_app(state.clone());
     let missing = app
         .oneshot(
             Request::builder()
@@ -859,7 +861,7 @@ async fn chat_completions_does_not_cool_down_entire_connection_for_model_specifi
     assert!(stored.extra.contains_key("modelLock_gpt-missing"));
     assert!(stored.rate_limited_until.is_none());
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let ok = app
         .oneshot(
             Request::builder()
@@ -922,7 +924,7 @@ async fn chat_completions_supports_enabled_models_with_nested_slashes() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -993,7 +995,7 @@ async fn chat_completions_preserves_earliest_retry_after_when_all_accounts_fail(
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()
@@ -1045,7 +1047,7 @@ async fn chat_completions_rejects_connections_without_credentials() {
     )
     .await;
 
-    let app = cipherroute::build_app(state);
+    let app = zeroproxy::build_app(state);
     let response = app
         .oneshot(
             Request::builder()

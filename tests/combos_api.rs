@@ -3,15 +3,15 @@ use std::sync::Arc;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
-use cipherroute::core::combo::{
-    get_rotated_models, reset_combo_rotation, rotation_index, ComboStrategy,
-};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::{ApiKey, Combo};
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::core::combo::{
+    get_rotated_models, reset_combo_rotation, rotation_index, ComboStrategy,
+};
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::{ApiKey, Combo};
 
 const TEST_KEY: &str = "combos-api-test-key";
 
@@ -27,6 +27,7 @@ fn active_key() -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -41,6 +42,7 @@ fn combo(id: &str, name: &str) -> Combo {
         created_at: None,
         updated_at: None,
         extra: BTreeMap::new(),
+        ..Default::default()
     }
 }
 
@@ -58,7 +60,7 @@ async fn app_state(combos: Vec<Combo>) -> AppState {
 
 #[tokio::test]
 async fn create_combo_returns_direct_combo_body_with_null_kind() {
-    let app = cipherroute::build_app(app_state(vec![]).await);
+    let app = zeroproxy::build_app(app_state(vec![]).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -98,7 +100,7 @@ async fn create_combo_returns_direct_combo_body_with_null_kind() {
 
 #[tokio::test]
 async fn create_combo_rejects_missing_name() {
-    let app = cipherroute::build_app(app_state(vec![]).await);
+    let app = zeroproxy::build_app(app_state(vec![]).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -124,7 +126,7 @@ async fn create_combo_rejects_missing_name() {
 
 #[tokio::test]
 async fn create_combo_rejects_duplicate_name() {
-    let app = cipherroute::build_app(app_state(vec![combo("combo-1", "writer")]).await);
+    let app = zeroproxy::build_app(app_state(vec![combo("combo-1", "writer")]).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -160,7 +162,7 @@ async fn update_combo_resets_rotation_state() {
     let _ = get_rotated_models(&models, Some(original_name), ComboStrategy::RoundRobin, 0);
     assert_eq!(rotation_index(original_name), Some(1));
 
-    let app = cipherroute::build_app(app_state(vec![combo("combo-1", original_name)]).await);
+    let app = zeroproxy::build_app(app_state(vec![combo("combo-1", original_name)]).await);
     let response = app
         .oneshot(
             Request::builder()
@@ -196,7 +198,7 @@ async fn delete_combo_resets_rotation_state() {
     let _ = get_rotated_models(&models, Some(combo_name), ComboStrategy::RoundRobin, 0);
     assert_eq!(rotation_index(combo_name), Some(1));
 
-    let app = cipherroute::build_app(app_state(vec![combo("combo-1", combo_name)]).await);
+    let app = zeroproxy::build_app(app_state(vec![combo("combo-1", combo_name)]).await);
     let response = app
         .oneshot(
             Request::builder()

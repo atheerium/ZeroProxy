@@ -1,4 +1,4 @@
-// Integration test for cipherroute::db::watcher::spawn_watcher.
+// Integration test for zeroproxy::db::watcher::spawn_watcher.
 //
 // NOTE: This test references the legacy JSON-file DB path (`db.json`). The
 // project now uses SQLite. The test body is intentionally absent because
@@ -14,11 +14,11 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use cipherroute::db::watcher::spawn_watcher;
-use cipherroute::db::Db;
 use serde_json::json;
 use tempfile::tempdir;
 use tokio::time::sleep;
+use zeroproxy::db::watcher::spawn_watcher;
+use zeroproxy::db::Db;
 
 #[ignore = "legacy JSON DB path — project uses SQLite; Db::new_in_memory no longer exists"]
 #[tokio::test]

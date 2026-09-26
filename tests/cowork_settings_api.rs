@@ -32,13 +32,13 @@ mod platform {
 
 use axum::body::Body;
 use axum::http::{Method, Request, StatusCode};
-use cipherroute::db::Db;
-use cipherroute::server::state::AppState;
-use cipherroute::types::ApiKey;
 use once_cell::sync::Lazy;
 use serde_json::json;
 use tempfile::tempdir;
 use tower::util::ServiceExt;
+use zeroproxy::db::Db;
+use zeroproxy::server::state::AppState;
+use zeroproxy::types::ApiKey;
 
 static ENV_LOCK: Lazy<Mutex<()>> = Lazy::new(|| Mutex::new(()));
 
@@ -54,6 +54,7 @@ fn active_key(key: &str) -> ApiKey {
         monthly_budget_usd: None,
         daily_budget_usd: None,
         daily_request_limit: None,
+        ..Default::default()
     }
 }
 
@@ -123,7 +124,7 @@ async fn cowork_settings_get_returns_not_installed_without_claude_dirs() {
     let home = tempdir().unwrap();
     let _guard = HomeEnvGuard::new(home.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::GET,
@@ -148,7 +149,7 @@ async fn cowork_settings_post_bootstraps_and_get_reads_config() {
     let home = tempdir().unwrap();
     let _guard = HomeEnvGuard::new(home.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .clone()
         .oneshot(authorized_request(
@@ -206,7 +207,7 @@ async fn cowork_settings_post_rejects_localhost_urls() {
     let home = tempdir().unwrap();
     let _guard = HomeEnvGuard::new(home.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let response = app
         .oneshot(authorized_request(
             Method::POST,
@@ -234,7 +235,7 @@ async fn cowork_settings_delete_clears_existing_config() {
     let home = tempdir().unwrap();
     let _guard = HomeEnvGuard::new(home.path());
 
-    let app = cipherroute::build_app(app_state().await);
+    let app = zeroproxy::build_app(app_state().await);
     let post_response = app
         .clone()
         .oneshot(authorized_request(
