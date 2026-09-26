@@ -1,5 +1,29 @@
 # ZeroProxy — Rust AI Proxy Router
 
+## Mission — read this first, it is not up for renegotiation
+
+> **ZeroProxy is "a lightweight OmniRoute Rust alternative for all free-tier LLM providers."**
+
+That one phrase is the whole product. Everything below is subordinate to it.
+
+**The goal is OmniRoute. The 9router/openproxy era is over.** We already replicated almost every
+feature from 9router and quangdang46/openproxy, and both of those repos update slowly, so chasing
+their release notes has low return. OmniRoute is the only upstream that still moves fast enough to
+be worth mirroring, so:
+
+- **Parity target = OmniRoute's FREE-TIER provider list + model catalog + model conventions.**
+- **Free tier only. Paid providers are explicitly out of scope.** Do not add them, do not research
+  them, do not report their absence as a gap.
+- **Lightweight is a hard constraint, not a nice-to-have.** If a port drags in MCP, A2A/ACP,
+  Electron/PWA/VNC, memory/skills frameworks, cloud sync, Telegram, or chaos engineering, it is
+  the wrong port. See the "do NOT port" list.
+- **Only free-tier LLM providers are real targets.** Search/fetch/TTS/embedding/image providers are
+  lower value — do not let them crowd out LLM work.
+
+**Do not ask the user to restate these goals.** They are recorded here permanently. If a task seems
+to conflict with this section, this section wins, and you should say so rather than quietly
+re-scoping.
+
 ## Project lineage — all four repos are one family
 
 ```
@@ -37,14 +61,15 @@ LLM proxy. ZeroProxy's purpose is to stay lightweight while moving **closer to O
 
 ## Repositories to refer to
 
-Look here before reinventing anything, in this order — it follows the lineage, so the most
-recent and most relevant descendant comes first:
+Look here before reinventing anything, in this order. OmniRoute is first because it is the active
+parity target; 9router and openproxy are demoted to reference-only since their feature parity work
+is effectively done.
 
 | Order | Repo | Why |
 |---|---|---|
-| 1 | https://github.com/diegosouzapw/OmniRoute | **Our target.** Catalog, provider, capability conventions |
-| 2 | https://github.com/quangdang46/openproxy | Our direct parent; 259 commits ahead of our `main` |
-| 3 | https://github.com/decolua/9router | Root of the family; where shared conventions originate |
+| 1 | https://github.com/diegosouzapw/OmniRoute | **The parity target.** Free-tier providers, model catalog, model conventions. Diff against this first. |
+| 2 | https://github.com/quangdang46/openproxy | Our direct parent; 259 commits ahead of our `main`. Reference for Rust idioms only — see the rename trap. |
+| 3 | https://github.com/decolua/9router | Root of the family; where shared conventions originate. Parity essentially achieved. |
 | 4 | https://github.com/tashfeenahmed/freellmapi | Occasionally useful, unmaintained |
 
 **`quangdang46/openproxy` is our `upstream` git remote, not a third-party reference.** Its recent
