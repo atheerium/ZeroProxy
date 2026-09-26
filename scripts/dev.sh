@@ -305,8 +305,10 @@ build() {
     echo "Nothing to build."
   fi
 
-  # Full preset runs checks after builds
-  if [[ "$PRESET" == "full" && "$DO_CHECKS" == true && "$MODE" == "build" ]]; then
+  # Do NOT re-add a `MODE == build` guard: `build` also runs for MODE=detach, and
+  # that guard silently skipped fmt/clippy/astro/tests for the documented
+  # `--full detach` pre-push gate. MODE=check never calls build, so no double-run.
+  if [[ "$PRESET" == "full" && "$DO_CHECKS" == true ]]; then
     echo ""
     run_checks
   fi
