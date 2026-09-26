@@ -415,6 +415,34 @@ failed this way while the translation output was byte-identical.
 - **`*.snap.new` is not gitignored**, so insta's staging files get committed by accident. 35 of
   them were tracked here. Before deleting any, prove they hold nothing unique.
 
+### 11. The sync normalizer projects each provider field TWICE
+`scripts/sync/normalize-sources.mjs` builds a provider twice: the inner `omnirouteLoaderSource`
+(the `tsx` script) assembles `out.registry[id]`, then the outer `loadOmniroute` re-projects an
+**explicit field list** into the final array. A field added to only one projection **vanishes
+with no error, no warning, and a plausible-looking snapshot** — `modelsUrl` was carried correctly
+through the inner projection and still came out `0` across all 270 providers. Always add to both,
+and verify by counting the field in the regenerated JSON rather than by the absence of an error.
+- **`omnirouteLoaderSource` is a JS template literal.** A **backtick inside a comment terminates
+  the string** and the whole normalizer dies with a syntax error pointing at unrelated text. No
+  backticks in that block.
+- **Use a fresh clone for data.** `~/dev/OmniRoute` is pinned to an old release and is ~1 month
+  stale. Clone fresh or pass `--src-omniroute=<fresh clone>`; re-measure the free/provider counts
+  afterwards rather than trusting the old checkout.
+
+### 12. `core::dns::is_private_ip` fails OPEN on link-local — do not use it to guard a URL
+It takes a **bare IP string**, not a URL or hostname, and returns `false` for anything unparseable
+(`src/core/dns/mod.rs:346`). It covers `10/8`, `127/8`, `172.16/12`, `192.168/16`, `::1`,
+`::ffff:127/104` — **not** `169.254.0.0/16`. So `is_private_ip("http://169.254.169.254/…")`
+returns `false`, i.e. *permissive*, on exactly the cloud-metadata case a guard exists to catch.
+The correct primitive is `resolve_public_ip` in
+`src/core/translator/helpers/image_helper.rs` — stricter, DNS-resolving, and its own tests assert
+it blocks `169.254.169.254`, `100.64.0.1`, and `240.0.0.1`. It is `pub(crate)` for reuse by
+`provider_models.rs`, which guards its `modelsUrl` fetch with it.
+- Residual, documented rather than fixed: `resolve_public_ip`'s caller binds `let _pinned_ip = …`
+  and then fetches **by hostname**, so the check guards *before* the request but leaves a TOCTOU
+  re-resolution window. That is the house pattern; widening it into a real connection pin is its
+  own change.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`

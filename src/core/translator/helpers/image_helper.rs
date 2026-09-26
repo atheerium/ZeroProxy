@@ -89,7 +89,10 @@ fn is_valid_image_body(bytes: &[u8]) -> bool {
 /// DNS-pin `host` to its resolved IP(s) and reject private/reserved addresses.
 /// Returns the first public IP found, or `None` if all resolved IPs are
 /// private or resolution fails.
-async fn resolve_public_ip(host: &str) -> Option<IpAddr> {
+///
+/// `pub(crate)` so other outbound fetches reuse this guard. Do NOT substitute
+/// `core::dns::is_private_ip`: it takes a bare IP string and misses link-local.
+pub(crate) async fn resolve_public_ip(host: &str) -> Option<IpAddr> {
     let addrs = net::lookup_host((host, 0)).await.ok()?;
     for addr in addrs {
         let ip = addr.ip();

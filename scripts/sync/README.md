@@ -68,6 +68,8 @@ applies them to `db.json` against the user's machine.
       "free": true,                  // OmniRoute only: upstream hasFree
       "noAuth": true,                // OmniRoute only: needs no credential
       "serviceKinds": ["llm"],       // OmniRoute only, sparse upstream
+      "modelsUrl": "https://…/v1/models",  // OmniRoute only: live model list
+      "passthroughModels": true,     // OmniRoute only: upstream catalog is authoritative
       "models": [
         { "id": "gpt-5.5", "name": "GPT-5.5", "kind": "llm", "contextLength": 1050000 }
       ]
@@ -95,4 +97,29 @@ Two caveats when reading the snapshot:
   providers.
 - Because free providers frequently ship no static model list, a free-only
   sync will bring in providers that contribute the provider but no models.
-  That is expected — the models appear via live discovery or a later sync.
+  That is expected: those providers carry a `modelsUrl`, and the server
+  fetches it on demand when you list that provider's models.
+
+## Live model discovery
+
+`modelsUrl` is the reason the snapshot does not go stale. Before it was
+carried, every catalog entry was a frozen list taken on the day the snapshot
+was generated — 28 free providers shipped no models at all and there was no
+way to discover theirs.
+
+Now, when a provider has a `modelsUrl` and is not one of the providers the
+server knows how to list explicitly, listing its models fetches that URL
+instead. The fetch is lazy: it happens only when you open that provider's
+model list, never on a timer, so an idle proxy makes no outbound requests.
+
+`modelsUrl` is a server-side fetch target, so it is treated as untrusted: the
+URL must be plain HTTP(S) and its host must resolve to a public address, or
+the request is refused. Reuse `resolve_public_ip` in
+`src/core/translator/helpers/image_helper.rs` for that check — do **not** use
+`core::dns::is_private_ip`, which takes a bare IP string and misses
+link-local, so it fails open on exactly the cloud-metadata address.
+
+To add a field to a provider, update **both** projections in
+`normalize-sources.mjs`: the inner `omnirouteLoaderSource` and the outer
+`loadOmniroute`. A field added to only one disappears silently, with no
+error.

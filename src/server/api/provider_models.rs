@@ -11,7 +11,10 @@ use chrono::{Duration as ChronoDuration, Utc};
 use reqwest::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE};
 use serde::Serialize;
 use serde_json::{json, Value};
+use url::Url;
 
+use crate::cli::sync::embedded_omniroute_models_url;
+use crate::core::translator::helpers::image_helper::resolve_public_ip;
 use crate::server::api::oauth::{get_refresh_lock_key, REFRESH_LOCKS};
 use crate::server::state::AppState;
 use crate::types::{CustomModel, ProviderConnection};
@@ -775,10 +778,37 @@ async fn fetch_provider_models_response(
             )
             .await
         }
-        other => Err(RouteError::bad_request(format!(
-            "Provider {other} does not support models listing"
-        ))),
+        // Fall back to the `modelsUrl` the OmniRoute snapshot records. The
+        // snapshot stores *where to look*, so a model upstream adds later is
+        // still reachable without re-running the sync. Lazy: this arm is only
+        // reached when someone lists this provider's models, so an idle proxy
+        // makes no outbound request.
+        other => match embedded_omniroute_models_url(other) {
+            Some(url) if is_public_http_url(&url).await => {
+                fetch_public_openai_style_models(connection, &url).await
+            }
+            _ => Err(RouteError::bad_request(format!(
+                "Provider {other} does not support models listing"
+            ))),
+        },
     }
+}
+
+/// Reject anything that is not a plain public HTTP(S) endpoint.
+///
+/// `modelsUrl` is a server-side fetch target, so a value aimed at loopback or
+/// a cloud-metadata address would make model discovery an SSRF primitive.
+async fn is_public_http_url(url: &str) -> bool {
+    if !url.starts_with("http://") && !url.starts_with("https://") {
+        return false;
+    }
+    let Ok(parsed) = Url::parse(url) else {
+        return false;
+    };
+    let Some(host) = parsed.host_str() else {
+        return false;
+    };
+    resolve_public_ip(host).await.is_some()
 }
 
 async fn fetch_first_party_openai_style_models(
@@ -2420,5 +2450,86 @@ mod tests {
             m.provider_alias == provider_alias && m.id == "different/model" && m.r#type == "llm"
         });
         assert!(!missing, "different id should not match");
+    }
+
+    // Negative-only on purpose: a public host would need a real DNS lookup, and
+    // a test that depends on the network is a test that fails in CI sandboxes.
+    // Literal IPs skip DNS entirely, so these are deterministic.
+    #[tokio::test]
+    async fn models_url_guard_rejects_non_public_targets() {
+        for hostile in [
+            "http://169.254.169.254/latest/meta-data/",
+            "http://127.0.0.1:8080/v1/models",
+            "http://10.0.0.5/v1/models",
+            "http://192.168.1.1/v1/models",
+            "http://[::1]/v1/models",
+        ] {
+            assert!(
+                !is_public_http_url(hostile).await,
+                "guard must reject {hostile}"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn models_url_guard_rejects_non_http_schemes() {
+        for not_a_web_url in [
+            "file:///etc/passwd",
+            "/models", // the one relative modelsUrl in the snapshot
+            "ftp://example.com/models",
+            "not a url at all",
+        ] {
+            assert!(
+                !is_public_http_url(not_a_web_url).await,
+                "guard must reject {not_a_web_url}"
+            );
+        }
+    }
+
+    #[test]
+    fn embedded_snapshot_resolves_a_models_url_by_id() {
+        assert_eq!(
+            embedded_omniroute_models_url("aihorde").as_deref(),
+            Some("https://oai.aihorde.net/v1/models")
+        );
+    }
+
+    #[test]
+    fn embedded_models_url_lookup_is_lazy_and_total() {
+        // No modelsUrl means the match arm does nothing at all: no DNS, no
+        // request. This is what keeps discovery on-demand rather than polling.
+        assert_eq!(
+            embedded_omniroute_models_url("totally-unknown-provider"),
+            None
+        );
+    }
+
+    /// Data-driven guard: the normalizer projects provider fields twice, and a
+    /// field added to only one projection vanishes with no error. If a
+    /// regeneration drops `modelsUrl` again, this fails instead of silently
+    /// returning the catalog to a frozen static list.
+    #[test]
+    fn embedded_snapshot_carries_models_urls() {
+        let snapshot: crate::cli::sync::SourceSnapshot =
+            serde_json::from_str(crate::cli::sync::EMBEDDED_OMNIROUTE_JSON)
+                .expect("embedded omniroute snapshot must parse");
+        let with_url = snapshot
+            .providers
+            .iter()
+            .filter(|p| p.models_url.is_some())
+            .count();
+        let passthrough = snapshot
+            .providers
+            .iter()
+            .filter(|p| p.passthrough_models == Some(true))
+            .count();
+        assert!(
+            with_url > 50,
+            "expected many providers to carry a modelsUrl, found {with_url}"
+        );
+        assert!(
+            passthrough > 50,
+            "expected many providers to be passthrough, found {passthrough}"
+        );
     }
 }

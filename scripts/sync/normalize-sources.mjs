@@ -238,6 +238,12 @@ async function loadOmniroute(rootDir) {
       ...(entry.format ? { format: entry.format } : {}),
       ...(entry.authType ? { authType: entry.authType } : {}),
       ...(entry.baseUrl ? { baseUrl: entry.baseUrl } : {}),
+      // Where this provider's live model list is fetched from, and whether the
+      // upstream catalog is authoritative. Carried so a model OmniRoute adds
+      // after this snapshot is still discoverable. Both are dropped by the
+      // projection above unless repeated here, so keep the two in step.
+      ...(entry.modelsUrl ? { modelsUrl: entry.modelsUrl } : {}),
+      ...(entry.passthroughModels ? { passthroughModels: true } : {}),
       // Free-tier markers come from the metadata module, NOT the registry:
       // `hasFree` marks "this provider has a usable free tier", `noAuth`
       // marks keyless providers. Both are needed to answer "is this free?".
@@ -314,6 +320,13 @@ const aliasMap = (typeof mod.generateAliasMap === "function") ? mod.generateAlia
       format: e.format,
       authType: e.authType,
       baseUrl: e.baseUrl,
+      // Carried so the snapshot describes how to refresh a provider's models,
+      // not just a frozen list. Omitting these made every catalog entry static
+      // and left sync unable to pick up a model OmniRoute added later.
+      // NOTE: no backticks in these comments - this whole block is a template
+      // literal, so one would terminate the string.
+      ...(e.modelsUrl ? { modelsUrl: e.modelsUrl } : {}),
+      ...(e.passthroughModels ? { passthroughModels: true } : {}),
       models: Array.isArray(e.models) ? e.models : [],
     };
   }
