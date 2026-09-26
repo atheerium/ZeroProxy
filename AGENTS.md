@@ -38,12 +38,13 @@ Treat this file as the sole source of truth for anything you were not told in th
 
 ## Current state (2026-09-26) — read before planning more work
 
-**The free-tier goal is met. PR #14 is approved and green, awaiting merge.**
+**The free-tier goal is met and PR #14 is MERGED into `main` (merge commit `c9d72419`, 2026-09-26).**
 
-- PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) is **approved by the maintainer but NOT
-  yet merged** — no merge has been performed. It is still a **draft**; mark it ready first. Its 24
-  commits sit on `sisyphus/feat/omniroute-free-sync` in worktree `../wt-sisyphus-omni-sync`.
-  **Do not claim it is merged until `git log main` actually shows those commits.**
+- PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) was **merged with a merge commit** (not
+  squash), so `git log main` shows the individual commits. It carried 25 commits relative to the old
+  local `main`, and 35 relative to `origin/main` — because the old local `main` had **10 unpushed
+  commits** of its own which the branch also contained. Nothing was lost; verify with
+  `git rev-list --count c9d72419^..HEAD` (36 = merge + 25 + 10).
 - The merge was deliberately held back while CI was red, then unblocked. The 40 test failures were
   **not** "latent stale-test debt" as first recorded — the broken test build had been *hiding two
   live production bugs*:
@@ -78,12 +79,12 @@ Treat this file as the sole source of truth for anything you were not told in th
    `auto_sync` models.dev daemon, 11 user-created, 8 imported), already rekeyed by the Trap 8
    migration. Do not assume a clean slate.
 
-**Approved by the maintainer (2026-09-26), not yet merged: PR #14.** The 24-commit free-tier +
-freshness branch is green (`1905 passed / 0 failed`, clippy 0 errors) and is waiting only on the
-merge itself; mark the draft ready, then merge. The custom-model toggle question is also **settled**
-— see below. One decision remains open: whether to cherry-pick upstream's 169 substantive commits
-(142 touch `src/` and carry the full `openproxy::` → `zeroproxy::` rename cost — see Trap 7; 27 are
-`src/`-free and cheap).
+**The one decision still open: whether to cherry-pick upstream's 169 substantive commits.** The
+free-tier + freshness work is merged and done. Upstream (`quangdang46/openproxy`, our own `upstream`
+remote) has 142 commits touching `src/` that carry the full `openproxy::` → `zeroproxy::` rename
+cost — see Trap 7 for the measured numbers; 27 are `src/`-free and cheap. Recommendation on record:
+cherry-pick the `src/`-free tier, do **not** merge the branch. The custom-model toggle question is
+**settled** — see below.
 
 **Settled: custom models stay permanently un-disable-able — they are the escape hatch.** The
 maintainer's call, in response to being offered the change. Do **not** port upstream's
