@@ -1,12 +1,56 @@
 # ZeroProxy — Rust AI Proxy Router
 
-# Repositories to refer to:
-https://github.com/diegosouzapw/OmniRoute
-https://github.com/decolua/9router
-https://github.com/quangdang46/openproxy/
-https://github.com/tashfeenahmed/freellmapi
+## Project lineage — all four repos are one family
 
-dont reinvent a solution before looking into one of these repositories (in order).
+```
+9router (decolua/9router) — JavaScript/Next.js, the ORIGINAL
+   ├── OmniRoute   (diegosouzapw/OmniRoute)   — TypeScript fork of 9router + CLIProxyAPI port
+   └── openproxy   (quangdang46/openproxy)    — Rust REWRITE fork of 9router
+          └── ZeroProxy (atheerium/ZeroProxy) — our fork of openproxy; renamed `zeroproxy`
+```
+
+Verified, not assumed: OmniRoute's own README states it *"started as a fork of 9router and a
+TypeScript port of the Go project CLIProxyAPI"*, and its credits table calls 9router *"The
+original project this fork is built on"*. **openproxy's** Rust rewrite of 9router is founder-stated.
+
+**Consequences for agents — this is why "the same stuff" keeps showing up:**
+
+- The repos share a directory layout: 9router and OmniRoute **both** have `open-sse/config/`.
+  Our own `scripts/sync/normalize-sources.mjs` reads `open-sse/config/providerModels.js` from
+  9router and `open-sse/config/providerRegistry.ts` from OmniRoute — near-identical shapes.
+- Concepts invented in 9router propagate to all descendants: `transports[]` multi-endpoint tables
+  (we mirror them in `src/core/chat/mod.rs:provider_transports`), `PROVIDER_ID_TO_ALIAS`,
+  `providerModels` catalogs, combo/fallback semantics, the `*-free` zero-priced tier convention.
+- **When something looks inexplicably familiar in 9router, OmniRoute, and here at once, it is
+  shared ancestry, not coincidence.** Diffing one against the other is usually more informative
+  than reading our own code alone.
+- A fix in 9router may already exist in OmniRoute and vice versa. Check both before implementing.
+
+## Why this fork exists
+
+openproxy was chosen as the base **because it is Rust** — the goal is an efficient, lightweight
+LLM proxy. ZeroProxy's purpose is to stay lightweight while moving **closer to OmniRoute**
+(feature parity on catalogs/providers/capabilities), *without* inheriting OmniRoute's bloat
+(MCP, A2A/ACP, Electron/PWA, memory frameworks, cloud sync, Telegram, chaos engineering).
+
+**Port from OmniRoute. Do not port its non-essential subsystems.** See "do NOT port" below.
+
+## Repositories to refer to
+
+Look here before reinventing anything, in this order — it follows the lineage, so the most
+recent and most relevant descendant comes first:
+
+| Order | Repo | Why |
+|---|---|---|
+| 1 | https://github.com/diegosouzapw/OmniRoute | **Our target.** Catalog, provider, capability conventions |
+| 2 | https://github.com/quangdang46/openproxy | Our direct parent; 259 commits ahead of our `main` |
+| 3 | https://github.com/decolua/9router | Root of the family; where shared conventions originate |
+| 4 | https://github.com/tashfeenahmed/freellmapi | Occasionally useful, unmaintained |
+
+**`quangdang46/openproxy` is our `upstream` git remote, not a third-party reference.** Its recent
+PRs are largely authored by `atheerium` (us). "Porting a feature from it" means *reconcile with our
+own upstream* — and note that merging it is currently **blocked**, see the rename trap below.
+
 ## 7 Questions Every Agent Asks
 
 | Q | A | Deep-dive |
@@ -65,6 +109,34 @@ has them. `docs/STATE.md` is also a stale session log from a merged branch — n
 Binary `zeroproxy` (was `cipherroute`, was `openproxy`); schema namespace `zeroproxy.v1` (was
 `cipherroute.v1`); data dir `~/.zeroproxy` (was `~/.cipherroute`). Legacy names survive in
 `pkill` patterns and comments by design. Check `Cargo.toml` `name` before trusting a doc.
+
+### 7. Merging `upstream` is blocked by a one-sided rename — do NOT attempt it casually
+`upstream/main` (`quangdang46/openproxy`) is **259 commits ahead** of us, but the branch is
+**diverged** (90 commits unique to us). A test-merge yields **49 conflicted files**
+(`src/server/api` ×13, `src/core/executor` ×7, `tests` ×5, plus `src/db/sqlite`, `src/core/model`,
+`src/core/auth`, `web/src/components/providers`).
+
+The real blocker is not the conflicts — it is that **we renamed the crate and upstream did not**:
+
+| | ours | upstream |
+|---|---|---|
+| `Cargo.toml` `[package] name` | `zeroproxy` v0.3.1 | `openproxy` v0.3.0 |
+| crate refs in `src/` | 152 × `zeroproxy::` | 143 × `openproxy::` |
+| schema namespace | `zeroproxy.v1` (frozen, 13 resources) | `openproxy.v1` |
+
+Our rename (`bf807c8a`, 2026-08-29) landed **after** the merge-base (`6eec13d8`, 2026-08-25).
+Every cleanly auto-merged file would therefore carry `openproxy::` paths into a crate named
+`zeroproxy` — a compile cascade *on top of* the 49 conflicts, plus a rewrite of the frozen
+`zeroproxy.v1` namespace. Both sides also genuinely changed the same files, so there is no
+wholesale `-X ours` / `-X theirs` escape.
+
+**Treat the full merge as a separate rebranding project needing explicit user sign-off.** It is
+NOT a prerequisite for provider work: `src/cli/sync.rs`, `scripts/sync/normalize-sources.mjs`, and
+`src/core/model/sources/*.json` already exist **on our side** and predate the divergence. The only
+upstream commit touching the sync subsystem (`f2b9dfcb`, a 9router snapshot refresh) contains **zero
+brand references** — so single commits can be cherry-picked safely. One brand leak lives inside the
+subsystem today: `src/cli/sync.rs` emits robot envelope `openproxy.v1.sync.apply`; make it
+`zeroproxy.v1.sync.apply` (additive inside the frozen namespace).
 
 ## Invariants (must not break)
 
