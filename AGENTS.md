@@ -94,6 +94,31 @@ cost — see Trap 7 for the measured numbers; 27 are `src/`-free and cheap. Reco
 cherry-pick the `src/`-free tier, do **not** merge the branch. The custom-model toggle question is
 **settled** — see below.
 
+### The re-verified `src/`-free shortlist (measured 2026-09-26, against `main` @ `bf042d59`)
+An earlier shortlist of these 27 was built **before** the 25 free-tier commits landed, and it is now
+**wrong** — do not use it. Each of the 27 was re-tested with `git show <sha> --format= | git apply
+--check -` against today's `main` (upstream is unmoved at `0b77f8fe`, 259 ahead, base `6eec13d8`).
+Result: **10 apply cleanly, 17 now conflict.**
+
+- **Applies clean AND brand-clean in the diff (8)** — the only ones worth picking:
+  `c58b35f7` pass `providerId` at remaining ProviderIcon sites · `4b05b4bd` stop opening the chat
+  page from erasing chat history · `57dd2e29` XiaomiMimoAuthModal · `c3c0eb95` providerIcon alias
+  resolve + 404 session cache · `d690880a` pxpipe restore details · `c37d42c4` pricing explainer +
+  top-5 overview · `d0737b17` + `20936f79` quota UI + quota utils (**a pair — take both or
+  neither**). Six of these show `brand_refs=1`, but every one is a `Refs openproxy-…` **beads line
+  in the commit message body**, not diff content.
+- **Applies clean but excluded (1):** `6925a3ef` has **11 in-diff** brand refs, including
+  `OPENPROXY_CODEX_TOKEN_URL` — a name `src/` does **not** read (it reads `CIPHERROUTE_CODEX_TOKEN_URL`),
+  so it is the Trap-6 env-var trap. It is also `tests/`-only; the `src/` fix it tests lives in a
+  different commit, so picking it alone is useless.
+- **Now conflicted (17)** — the previously-promised Tier 1 `29c97c10` (a11y model picker) is in
+  here, as are `cf667502`/`588cb9fc`, `952c937b`/`ecf9bde3`, `e8d858ed`, `0d9a5e4e`, `b9dc17e1`,
+  `96f28409`, `33a69252`, `406f00cb`, `ac1d7116` (already superseded by `19d8e0eb`), `e5db61ab`
+  (settled: do not port), and the four `sim-` commits `4619a421`/`701bdc7e`/`c381d4dd`/`8635fc2a`.
+
+`git apply --check` tests each commit **in isolation**, so a commit whose partner already conflicted
+can still read CLEAN. Pairs are called out above; respect them.
+
 **Settled: custom models stay permanently un-disable-able — they are the escape hatch.** The
 maintainer's call, in response to being offered the change. Do **not** port upstream's
 `e5db61ab fix(web): honour disabled state for custom models end-to-end`, and do not "complete" the
