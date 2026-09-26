@@ -38,11 +38,21 @@ Treat this file as the sole source of truth for anything you were not told in th
 
 ## Current state (2026-09-26) — read before planning more work
 
-**The free-tier goal is met and shipped on `main`.**
+**The free-tier goal is met. PR #14 is approved and green, awaiting merge.**
 
-- PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) merged into `main` on 2026-09-26 at the
-  maintainer's explicit request. Its 20 commits are trunk; the worktree and branch
-  `sisyphus/feat/omniroute-free-sync` are historical and can be deleted.
+- PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) is **approved by the maintainer but NOT
+  yet merged** — no merge has been performed. It is still a **draft**; mark it ready first. Its 24
+  commits sit on `sisyphus/feat/omniroute-free-sync` in worktree `../wt-sisyphus-omni-sync`.
+  **Do not claim it is merged until `git log main` actually shows those commits.**
+- The merge was deliberately held back while CI was red, then unblocked. The 40 test failures were
+  **not** "latent stale-test debt" as first recorded — the broken test build had been *hiding two
+  live production bugs*:
+  - `TtftConfig::from_value` read the transposed keys `"tthtTimeoutMs"` / `"tthtQuarantineSecs"`,
+    so **every per-combo TTFT knob was dead** and always used the 5000 ms default. (`ttftAdaptive`
+    was spelled correctly, so adaptive mode worked while both scalar knobs did not.)
+  - `error_config::classify_error` let a status-only rule match *before* the "upstream returned"
+    carve-out, so **a request that failed to translate took the provider out of rotation for
+    120 s** instead of falling through. This is OmniRoute PR #14830; ours had the bug.
 - Delivered: `zeroproxy sync omniroute --free-only` imports OmniRoute's free-tier providers as
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
@@ -68,10 +78,11 @@ Treat this file as the sole source of truth for anything you were not told in th
    `auto_sync` models.dev daemon, 11 user-created, 8 imported), already rekeyed by the Trap 8
    migration. Do not assume a clean slate.
 
-**Decided by the maintainer (2026-09-26): PR #14 is merged into `main`.** The 19-commit
-free-tier + freshness branch is now trunk. The custom-model toggle question is also **settled** — see
-below. One decision remains open: whether to cherry-pick upstream's 169 substantive commits (142
-touch `src/` and carry the full `openproxy::` → `zeroproxy::` rename cost — see Trap 7; 27 are
+**Approved by the maintainer (2026-09-26), not yet merged: PR #14.** The 24-commit free-tier +
+freshness branch is green (`1905 passed / 0 failed`, clippy 0 errors) and is waiting only on the
+merge itself; mark the draft ready, then merge. The custom-model toggle question is also **settled**
+— see below. One decision remains open: whether to cherry-pick upstream's 169 substantive commits
+(142 touch `src/` and carry the full `openproxy::` → `zeroproxy::` rename cost — see Trap 7; 27 are
 `src/`-free and cheap).
 
 **Settled: custom models stay permanently un-disable-able — they are the escape hatch.** The
@@ -333,6 +344,21 @@ Consequences worth remembering:
   `http://127.0.0.1:4623/dashboard`. Note the chip is in a width-constrained navbar row, so keep any
   future label change short or it will wrap.
 
+### 10. A crate rename silently orphans every insta snapshot
+`insta` derives the snapshot **filename from the crate name**. Renaming `cipherroute` → `zeroproxy`
+left all 35 committed references named `cipherroute__*.snap`, so insta found no reference and
+reported **`+new results` with zero `-` lines** — "missing", not "changed". 30 translator tests
+failed this way while the translation output was byte-identical.
+
+- **Read the diff before touching a snapshot.** `+new results` with no `-` lines means the
+  reference is missing; only real `-`/`+` pairs mean behaviour changed. Running `cargo insta
+  accept` (or `INSTA_UPDATE`) on the former **overwrites the reference with the current output and
+  permanently blinds the test** — it would have "fixed" 30 tests that were never broken. The
+  snapshot bodies here were verified byte-identical to the tracked `.snap.new` artifacts first.
+- **Fix the rename, not the snapshot:** `git mv` each `cipherroute__*.snap` to `zeroproxy__*.snap`.
+- **`*.snap.new` is not gitignored**, so insta's staging files get committed by accident. 35 of
+  them were tracked here. Before deleting any, prove they hold nothing unique.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
@@ -447,10 +473,16 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
 
 ## Testing
 
-- **CI runs `cargo test --lib --all-features` on Linux + macOS only.** Integration tests under
-  `tests/` are intentionally excluded (their build was repaired separately — they now compile, but
-  their pass rate is unmeasured), so a green local
-  `cargo test` on `tests/` is *not* the gate.
+- **Only Linux actually runs the tests.** The `rust` job matrixes `[ubuntu-latest, macos-latest]`,
+  but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
+  proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
+  pass as "tests pass" — that misreading happened here once already.
+- **The gate is green: `cargo test --lib --all-features` → 1905 passed, 0 failed.** Keep it that
+  way; a red merge is not worth landing, because it destroys the only thing that makes the gate
+  worth having.
+- Integration tests under `tests/` are intentionally excluded (their build was repaired separately
+  — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
+  is *not* the gate.
 - Unit tests live in `src/**` as `#[cfg(test)]` modules (~224 files) — this is why `--lib` is
   the CI gate; parity locks need no network.
 - Web: `pnpm --dir web test` (vitest, 2 suites: `availableModels`, `providersPage`).
