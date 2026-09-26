@@ -413,7 +413,29 @@ failed this way while the translation output was byte-identical.
   snapshot bodies here were verified byte-identical to the tracked `.snap.new` artifacts first.
 - **Fix the rename, not the snapshot:** `git mv` each `cipherroute__*.snap` to `zeroproxy__*.snap`.
 - **`*.snap.new` is not gitignored**, so insta's staging files get committed by accident. 35 of
-  them were tracked here. Before deleting any, prove they hold nothing unique.
+  them were tracked here. Before deleting any, prove they hold nothing unique. This is the same
+  three-layer rename trap: the rename fixed the *test files* in `6f31d535` but not the snapshot
+  *filenames*.
+- **The catalog sync is model-level, not provider-level** — invisible until the maintainer asked
+  why the dashboard showed 21 providers. `sync omniroute` writes *models* into `customModels`; it
+  never adds a provider you can *add*. Three different numbers are all correct and none is the
+  catalogue: the Providers page lists **configured connections** (21), the addable catalogue is
+  `AI_PROVIDERS` (hand-maintained **130**; `GENERATED_FREE_TIER_PROVIDERS` + `GENERATED_OTHER_PROVIDERS`
+  now bring it to **326**), and the snapshot holds 270.
+
+### 11. Two generator-output traps — fix the generator, never the emitted file
+`scripts/sync/generate-web-providers.mjs` emits `web/src/shared/constants/providers.generated.ts`.
+Both of these shipped a broken file before being caught, and both were fixed **in the generator**,
+which is the entire point of having one:
+- **`new URL("scheme://x").origin` returns the string `"null"`, not a URL.** `JSON.stringify("null")`
+  then renders a literal `website: "null"` in the UI. Require `protocol === "http:" || "https:"`
+  before assigning. This skipped 7 providers legitimately: `auggie`, `codex-app-server`, `zcode`,
+  `devin-cli`, `devin-cli-agentic` (`*://` schemes) and `copilot-web`, `copilot-m365-web` (`wss://`).
+- **Provider ids contain hyphens, which are invalid in a bare TS object key.** 80 keys were emitted
+  unquoted and esbuild failed with `Expected "}" but found "-"`. Use `JSON.stringify(id)` for keys.
+
+**Verify with `node scripts/sync/generate-web-providers.mjs --check`** (exit 1 if the committed file
+is stale) — the same shape as the existing `--prune` staleness idea, and suitable for a pre-push hook.
 
 ## Invariants (must not break)
 
