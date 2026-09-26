@@ -146,22 +146,41 @@ The real blocker is not the conflicts — it is that **we renamed the crate and 
 | | ours | upstream |
 |---|---|---|
 | `Cargo.toml` `[package] name` | `zeroproxy` v0.3.1 | `openproxy` v0.3.0 |
-| crate refs in `src/` | 152 × `zeroproxy::` | 143 × `openproxy::` |
-| schema namespace | `zeroproxy.v1` (frozen, 13 resources) | `openproxy.v1` |
+| crate refs in `src/` | 152 × `zeroproxy::` / 0 `openproxy::` | 0 × `zeroproxy::` / 143 × `openproxy::` |
+| crate refs, whole repo | 567 × `zeroproxy::` / 2 × `openproxy::` | 0 × `zeroproxy::` / 700 × `openproxy::` |
+| schema namespace, whole repo | 254 × `zeroproxy.v1` (frozen, 13 resources) | 0 × `zeroproxy.v1` / 264 × `openproxy.v1` |
+
+The two trees are **mutually exclusive** in brand spelling — there is no overlap to reconcile,
+so every one of the 143 `openproxy::` paths and 264 `openproxy.v1` emit sites must be rewritten.
+Count with `git grep -o <pat> <ref> | wc -l`, **not** `git grep -c` (that counts matching
+*lines*, which undercounts a lot).
 
 Our rename (`bf807c8a`, 2026-08-29) landed **after** the merge-base (`6eec13d8`, 2026-08-25).
-Every cleanly auto-merged file would therefore carry `openproxy::` paths into a crate named
-`zeroproxy` — a compile cascade *on top of* the 49 conflicts, plus a rewrite of the frozen
-`zeroproxy.v1` namespace. Both sides also genuinely changed the same files, so there is no
-wholesale `-X ours` / `-X theirs` escape.
+Both sides also genuinely changed the same files, so there is no wholesale `-X ours` /
+`-X theirs` escape.
+
+**The dangerous part is the 49 conflicts, not the 234 files that merge clean.** Measured: of the
+files upstream changed, **49 conflict and 234 auto-merge with no conflict marker at all.** Those
+234 land silently, carrying `openproxy::` into a crate named `zeroproxy` — so the compile cascade
+and the rewrite of the frozen `zeroproxy.v1` namespace arrive with *no* conflict to alert you,
+only a wall of `E0433`/`E0432` afterwards. Budget the rename as the dominant cost, not the
+conflicts.
 
 **Treat the full merge as a separate rebranding project needing explicit user sign-off.** It is
 NOT a prerequisite for provider work: `src/cli/sync.rs`, `scripts/sync/normalize-sources.mjs`, and
 `src/core/model/sources/*.json` already exist **on our side** and predate the divergence. The only
 upstream commit touching the sync subsystem (`f2b9dfcb`, a 9router snapshot refresh) contains **zero
-brand references** — so single commits can be cherry-picked safely. One brand leak lives inside the
-subsystem today: `src/cli/sync.rs` emits robot envelope `openproxy.v1.sync.apply`; make it
-`zeroproxy.v1.sync.apply` (additive inside the frozen namespace).
+brand references** — so single commits can be cherry-picked safely. (An earlier revision of this trap
+claimed `src/cli/sync.rs` leaked an `openproxy.v1.sync.apply` envelope. False: our copy emits
+`zeroproxy.v1.sync.apply` at `src/cli/sync.rs:588`; it was the *upstream* copy that said `openproxy`.)
+
+**What the 259 are actually worth** (measured): 107 `fix` + 58 `feat` = 165 substantive, plus 23
+`beads` bookkeeping and 29 `chore`. **Zero dependabot** — unlike what the PR list suggests, this is
+hand-written parity work, not dependency noise. So the value is real (that is where the
+`fix(chat): resolve the target format transport-first`, `fix(providers): probe OpenAI-compatible`,
+and `feat(providers): import catalog from live provider models` work lives), but it is
+**not** the free-tier catalog goal: that is already met on our branch via `sync omniroute
+--free-only`. Cherry-pick the individual parity commits you want; do not merge the branch.
 
 ### 8. `kv` keys custom models by `alias/model-id` — never revert to a bare model id
 Custom models live in the `kv` table under `scope = 'customModels'`, primary key `(scope, key)`.
