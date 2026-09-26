@@ -163,6 +163,23 @@ brand references** — so single commits can be cherry-picked safely. One brand 
 subsystem today: `src/cli/sync.rs` emits robot envelope `openproxy.v1.sync.apply`; make it
 `zeroproxy.v1.sync.apply` (additive inside the frozen namespace).
 
+### 8. `kv` stores one model per model id — synced catalogs silently lose collisions
+Custom models live in the `kv` table under `scope = 'customModels'`, whose primary key is
+`(scope, key)` with `key` = the **model id alone**, not `alias/model-id`. Two providers offering
+the same model id therefore overwrite each other: the second sync write wins and the first
+provider silently loses that model.
+
+This matters because free-tier catalogs collide heavily. In the current OmniRoute snapshot the
+**999 free `(alias, model)` pairs collapse to 773 distinct ids — 226 lost (23%)**. Worst offenders:
+`deepseek-v4-flash` (10 providers), `openai/gpt-oss-120b` (9), `gpt-oss-120b` (8), `glm-5.2` (7),
+`openai/gpt-oss-20b` (7), `gemini-3.1-pro-preview` (6). A full unfiltered sync reports 2592 models
+but only ~1281 rows exist.
+
+So `sync` reporting N created does **not** mean N rows are readable. Verify with a real row count,
+not the CLI's own diff. The fix is a composite key (`alias/model-id`), but that changes the storage
+contract read by `/v1/models`, `provider models list`, and combo resolution — it is its own change,
+not a tweak. Do not "fix" it casually.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
