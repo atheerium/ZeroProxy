@@ -49,6 +49,8 @@ const navItems: NavItem[] = [
   { href: "/dashboard/payload-rules", label: "Payload Rules", icon: "tune" },
   { href: "/dashboard/db-backups", label: "DB Backups", icon: "backup" },
   { href: "/dashboard/usage", label: "Usage", icon: "bar_chart" },
+  { href: "/dashboard/analytics", label: "Analytics", icon: "analytics" },
+  { href: "/dashboard/provider-stats", label: "Provider Stats", icon: "table_chart" },
   { href: "/dashboard/quota", label: "Quota Tracker", icon: "data_usage" },
   { href: "/dashboard/mitm", label: "MITM", icon: "security" },
   { href: "/dashboard/cli-tools", label: "CLI Tools", icon: "terminal" },
