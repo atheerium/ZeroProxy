@@ -208,6 +208,7 @@ export default function PlaygroundPageClient() {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const [copiedTurnId, setCopiedTurnId] = useState<string | null>(null);
+  const [railOpen, setRailOpen] = useState(false);
 
   const abortRef = useRef<AbortController | null>(null);
   /** Live stream scratchpad: text arrives here and is flushed per frame. */
@@ -499,12 +500,24 @@ export default function PlaygroundPageClient() {
           >
             Clear
           </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="bar_chart"
+            onClick={() => setRailOpen((v) => !v)}
+            className="lg:hidden"
+            aria-label="Toggle stats rail"
+            aria-expanded={railOpen}
+          >
+            Stats
+          </Button>
         </div>
       </div>
 
       {/* ---- Body: transcript + stats rail ---- */}
-      <div className="flex min-h-0 flex-1 gap-4">
-        <div className="flex min-w-0 flex-1 flex-col overflow-hidden rounded-mini-md border border-hairline bg-surface-card">
+      <div className="flex min-h-0 flex-1 flex-col lg:flex-row gap-4">
+        <div className="flex min-w-0 flex-1 flex-col min-h-0 overflow-hidden rounded-mini-md border border-hairline bg-surface-card">
           <div ref={scrollRef} className="custom-scrollbar min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
             {turns.length === 0 ? (
               <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
@@ -608,7 +621,7 @@ export default function PlaygroundPageClient() {
         </div>
 
         {/* ---- Stats rail ---- */}
-        <aside className="custom-scrollbar hidden w-[264px] shrink-0 overflow-y-auto rounded-mini-md border border-hairline bg-surface-card p-4 lg:block">
+        <aside className={cn("custom-scrollbar w-full shrink-0 overflow-y-auto rounded-mini-md border border-hairline bg-surface-card p-4 lg:w-[264px]", railOpen ? "block" : "hidden", "lg:block")}>
           <h2 className="mb-3 text-[12px] font-semibold tracking-wide text-text-muted uppercase">
             Last response
           </h2>
