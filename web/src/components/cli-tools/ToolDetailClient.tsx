@@ -19,6 +19,7 @@ import {
   DeepSeekTuiToolCard,
   JcodeToolCard,
   GrokBuildToolCard,
+  OmoToolCard,
   MitmLinkCard,
 } from "@/components/cli-tools";
 
@@ -37,6 +38,7 @@ const STATUS_ENDPOINTS: Record<string, string> = {
   "deepseek-tui": "/api/cli-tools/deepseek-tui-settings",
   jcode: "/api/cli-tools/jcode-settings",
   "grok-build": "/api/cli-tools/grok-build-settings",
+  omo: "/api/cli-tools/omo-settings",
 };
 
 export default function ToolDetailClient() {
@@ -222,17 +224,19 @@ export default function ToolDetailClient() {
         return <DeepSeekTuiToolCard {...commonProps} activeProviders={getActiveProviders()} hasActiveProviders={hasActiveProviders} cloudEnabled={cloudEnabled} initialStatus={toolStatus} />;
       case "jcode":
         return <JcodeToolCard {...commonProps} activeProviders={getActiveProviders()} hasActiveProviders={hasActiveProviders} cloudEnabled={cloudEnabled} initialStatus={toolStatus} />;
-      case "grok-build":
-        return (
-          <GrokBuildToolCard
-            {...commonProps}
-            activeProviders={getActiveProviders()}
-            hasActiveProviders={hasActiveProviders}
-            cloudEnabled={cloudEnabled}
-            initialStatus={toolStatus}
-          />
-        );
-      default:
+       case "grok-build":
+         return (
+           <GrokBuildToolCard
+             {...commonProps}
+             activeProviders={getActiveProviders()}
+             hasActiveProviders={hasActiveProviders}
+             cloudEnabled={cloudEnabled}
+             initialStatus={toolStatus}
+           />
+         );
+       case "omo":
+         return <OmoToolCard {...commonProps} activeProviders={getActiveProviders()} hasActiveProviders={hasActiveProviders} cloudEnabled={cloudEnabled} initialStatus={toolStatus} />;
+       default:
         return <DefaultToolCard toolId={toolId} {...commonProps} activeProviders={getActiveProviders()} cloudEnabled={cloudEnabled} tunnelEnabled={tunnelEnabled} />;
     }
   };
