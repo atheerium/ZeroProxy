@@ -205,6 +205,8 @@ async fn main() -> anyhow::Result<()> {
                         host: host.clone().unwrap_or_else(|| cli.host.clone()),
                         port: port.unwrap_or(cli.port),
                         detach: *detach,
+                        web_dir: cli.web_dir.clone(),
+                        dashboard_sidecar_url: cli.dashboard_sidecar_url.clone(),
                     };
                     match zeroproxy::cli::server::run_start(ctx, &resolved, opts).await? {
                         Some(exit) => {

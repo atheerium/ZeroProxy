@@ -38,10 +38,45 @@ pub struct StartOptions {
     pub host: String,
     pub port: u16,
     pub detach: bool,
+    /// Serve dashboard assets from this directory instead of the copies
+    /// embedded at build time. Must be re-emitted to the detached child —
+    /// see the re-exec note in `run_start`.
+    pub web_dir: Option<PathBuf>,
+    /// Reverse-proxy the dashboard at this base URL instead of serving assets
+    /// at all. Also must be re-emitted to the detached child.
+    pub dashboard_sidecar_url: Option<String>,
 }
 
 pub fn pid_file_path(data_dir: &Path) -> PathBuf {
     data_dir.join(PID_FILE)
+}
+
+/// Build the argv (excluding argv[0]) for the detached child process.
+///
+/// This is an explicit allowlist, so adding a field to [`StartOptions`] does
+/// **not** automatically reach the child — it must be added here too. An
+/// omission is silent rather than loud: the parent's health probe still
+/// passes, because the dropped flags only govern asset serving, not the API.
+fn detached_argv(opts: &StartOptions, data_dir: &Path) -> Vec<std::ffi::OsString> {
+    use std::ffi::OsString;
+    let mut argv = vec![
+        OsString::from("--no-open"),
+        OsString::from("--host"),
+        opts.host.clone().into(),
+        OsString::from("--port"),
+        opts.port.to_string().into(),
+        OsString::from("--data-dir"),
+        data_dir.into(),
+    ];
+    if let Some(dir) = opts.web_dir.as_deref() {
+        argv.push(OsString::from("--web-dir"));
+        argv.push(dir.into());
+    }
+    if let Some(url) = opts.dashboard_sidecar_url.as_deref() {
+        argv.push(OsString::from("--dashboard-sidecar-url"));
+        argv.push(url.into());
+    }
+    argv
 }
 
 /// Read the PID file, returning `None` if absent or unparseable.
@@ -169,13 +204,7 @@ pub async fn run_start(
     let stderr = stdout.try_clone().context("clone log file handle")?;
 
     let mut cmd = std::process::Command::new(&me);
-    cmd.arg("--no-open")
-        .arg("--host")
-        .arg(&opts.host)
-        .arg("--port")
-        .arg(opts.port.to_string())
-        .arg("--data-dir")
-        .arg(&cfg.data_dir);
+    cmd.args(detached_argv(&opts, &cfg.data_dir));
     cmd.stdin(std::process::Stdio::null());
     cmd.stdout(stdout);
     cmd.stderr(stderr);
@@ -521,6 +550,74 @@ mod tests {
         assert_eq!(read_pid(dir.path()), Some(12345));
         remove_pid(dir.path());
         assert!(read_pid(dir.path()).is_none());
+    }
+
+    fn opts() -> StartOptions {
+        StartOptions {
+            host: "127.0.0.1".into(),
+            port: 4623,
+            detach: true,
+            web_dir: None,
+            dashboard_sidecar_url: None,
+        }
+    }
+
+    fn argv_of(o: &StartOptions) -> Vec<String> {
+        detached_argv(o, Path::new("/data"))
+            .into_iter()
+            .map(|a| a.to_string_lossy().into_owned())
+            .collect()
+    }
+
+    #[test]
+    fn detached_argv_always_carries_the_server_basics() {
+        assert_eq!(
+            argv_of(&opts()),
+            [
+                "--no-open",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "4623",
+                "--data-dir",
+                "/data"
+            ]
+        );
+    }
+
+    /// Regression: `--web-dir` and `--dashboard-sidecar-url` were dropped here,
+    /// so the process that actually served the dashboard fell back to assets
+    /// embedded at build time while every caller still saw a green health
+    /// check. Any new `StartOptions` field needs a matching entry in
+    /// `detached_argv`; this test is what stops the next one being forgotten.
+    #[test]
+    fn detached_argv_propagates_asset_flags() {
+        let o = StartOptions {
+            web_dir: Some(PathBuf::from("/repo/web/dist")),
+            dashboard_sidecar_url: Some("http://127.0.0.1:4624".into()),
+            ..opts()
+        };
+        let argv = argv_of(&o);
+        let value_after = |flag: &str| {
+            argv.iter()
+                .position(|a| a == flag)
+                .map(|i| argv[i + 1].clone())
+                .unwrap_or_else(|| panic!("{flag} absent from {argv:?}"))
+        };
+        assert_eq!(value_after("--web-dir"), "/repo/web/dist");
+        assert_eq!(
+            value_after("--dashboard-sidecar-url"),
+            "http://127.0.0.1:4624"
+        );
+    }
+
+    /// A flag that is absent must not be emitted as a bare dangling token,
+    /// which would make clap reject the whole child argv.
+    #[test]
+    fn detached_argv_omits_unset_asset_flags() {
+        let argv = argv_of(&opts());
+        assert!(!argv.iter().any(|a| a == "--web-dir"));
+        assert!(!argv.iter().any(|a| a == "--dashboard-sidecar-url"));
     }
 
     #[test]

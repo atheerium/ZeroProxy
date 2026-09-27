@@ -613,6 +613,10 @@ impl Cli {
         let rt = tokio::runtime::Runtime::new()?;
         let ctx = self.output_ctx();
         let overrides = self.cli_overrides();
+        // `self.cmd` moves out of `self` below, so read the asset-serving flags
+        // first; `server start --detach` has to re-emit them to its child.
+        let web_dir = self.web_dir.clone();
+        let dashboard_sidecar_url = self.dashboard_sidecar_url.clone();
         if let Some(cmd) = self.cmd {
             match cmd {
                 Command::Provider { cmd } => {
@@ -749,6 +753,8 @@ impl Cli {
                                 host: host.unwrap_or_else(|| "127.0.0.1".to_string()),
                                 port: port.unwrap_or(4623),
                                 detach,
+                                web_dir,
+                                dashboard_sidecar_url,
                             };
                             rt.block_on(server::run_start(ctx, &resolved, opts))
                                 .map(|_| ())

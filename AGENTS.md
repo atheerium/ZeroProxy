@@ -292,6 +292,35 @@ looks redundant until you notice what it is keeping alive.
 Diagnose with `ss -tlnp | grep 4623` and compare against `100.115.170.56` (this box's Tailscale
 IP). Remember `pgrep -f 'zeroproxy.*4623'` self-matches; use `pgrep -x zeroproxy`.
 
+### 4c. `server start --detach` used to silently drop `--web-dir` — a green health check
+meant nothing about the dashboard
+`run_start` (`src/cli/server.rs`) does not fork-and-exec with the parent's argv. In the detached
+branch it **builds a fresh argv from scratch**, and it used to emit only `--no-open --host --port
+--data-dir`. `dev.sh` invokes `"$BIN" --web-dir "$REPO_ROOT/web/dist" server start --detach …`, so
+`--web-dir` reached only the short-lived parent; **the process that actually served never received
+it** and fell back to build-time-embedded assets. Same for `--dashboard-sidecar-url` (the `:4624`
+Astro dev proxy), so `pnpm dev` HMR was broken the same way.
+
+Why it is expensive: **it fails silently and looks successful.** `run_start` probes
+`/api/health` after spawning, and the health endpoint does not care where assets came from — so
+dev.sh printed "binary verified / health ok", exited 0, and `verify_fresh_binary` passed. Only the
+dashboard was wrong. Symptoms, all of which look like something else:
+- every `/dashboard/*` page 404s into the `dashboard.html` SPA shell, which renders
+  `EndpointPageClient` — a *plausible-looking* endpoint page, not an obvious 404;
+- `web/src` edits appear to do nothing until you rebuild the binary;
+- a page you just built is "missing" from the live server even though `web/dist` contains it.
+
+**Assert the flag, never the health check:** `pgrep -x zeroproxy` must show `--web-dir` in the
+argv. Fixed by carrying both flags in `StartOptions` and re-emitting them via `detached_argv`,
+which has a regression test — but the argv is still a hand-maintained allowlist, so a new
+`StartOptions` field must be added there too or it will be dropped the same silent way.
+
+Two related things that cost the same debugging time: **`--web-only` never starts the server** (it
+builds and exits telling you to run `--fast detach`; use `--web-only detach`), and
+`dev.sh --fast` from a worktree is pointless if that worktree has no `target/` — `verify_fresh_binary`
+compares `readlink -f /proc/<pid>/exe` against `$REPO_ROOT/target/debug/zeroproxy`, so a cold
+worktree needs either a real build or a **hardlink** (not a symlink) from another checkout.
+
 ### 5. Docs trap — most of `docs/` is gitignored
 `.gitignore` has `docs/*` with only these allow-listed (verified via `git ls-files docs/`):
 `ARCHITECTURE.md`, `agent-orchestration.md`, `git-conventions.md`, `parity-9router.md`,
