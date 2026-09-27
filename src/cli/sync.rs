@@ -35,6 +35,22 @@ pub(crate) const EMBEDDED_9ROUTER_JSON: &str = include_str!("../core/model/sourc
 pub(crate) const EMBEDDED_OMNIROUTE_JSON: &str =
     include_str!("../core/model/sources/omniroute.json");
 
+/// The upstream `modelsUrl` for `provider`, matched on id or alias.
+///
+/// The snapshot records *where to look*, not only what was true when it was
+/// generated, so a model OmniRoute adds later is still discoverable.
+/// Parsed once; the embedded JSON is a compile-time constant.
+pub(crate) fn embedded_omniroute_models_url(provider: &str) -> Option<String> {
+    static SNAPSHOT: once_cell::sync::Lazy<Option<SourceSnapshot>> =
+        once_cell::sync::Lazy::new(|| serde_json::from_str(EMBEDDED_OMNIROUTE_JSON).ok());
+    let snapshot = SNAPSHOT.as_ref()?;
+    snapshot
+        .providers
+        .iter()
+        .find(|p| p.id == provider || p.alias == provider)
+        .and_then(|p| p.models_url.clone())
+}
+
 #[derive(Debug, Clone, Subcommand)]
 pub enum SyncCmd {
     /// Sync provider catalog from decolua/9router.
@@ -137,6 +153,15 @@ pub struct SourceProvider {
     /// it would silently drop real ones.
     #[serde(default)]
     pub service_kinds: Option<Vec<String>>,
+    /// Upstream `modelsUrl`: where this provider's live model list is fetched
+    /// from. Carried so a model added upstream after this snapshot was taken can
+    /// still be discovered without re-running the sync.
+    #[serde(default)]
+    pub models_url: Option<String>,
+    /// Upstream `passthroughModels`: the upstream catalog is authoritative, so
+    /// the static list here is a seed rather than the answer.
+    #[serde(default)]
+    pub passthrough_models: Option<bool>,
     #[serde(default)]
     pub models: Vec<SourceModel>,
 }
@@ -706,6 +731,8 @@ mod tests {
                 free: None,
                 no_auth: None,
                 service_kinds: None,
+                models_url: None,
+                passthrough_models: None,
                 models: vec![SourceModel {
                     id: "fakeprov/unique-model-id".into(),
                     name: Some("Sample".into()),
@@ -882,6 +909,8 @@ mod tests {
                 free,
                 no_auth,
                 service_kinds: None,
+                models_url: None,
+                passthrough_models: None,
                 models: vec![SourceModel {
                     id: format!("{alias}/m1"),
                     name: None,
