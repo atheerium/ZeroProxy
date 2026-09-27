@@ -145,6 +145,24 @@ need it gone, delete the model.
 
 ## Verification traps — each of these produced a wrong conclusion at least once
 
+- **Never measure memory off a debug build.** The maintainer's ceiling is 200 MB
+  RAM, 300 MB absolute. **Measured 2026-09-27: the release build sits at 45.6 MB
+  RSS / 45.6 MB peak — roughly 4x under the tight ceiling, so the constraint is
+  met and there is nothing to fix.** The *debug* build measures 314 MB RSS / 348 MB
+  peak, i.e. it looks like a 15% breach of the hard limit. That is an artifact:
+  `target/debug/zeroproxy` is **522 MB** against a **27.8 MB** release binary
+  (release already sets `lto = "fat"`, `codegen-units = 1`, `opt-level = "s"`,
+  `strip = "symbols"`). I read the debug number first and nearly opened a
+  performance investigation against a problem that does not exist. Measure with
+  `cargo build --release` and read `/proc/<pid>/status`, and say which build you
+  measured.
+- **`/v1/v1/*` routes are a deliberate compatibility layer, not a duplication bug.**
+  Inference is registered twice: a `/v1` nest serving `/v1/models`,
+  `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, *and* literal
+  `/v1/v1/*` routes. Some agentic harnesses emit a `base_url` that already ends
+  in `/v1` and then append the standard path, so both spellings must answer.
+  Verified live: `GET /v1/models` and `GET /v1/v1/models` both return 200.
+  Do not "deduplicate" these into one.
 - **`gh` resolves to the WRONG REPOSITORY unless you pass `--repo`.** This checkout has **two**
   remotes: `origin` = `atheerium/ZeroProxy` (ours) and `upstream` = `quangdang46/openproxy` (our
   parent). **Measured: bare `gh repo view` returns `quangdang46/openproxy`, not ZeroProxy** — so
