@@ -13,7 +13,7 @@ use regex::Regex;
 use serde::Serialize;
 use serde_json::{json, Value};
 
-use crate::core::model::catalog::provider_catalog;
+use crate::core::model::catalog::{is_free_model_id, provider_catalog};
 use crate::core::model::resolve_provider_alias;
 use crate::server::auth::require_api_key;
 use crate::server::state::AppState;
@@ -569,6 +569,7 @@ fn model_card(
     max_completion_tokens: Option<u32>,
 ) -> ModelCard {
     let root = id.split('/').next_back().unwrap_or(&id).to_string();
+    let is_free = is_free_model_id(&id);
     ModelCard {
         id,
         object: "model",
@@ -580,6 +581,7 @@ fn model_card(
         kind,
         context_length,
         max_completion_tokens,
+        is_free,
     }
 }
 
@@ -645,6 +647,9 @@ struct ModelCard {
     /// Maximum completion/output tokens (9router v0.5.55 parity).
     #[serde(skip_serializing_if = "Option::is_none")]
     max_completion_tokens: Option<u32>,
+    /// Free by model name. Unlike `providerFreeTier` this is not optional, so
+    /// `false` means "not free *by name*" — not a confirmed paid model.
+    is_free: bool,
 }
 
 /// GET /v1/models/info?model={model_id}

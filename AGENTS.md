@@ -187,6 +187,32 @@ That is upstream refusing a non-OpenCode client, surfaced faithfully. Do not "fi
 bug. Contrast with a real routing failure, which is `400 {"code":"bad_request","message":"No
 credentials for provider: <id>"}` — that one *is* ours.
 
+## Free-model detection has FOUR implementations and they disagree — do not add a fifth
+
+`is_free_model_id` in `src/core/model/catalog.rs` is now the canonical predicate, and
+`web/src/shared/utils/freeModels.ts` deliberately mirrors it. Three pre-existing Rust sites
+answer a *related* question with their own, different, rules:
+
+| site | question it actually answers | rules |
+|---|---|---|
+| `core/model/catalog.rs` `is_free_model_id` (new) | "is this free by name?" | `:free` `-free` `_free` `/free`, **case-insensitive** |
+| `core/auto/scoring.rs:80-86` | "should auto-prefer this?" | the above **plus** `== "free"`, `starts_with("free-")`, `ends_with("-free-1")`, any `:`-segment `== "free"` |
+| `server/api/providers.rs:66` | "is this an opencode-free id?" | `-free` only |
+| `server/api/chat.rs:3098` | "is this a *premium* opencode model?" | `-free` only, **inverted** |
+
+**These were left alone deliberately, not overlooked.** `scoring.rs` decides which model the
+`auto` presets select, so consolidating it changes routing; no test pins the desired
+selection, so a silent change there would be a behaviour change disguised as a refactor. The
+other two are provider-specific special cases, not general classification.
+
+**If you add a fifth copy, you have made it worse.** Either call `is_free_model_id`, or — if
+your question really is different (scoring, premium-vs-free) — say so in a comment naming the
+question, because "free" reads like one concept and is currently three.
+
+`is_free` on `/v1/models` is a **non-optional** bool, so `false` means "not free *by name*",
+NOT "confirmed paid" — the opposite of `providerFreeTier`, where absence means unknown. Keep
+that asymmetry in mind before consuming it.
+
 ## Verification traps — each of these produced a wrong conclusion at least once
 
 - **Never measure memory off a debug build.** The maintainer's ceiling is 200 MB
