@@ -8,6 +8,11 @@ import type {
   MediaProviderKind,
   AuthMethod
 } from "../../types";
+import {
+  GENERATED_FREE_TIER_PROVIDERS,
+  GENERATED_OTHER_PROVIDERS,
+  GENERATED_FREE_TIER_PROVIDER_IDS
+} from "./providers.generated";
 
 // Free Providers (kiro first, iflow last)
 export const FREE_PROVIDERS: Record<string, Provider> = {
@@ -35,26 +40,15 @@ export const FREE_TIER_PROVIDERS: Record<string, Provider> = {
 };
 
 // Single source of truth for free-tier provider IDs (categorization shared
-// across backend + frontend). These are the providers the dashboard treats
-// as free tier. Keep in sync with FREE_TIER_PROVIDERS above.
+// across backend + frontend). Curated ids first, then the generated ones — the
+// previous hand-maintained list had drifted: 10 of its 17 ids were absent from
+// FREE_TIER_PROVIDERS, so the "keep in sync" comment was already untrue.
 export const FREE_TIER_PROVIDER_IDS: string[] = [
-  "nvidia",
-  "opencode-zen",
-  "openrouter",
-  "kilocode",
-  "ollama",
-  "gemini",
-  "modelscope",
-  "aion",
-  "agnes",
-  "ai21",
-  "ovhcloud",
-  "groq",
-  "mistral",
-  "llm7",
-  "sambanova",
-  "kiro",
-  "huggingface",
+  ...Object.keys(FREE_TIER_PROVIDERS),
+  ...Object.keys(FREE_PROVIDERS).filter((id) => !FREE_TIER_PROVIDERS[id]),
+  ...GENERATED_FREE_TIER_PROVIDER_IDS.filter(
+    (id) => !FREE_TIER_PROVIDERS[id] && !FREE_PROVIDERS[id]
+  ),
 ];
 
 // O(1) membership lookup derived from the canonical ID list.
@@ -259,7 +253,21 @@ export function isCustomEmbeddingProvider(providerId: string): boolean {
 }
 
 // All providers (combined)
-export const AI_PROVIDERS: Record<string, Provider> = { ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...OAUTH_PROVIDERS, ...APIKEY_PROVIDERS, ...WEB_COOKIE_PROVIDERS };
+// Generated maps come LAST so a curated entry always wins on id collision.
+export const AI_PROVIDERS: Record<string, Provider> = { ...FREE_PROVIDERS, ...FREE_TIER_PROVIDERS, ...OAUTH_PROVIDERS, ...APIKEY_PROVIDERS, ...WEB_COOKIE_PROVIDERS, ...GENERATED_FREE_TIER_PROVIDERS, ...GENERATED_OTHER_PROVIDERS };
+
+// Preserves the curated precedence the provider detail page relied on.
+export function lookupProvider(id: string): Provider | undefined {
+  return (
+    OAUTH_PROVIDERS[id] ||
+    APIKEY_PROVIDERS[id] ||
+    FREE_PROVIDERS[id] ||
+    FREE_TIER_PROVIDERS[id] ||
+    WEB_COOKIE_PROVIDERS[id] ||
+    GENERATED_FREE_TIER_PROVIDERS[id] ||
+    GENERATED_OTHER_PROVIDERS[id]
+  );
+}
 
 // Free-tier limitations per provider. Sourced from the awesome-freellm-apis
 // directory (github.com/open-free-llm-api) and freellmapi.co, verified
