@@ -459,6 +459,18 @@ and verify by counting the field in the regenerated JSON rather than by the abse
 - **Use a fresh clone for data.** `~/dev/OmniRoute` is pinned to an old release and is ~1 month
   stale. Clone fresh or pass `--src-omniroute=<fresh clone>`; re-measure the free/provider counts
   afterwards rather than trusting the old checkout.
+- **One `modelsUrl` in 96 is relative (`volcengine-coding-plan` → `"/models"`) — leave it failing
+  closed. Do not "fix" it by joining onto `baseUrl`.** `Url::join("/models")` replaces the whole
+  path and yields `…volces.com/models`, dropping `/api/coding/v3`, which returns **401 per the
+  provider's own registry comment**; joining onto the base's *directory* instead yields
+  `…/api/coding/v3/chat/models`, still wrong. The value actually served needs **two** path segments
+  stripped, which no principled rule produces. **OmniRoute never resolves it either** — its
+  discovery route uses a hardcoded `NAMED_OPENAI_STYLE_PROVIDERS` set, and
+  `providerModelsConfig.ts:495` states outright *"The registry has no modelsUrl, so without this
+  entry the route fell back to a stale 6-model seed."* Their `modelsUrl` is documentation, not a
+  fetch input, so this limitation is **shared, not a ZeroProxy gap**. The guard rejects it, the
+  provider keeps its `does not support models listing` error, and
+  `models_url_guard_rejects_non_http_schemes` pins the case so it is not deleted as a typo.
 
 ### 13. `core::dns::is_private_ip` fails OPEN on link-local — do not use it to guard a URL
 It takes a **bare IP string**, not a URL or hostname, and returns `false` for anything unparseable
