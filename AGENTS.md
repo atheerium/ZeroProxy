@@ -716,6 +716,42 @@ to the release profile. Full flags: `./scripts/dev.sh --help`.
 > **Never run the release binary for dev work** — stale embedded assets. dev.sh always passes
 > `--web-dir`.
 
+### The after-each-change contract (read this before your first build)
+
+**`./scripts/dev.sh` with no flags is the correct default and it does not block.** Run it from the
+repo root after every change. It rebuilds only the stale layer, restarts detached, verifies the
+serving binary, and returns. Do **not** pass a mode. `dev.sh run` is the only way to get a
+foreground server, and an agent should essentially never want that.
+
+```bash
+./scripts/dev.sh                 # build-if-stale + restart + verify + return
+./scripts/dev.sh --doctor        # is what actually running? exits 1 if anything is wrong
+./scripts/dev.sh --full detach   # the pre-push gate: fmt + clippy + astro + tests
+./scripts/dev.sh --check         # lint only, no build
+PORT=4631 ./scripts/dev.sh       # a second instance, for testing a change safely
+```
+
+Three things that make this reliable, each of which used to be a trap:
+
+- **The two build layers are independent.** `web/dist` is served from disk, so a `web/src` edit is
+  live with **no** cargo build; a `src/**` edit is not. `--doctor` prints which layer is stale.
+- **`--doctor` is the only check that catches Trap 4c.** A green `/health` cannot tell you the
+  dashboard is being served from disk rather than from build-time embedded assets; `--doctor`
+  inspects the serving process's argv and exits 1 if `--web-dir` is missing.
+- **`--doctor` resolves the pid from the `$PORT` listener, not `pgrep -x zeroproxy`.** With two
+  instances running, `pgrep` inspects the wrong one and will happily green-light a broken server.
+  Same wrong-process class as Trap 4b.
+
+**Free-model naming convention.** Free tiers are detected by name suffix, case-insensitively:
+`:free`, `-free`, `_free`, `/free`. Measured over the 1787 distinct model ids in
+`sources/omniroute.json` + `provider_catalog.json`: **46** match. Case-insensitivity is
+load-bearing — three ids use a capital `Free` (`...-Distill-Llama-70B-Free`,
+`Llama-3.3-70B-Instruct-Turbo-Free`, `Llama-Vision-Free`) that a naive `endsWith("-free")` misses.
+Two ids contain "free" as an *infix* and are deliberately **not** classified, because intent is
+unknowable from the name: `goldeneye-free-auto`, `gpt-5.6-luna-free-thinking`.
+The predicate is `isFreeModelId` in `web/src/shared/utils/freeModels.ts`, with unit tests in
+`web/src/__tests__/freeModels.test.ts` — extend the suffix list there, never inline it.
+
 ### Reload contract (run this yourself — never ask the user)
 
 | Change | Command | Why |

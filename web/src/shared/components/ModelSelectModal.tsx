@@ -8,6 +8,7 @@ import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { getModelsByProviderId, useEnsureCatalog } from "@/shared/constants/models";
 import { OAUTH_PROVIDERS, APIKEY_PROVIDERS, FREE_PROVIDERS, FREE_TIER_PROVIDERS, AI_PROVIDERS, isOpenAICompatibleProvider, isAnthropicCompatibleProvider, getProviderAlias } from "@/shared/constants/providers";
 import { getProviderCustomModelRows } from "@/shared/utils/providerCustomModels";
+import { isFreeModelId } from "@/shared/utils/freeModels";
 import { buildAvailableModels, fetchLiveModels, useFavorites, type LiveModel } from "@/shared/models/availableModels";
 import React from "react";
 
@@ -117,6 +118,9 @@ export default function ModelSelectModal({
   const [disabledMap, setDisabledMap] = useState<Record<string, string[]>>({});
   const [liveModelsByAlias, setLiveModelsByAlias] = useState<Record<string, LiveModel[]>>({});
   const [freeOnlyByAlias, setFreeOnlyByAlias] = useState<Record<string, boolean>>({});
+  // Not the same as freeOnlyByAlias above, which is a per-alias fetcher hint
+  // loaded from settings. Merging the two would silently drop that hint.
+  const [freeNamesOnly, setFreeNamesOnly] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
   // Shared favorites (star) store — same cache the provider page uses.
@@ -251,6 +255,13 @@ export default function ModelSelectModal({
       return models.filter((m) => m.isPlaceholder || m.type === kindFilter);
     };
 
+    // Both arms are load-bearing: isFree is the snapshot/persisted marker, while
+    // isFreeModelId is the only signal for providers carrying no free metadata.
+    const filterFreeNames = (models: any[]) => {
+      if (!freeNamesOnly) return models;
+      return models.filter((m) => m.isFree === true || isFreeModelId(m.id));
+    };
+
     const isDisabled = (alias: string, modelId: string) => {
       const arr = disabledMap[alias];
       return Array.isArray(arr) && arr.includes(modelId);
@@ -379,11 +390,11 @@ export default function ModelSelectModal({
             .filter((r) => r.source === "custom")
             .map((r) => ({ id: r.id, name: r.name || r.id, value: r.fullModel, isCustom: true }));
 
-          let allModels = filterByKind([
+          let allModels = filterFreeNames(filterByKind([
             ...hardcodedModels.map((m) => ({ id: m.id, name: m.name, value: `${alias}/${m.id}`, type: m.type })),
             ...customAliasModels,
             ...customRegisteredModels,
-          ]);
+          ]));
 
           if (allModels.length === 0 && ALLOW_PROVIDER_FALLBACK_KINDS.has(kindFilter)) {
             const supports = (providerInfo.serviceKinds || ["llm"]).includes(kindFilter);
@@ -406,14 +417,14 @@ export default function ModelSelectModal({
             type: "llm",
             freeOnly: freeOnlyByAlias[alias] || false,
           });
-          let allModels = built.enabledRows.map((r) => ({
+          let allModels = filterFreeNames(built.enabledRows.map((r) => ({
             id: r.id,
             name: r.name,
             value: r.fullModel,
             type: r.type,
             isFree: r.isFree,
             isCustom: r.source === "custom" || r.source === "legacyAlias",
-          }));
+          })));
 
           if (allModels.length === 0 && kindFilter === null && (providerInfo.serviceKinds || ["llm"]).includes("llm")) {
             allModels = [{ id: providerId, name: providerInfo.name, value: alias }];
@@ -544,6 +555,18 @@ export default function ModelSelectModal({
             className="w-full pl-8 pr-3 py-1.5 bg-surface border border-border rounded text-xs focus:outline-none focus:ring-1 focus:ring-primary/50"
           />
         </div>
+        <button
+          type="button"
+          onClick={() => setFreeNamesOnly((v) => !v)}
+          aria-pressed={freeNamesOnly}
+          className={`mt-2 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-bold border ${
+            freeNamesOnly
+              ? "border-green-500/40 text-green-500 bg-green-500/10"
+              : "border-border text-text-muted"
+          }`}
+        >
+          FREE ONLY
+        </button>
       </div>
 
       {/* Provider outline - quick jump when many providers */}
