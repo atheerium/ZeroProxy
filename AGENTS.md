@@ -143,6 +143,50 @@ Consequence to respect: a custom model can never be hidden by the Available Mode
 "disable everything" will still leave custom models selectable. That is correct, not a bug — if you
 need it gone, delete the model.
 
+## Live end-to-end verification (2026-09-27) — the proxy WORKS, and three traps came out of it
+
+Real requests against the running instance on `:4623`, using the maintainer's own 4 real combos.
+This is the empirical answer to "does it plug into an agentic harness and do combos work".
+
+| probe | result |
+|---|---|
+| `POST /v1/chat/completions` model `build` (4 members, 2 providers) | **200 in 1.7 s**, served by **kilocode** (first member; no fallback needed) |
+| same, `max_tokens: 512` | 200 in 0.75 s, `finish_reason: stop`, `content: "OK"` |
+| independent model `openrouter/nvidia/nemotron-3.5-lightning:free` | **200**, real completion |
+| `GET /v1/models` | **1572** model ids |
+| `opencode-zen/nemotron-3-ultra-free` | **502** — and this is CORRECT, see trap 3 |
+
+### Trap 1 — the 56-token empty completion REPRODUCES ON DEMAND, and it is a token-budget problem
+Same combo, same prompt, only the budget differs:
+
+| `max_tokens` | `finish_reason` | `content` |
+|---|---|---|
+| 16 | `length` | **`null`** |
+| 512 | `stop` | `"OK"` |
+
+Free reasoning models spend the *entire* budget on `reasoning` and emit nothing into `content`.
+At 16 tokens the client receives a billed response with a `null` content — this is exactly the
+maintainer's 56-token report, and it is **not** a client bug. Any fix must promote `reasoning`
+into `content` when `content` is empty (or return an error so `classify_error` makes it
+fallback-eligible). Note `finish_reason` stays honest (`length`), so the emptiness is only
+visible in `content` — grep for `"content":null`, not for a non-`stop` finish reason.
+
+### Trap 2 — `provider` in the response body is the MODEL's catalog provider, NOT the connection that served it
+A request to `openrouter/nvidia/nemotron-3.5-lightning:free` came back `"provider":"Nvidia"`, which
+reads as "the OpenRouter connection served this" but is simply the first segment of the model id.
+Meanwhile `/health` simultaneously showed `openrouter` in `server_error` with a future
+`degradedUntil` — so the two facts looked contradictory and were not.
+**`usageHistory.provider` is the only authoritative record of which connection served a request.**
+Read it with `sqlite3 "$DB" ".backup '$SNAP'"` first: the live server holds un-checkpointed WAL, so
+querying the db file directly returns **empty tables** and looks like "no keys, no combos, nothing
+configured". That is a false negative, not an empty install.
+
+### Trap 3 — a 502 from a provider can be the provider's own policy, correctly relayed
+`opencode-zen/*` returns `502 {"message":"OpenCode's free tier can only be used from within OpenCode"}`.
+That is upstream refusing a non-OpenCode client, surfaced faithfully. Do not "fix" it as a routing
+bug. Contrast with a real routing failure, which is `400 {"code":"bad_request","message":"No
+credentials for provider: <id>"}` — that one *is* ours.
+
 ## Verification traps — each of these produced a wrong conclusion at least once
 
 - **Never measure memory off a debug build.** The maintainer's ceiling is 200 MB
