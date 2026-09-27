@@ -145,6 +145,16 @@ need it gone, delete the model.
 
 ## Verification traps — each of these produced a wrong conclusion at least once
 
+- **`gh` resolves to the WRONG REPOSITORY unless you pass `--repo`.** This checkout has **two**
+  remotes: `origin` = `atheerium/ZeroProxy` (ours) and `upstream` = `quangdang46/openproxy` (our
+  parent). **Measured: bare `gh repo view` returns `quangdang46/openproxy`, not ZeroProxy** — so
+  `gh pr list` shows *upstream's* PRs (#468-470) and not ours (#14-#18). This repo and upstream
+  **both have a PR #18**, so `gh pr view 18` cheerfully reported an unrelated upstream PR as
+  `MERGED`, and `gh pr merge 18` was a no-op against it one command away from merging in the wrong
+  repository. **Always pass `--repo atheerium/ZeroProxy`,** or go through
+  `gh api repos/atheerium/ZeroProxy/...`. Verify with
+  `gh repo view --json nameWithOwner` before trusting any bare `gh` output. The `github_*` MCP
+  tools are unambiguous — they take an explicit owner/repo.
 - **The shell is zsh, which does not word-split unquoted variables** the way bash does. `for b in
   $LIST; do git branch -d "$b"; done` passes the ENTIRE list as ONE argument — it failed here with
   25 branch names handed to a single `git branch -d`, and a `git commit` wrapped in a variable
@@ -707,6 +717,11 @@ once, then act.
 
 Install hooks once per clone: `./scripts/setup-hooks.sh` (copies `.githooks/*` → `.git/hooks/`).
 Re-run after pulling hook changes.
+
+**Always pass `--repo atheerium/ZeroProxy` to every `gh` command.** Bare `gh pr <n>` resolves
+against `upstream` (`quangdang46/openproxy`), and this repo and upstream both have a PR #18 — so
+`gh pr merge 18` would act on *upstream's* PR 18. Measured, not theoretical; see Verification
+traps. The `github_*` MCP tools take an explicit owner/repo and are immune.
 
 - **pre-commit**: `cargo fmt --check` if `.rs` staged; secret scan; **blocks staging
   `opencode.json`, `.env`, `admin.key`, `db.json`**.
