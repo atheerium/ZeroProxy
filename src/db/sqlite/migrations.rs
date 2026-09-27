@@ -49,6 +49,7 @@ pub fn apply_pending_migrations(conn: &Connection) -> rusqlite::Result<()> {
     // (free-tier Feature 3). Safe to run on every open — no-op when present.
     add_api_keys_budget_column(conn)?;
     rekey_custom_models(conn)?;
+    add_usage_history_reliability_columns(conn)?;
 
     let current = get_schema_version(conn)?;
     if current < SCHEMA_VERSION {
@@ -146,6 +147,133 @@ fn rekey_custom_models(conn: &Connection) -> rusqlite::Result<()> {
             rusqlite::params![key],
         )?;
     }
+    Ok(())
+}
+
+/// Add `success`, `latency_ms`, `ttft_ms` columns to `usageHistory` if missing.
+/// Also backfills existing rows from the `meta` JSON blob.
+///
+/// SQLite has no `ADD COLUMN IF NOT EXISTS`, so we probe `pragma_table_info`
+/// first. The backfill is guarded by `WHERE latency_ms IS NULL OR ttft_ms IS NULL
+/// OR success IS NULL` so it only touches rows that haven't been backfilled yet.
+///
+/// NOTE: Historical failures were never persisted before this migration (the
+/// `usageHistory` table was a success-only ledger). Therefore, pre-migration
+/// rows have `success = 1` by default, and the true historical success rate is
+/// **permanently unknowable** for those rows. The `failureCountingStartedAt`
+/// field in analytics responses marks the earliest row with `success = 0` so
+/// consumers know the boundary.
+pub fn add_usage_history_reliability_columns(conn: &Connection) -> rusqlite::Result<()> {
+    let table_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='usageHistory'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+    if !table_exists {
+        return Ok(());
+    }
+
+    let has_success: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('usageHistory') WHERE name = 'success'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|count| count > 0)
+        .unwrap_or(false);
+    if !has_success {
+        conn.execute(
+            "ALTER TABLE usageHistory ADD COLUMN success INTEGER NOT NULL DEFAULT 1",
+            [],
+        )?;
+    }
+    let added_success = !has_success;
+
+    let has_latency: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('usageHistory') WHERE name = 'latency_ms'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|count| count > 0)
+        .unwrap_or(false);
+    if !has_latency {
+        conn.execute("ALTER TABLE usageHistory ADD COLUMN latency_ms INTEGER", [])?;
+    }
+    let added_latency = !has_latency;
+
+    let has_ttft: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM pragma_table_info('usageHistory') WHERE name = 'ttft_ms'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|count| count > 0)
+        .unwrap_or(false);
+    if !has_ttft {
+        conn.execute("ALTER TABLE usageHistory ADD COLUMN ttft_ms INTEGER", [])?;
+    }
+    let added_ttft = !has_ttft;
+
+    // The backfill is a full-table scan with a per-row `json_extract`, so it must
+    // run exactly once rather than on every open.
+    //
+    // Gating on "a column was just added" is not sufficient: if the process dies
+    // between the ALTER and the UPDATE, the next open sees the columns already
+    // present, concludes there is nothing to do, and leaves those rows NULL
+    // forever. So a completion marker in `_meta` is the primary gate, and it is
+    // written only AFTER the UPDATE succeeds, which makes a crash mid-backfill
+    // simply retry on the next open.
+    //
+    // The `WHERE ... IS NULL` predicate cannot serve as that gate: rows whose
+    // `meta` carries no `latency` object keep `latency_ms = NULL` forever
+    // (CAST(NULL) IS NULL), so the predicate stays true for them and the scan
+    // would repeat on every process start forever.
+    //
+    // `_meta` is created by the caller, but this function is also called
+    // standalone by tests, so its absence falls back to the column-added check.
+    let meta_exists: bool = conn
+        .query_row(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='_meta'",
+            [],
+            |row| row.get::<_, i64>(0),
+        )
+        .map(|c| c > 0)
+        .unwrap_or(false);
+
+    let backfill_done = meta_exists
+        && conn
+            .query_row(
+                "SELECT COUNT(*) FROM _meta WHERE key = 'usage_history_reliability_backfilled'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )
+            .map(|count| count > 0)
+            .unwrap_or(false);
+
+    if !backfill_done || added_success || added_latency || added_ttft {
+        conn.execute(
+            "UPDATE usageHistory
+             SET latency_ms = CAST(json_extract(meta, '$.latency.total') AS INTEGER),
+                 ttft_ms   = CAST(json_extract(meta, '$.latency.ttft') AS INTEGER),
+                 success   = CASE WHEN status = 'success' THEN 1 ELSE 0 END
+             WHERE latency_ms IS NULL OR ttft_ms IS NULL OR success IS NULL",
+            [],
+        )?;
+
+        if meta_exists {
+            conn.execute(
+                "INSERT INTO _meta(key, value)
+                 VALUES('usage_history_reliability_backfilled', '1')
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [],
+            )?;
+        }
+    }
+
     Ok(())
 }
 

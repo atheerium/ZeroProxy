@@ -235,7 +235,9 @@ pub(crate) fn export_usage_impl(conn: &Connection) -> rusqlite::Result<Value> {
     let history: Vec<Value> = {
         let mut stmt = conn.prepare(
             "SELECT timestamp, provider, model, connectionId, apiKey, endpoint,
-                    promptTokens, completionTokens, cost, status, tokens, meta
+                    promptTokens, completionTokens, cost, status, tokens, meta,
+                    bytesBefore, bytesAfter, bytesSaved, imagePrompts,
+                    success, latency_ms, ttft_ms
              FROM usageHistory ORDER BY timestamp DESC LIMIT 10000",
         )?;
         let rows = stmt.query_map([], |row| {
@@ -251,6 +253,9 @@ pub(crate) fn export_usage_impl(conn: &Connection) -> rusqlite::Result<Value> {
                 "tokens": row.get::<_, Option<String>>(10)?.and_then(|s| serde_json::from_str::<Value>(&s).ok()),
                 "cost": row.get::<_, Option<f64>>(8)?,
                 "status": row.get::<_, Option<String>>(9)?,
+                "success": row.get::<_, Option<i32>>(16)?.map(|v| v != 0),
+                "latencyMs": row.get::<_, Option<i64>>(17)?,
+                "ttftMs": row.get::<_, Option<i64>>(18)?,
             }))
         })?;
         rows.collect::<rusqlite::Result<Vec<_>>>()?

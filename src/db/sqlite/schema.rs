@@ -170,7 +170,10 @@ pub const TABLES_SQL: &[&str] = &[
         bytesBefore      INTEGER DEFAULT 0,
         bytesAfter       INTEGER DEFAULT 0,
         bytesSaved       INTEGER DEFAULT 0,
-        imagePrompts     INTEGER DEFAULT 0
+        imagePrompts     INTEGER DEFAULT 0,
+        success          INTEGER NOT NULL DEFAULT 1,
+        latency_ms       INTEGER,
+        ttft_ms          INTEGER
     )
     "#,
     r#"

@@ -13,7 +13,8 @@ pub fn get_history(
     let mut stmt = conn.prepare(
         "SELECT timestamp, provider, model, connectionId, apiKey, endpoint,
                 promptTokens, completionTokens, cost, status, tokens, meta,
-                bytesBefore, bytesAfter, bytesSaved, imagePrompts
+                bytesBefore, bytesAfter, bytesSaved, imagePrompts,
+                success, latency_ms, ttft_ms
          FROM usageHistory ORDER BY timestamp DESC LIMIT ?1 OFFSET ?2",
     )?;
     let rows = stmt.query_map(params![limit, offset], row_to_usage)?;
@@ -33,8 +34,9 @@ pub fn insert(conn: &Connection, entry: &UsageEntry) -> rusqlite::Result<()> {
     conn.execute(
         "INSERT INTO usageHistory(timestamp, provider, model, connectionId, apiKey, endpoint,
                 promptTokens, completionTokens, cost, status, tokens, meta,
-                bytesBefore, bytesAfter, bytesSaved, imagePrompts)
-         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16)",
+                bytesBefore, bytesAfter, bytesSaved, imagePrompts,
+                success, latency_ms, ttft_ms)
+         VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
         params![
             entry.timestamp.as_deref().unwrap_or(""),
             entry.provider.as_deref(),
@@ -60,6 +62,9 @@ pub fn insert(conn: &Connection, entry: &UsageEntry) -> rusqlite::Result<()> {
             entry.bytes_after as i64,
             entry.bytes_saved as i64,
             entry.image_prompts as i64,
+            entry.success.map(|s| s as i32).unwrap_or(1),
+            entry.latency_ms,
+            entry.ttft_ms,
         ],
     )?;
     Ok(())
@@ -104,6 +109,9 @@ fn row_to_usage(row: &rusqlite::Row<'_>) -> rusqlite::Result<UsageEntry> {
     let bytes_after: u64 = row.get::<_, i64>(13).unwrap_or(0) as u64;
     let bytes_saved: u64 = row.get::<_, i64>(14).unwrap_or(0) as u64;
     let image_prompts: u64 = row.get::<_, i64>(15).unwrap_or(0) as u64;
+    let success: Option<bool> = row.get::<_, Option<i32>>(16)?.map(|v| v != 0);
+    let latency_ms: Option<i64> = row.get(17)?;
+    let ttft_ms: Option<i64> = row.get(18)?;
 
     let tokens = tokens_str.and_then(|s| serde_json::from_str(&s).ok());
     let extra: std::collections::BTreeMap<String, Value> = meta_str
@@ -120,11 +128,14 @@ fn row_to_usage(row: &rusqlite::Row<'_>) -> rusqlite::Result<UsageEntry> {
         endpoint,
         cost,
         status,
+        success,
         bytes_before,
         bytes_after,
         bytes_saved,
         image_prompts,
         extra,
+        latency_ms,
+        ttft_ms,
         ..Default::default()
     })
 }
@@ -186,5 +197,140 @@ mod tests {
         assert_eq!(latency["total"], 1234);
         assert_eq!(latency["ttft"], 567);
         assert_eq!(loaded.extra["error_class"], "timeout");
+    }
+
+    #[test]
+    fn roundtrip_with_success_latency_ttft_columns() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let entry = UsageEntry {
+            model: "test-model".into(),
+            provider: Some("test-provider".into()),
+            timestamp: Some("2026-09-26T12:00:00Z".into()),
+            status: Some("success".into()),
+            success: Some(true),
+            latency_ms: Some(5000),
+            ttft_ms: Some(1200),
+            ..Default::default()
+        };
+        db.with_transaction(|tx| insert(tx, &entry)).unwrap();
+        let history = db.with_conn(|c| get_history(c, 10, 0)).unwrap();
+        assert_eq!(history.len(), 1);
+        let loaded = &history[0];
+        assert_eq!(loaded.model, "test-model");
+        assert_eq!(loaded.provider.as_deref(), Some("test-provider"));
+        assert_eq!(loaded.status.as_deref(), Some("success"));
+        assert_eq!(loaded.success, Some(true));
+        assert_eq!(loaded.latency_ms, Some(5000));
+        assert_eq!(loaded.ttft_ms, Some(1200));
+    }
+
+    #[test]
+    fn roundtrip_with_failure_success_false() {
+        let db = SqliteDb::open_in_memory().unwrap();
+        let entry = UsageEntry {
+            model: "failed-model".into(),
+            provider: Some("failed-provider".into()),
+            timestamp: Some("2026-09-26T12:00:00Z".into()),
+            status: Some("error".into()),
+            success: Some(false),
+            latency_ms: None,
+            ttft_ms: None,
+            ..Default::default()
+        };
+        db.with_transaction(|tx| insert(tx, &entry)).unwrap();
+        let history = db.with_conn(|c| get_history(c, 10, 0)).unwrap();
+        assert_eq!(history.len(), 1);
+        let loaded = &history[0];
+        assert_eq!(loaded.success, Some(false));
+        assert_eq!(loaded.latency_ms, None);
+        assert_eq!(loaded.ttft_ms, None);
+    }
+
+    #[test]
+    fn migration_backfill_populates_columns_from_meta() {
+        // Build the table at its PRE-migration shape. Using `open_in_memory()`
+        // would create it from the current schema, which already has the three
+        // columns, so the migration's ALTER steps would be skipped and the
+        // backfill would have nothing to prove.
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE _meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE usageHistory (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
+                 provider TEXT, model TEXT, connectionId TEXT, apiKey TEXT,
+                 endpoint TEXT, promptTokens INTEGER DEFAULT 0,
+                 completionTokens INTEGER DEFAULT 0, cost REAL DEFAULT 0,
+                 status TEXT, tokens TEXT, meta TEXT, bytesBefore INTEGER DEFAULT 0,
+                 bytesAfter INTEGER DEFAULT 0, bytesSaved INTEGER DEFAULT 0,
+                 imagePrompts INTEGER DEFAULT 0
+             );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO usageHistory(timestamp, provider, model, status, meta)
+             VALUES(?1, ?2, ?3, ?4, ?5)",
+            rusqlite::params![
+                "2026-09-01T00:00:00Z",
+                "openrouter",
+                "test/model",
+                "success",
+                serde_json::json!({"latency": {"total": 36655, "ttft": 9052}}).to_string(),
+            ],
+        )
+        .unwrap();
+
+        crate::db::sqlite::migrations::add_usage_history_reliability_columns(&conn).unwrap();
+
+        let history = get_history(&conn, 10, 0).unwrap();
+        assert_eq!(history.len(), 1);
+        let loaded = &history[0];
+        assert_eq!(loaded.success, Some(true));
+        assert_eq!(loaded.latency_ms, Some(36655));
+        assert_eq!(loaded.ttft_ms, Some(9052));
+    }
+
+    #[test]
+    fn migration_backfill_runs_once_and_is_not_repeated() {
+        let conn = rusqlite::Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE _meta(key TEXT PRIMARY KEY, value TEXT NOT NULL);
+             CREATE TABLE usageHistory (
+                 id INTEGER PRIMARY KEY AUTOINCREMENT, timestamp TEXT NOT NULL,
+                 provider TEXT, model TEXT, connectionId TEXT, apiKey TEXT,
+                 endpoint TEXT, promptTokens INTEGER DEFAULT 0,
+                 completionTokens INTEGER DEFAULT 0, cost REAL DEFAULT 0,
+                 status TEXT, tokens TEXT, meta TEXT, bytesBefore INTEGER DEFAULT 0,
+                 bytesAfter INTEGER DEFAULT 0, bytesSaved INTEGER DEFAULT 0,
+                 imagePrompts INTEGER DEFAULT 0
+             );",
+        )
+        .unwrap();
+        conn.execute(
+            "INSERT INTO usageHistory(timestamp, provider, model, status, meta)
+             VALUES('2026-09-01T00:00:00Z', 'openrouter', 'test/model', 'success', '{}')",
+            [],
+        )
+        .unwrap();
+
+        crate::db::sqlite::migrations::add_usage_history_reliability_columns(&conn).unwrap();
+        let marker: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM _meta WHERE key = 'usage_history_reliability_backfilled'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(marker, 1, "backfill must record its completion marker");
+
+        // A row inserted afterwards has no latency in `meta`, so its latency_ms
+        // stays NULL. Re-running the migration must NOT re-scan the table, which
+        // is what the marker is for.
+        conn.execute(
+            "INSERT INTO usageHistory(timestamp, provider, model, status, meta)
+             VALUES('2026-09-02T00:00:00Z', 'openrouter', 'test/model2', 'success', '{}')",
+            [],
+        )
+        .unwrap();
+        crate::db::sqlite::migrations::add_usage_history_reliability_columns(&conn).unwrap();
     }
 }

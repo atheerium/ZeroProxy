@@ -241,16 +241,38 @@ fn import_usage_impl(conn: &Connection, payload: &Value) -> rusqlite::Result<usi
             let tokens_str = item
                 .get("tokens")
                 .map(|t| serde_json::to_string(t).unwrap_or_default());
+            let success = item
+                .get("success")
+                .and_then(Value::as_bool)
+                .map(|b| b as i32);
+            let latency_ms = item.get("latencyMs").and_then(Value::as_i64);
+            let ttft_ms = item.get("ttftMs").and_then(Value::as_i64);
             conn.execute(
-                "INSERT INTO usageHistory(timestamp, provider, model, cost, status, tokens)
-                 VALUES(?1,?2,?3,?4,?5,?6)",
+                "INSERT INTO usageHistory(timestamp, provider, model, connectionId, apiKey, endpoint,
+                        promptTokens, completionTokens, cost, status, tokens, meta,
+                        bytesBefore, bytesAfter, bytesSaved, imagePrompts,
+                        success, latency_ms, ttft_ms)
+                 VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?14,?15,?16,?17,?18,?19)",
                 rusqlite::params![
                     item.get("timestamp").and_then(Value::as_str).unwrap_or(""),
                     item.get("provider").and_then(Value::as_str),
                     item.get("model").and_then(Value::as_str).unwrap_or(""),
+                    item.get("connectionId").and_then(Value::as_str),
+                    item.get("apiKey").and_then(Value::as_str),
+                    item.get("endpoint").and_then(Value::as_str),
+                    item.get("promptTokens").and_then(Value::as_i64).unwrap_or(0),
+                    item.get("completionTokens").and_then(Value::as_i64).unwrap_or(0),
                     item.get("cost").and_then(Value::as_f64),
                     item.get("status").and_then(Value::as_str),
                     tokens_str,
+                    item.get("meta").map(|v| serde_json::to_string(v).unwrap_or_default()),
+                    item.get("bytesBefore").and_then(Value::as_i64).unwrap_or(0),
+                    item.get("bytesAfter").and_then(Value::as_i64).unwrap_or(0),
+                    item.get("bytesSaved").and_then(Value::as_i64).unwrap_or(0),
+                    item.get("imagePrompts").and_then(Value::as_i64).unwrap_or(0),
+                    success,
+                    latency_ms,
+                    ttft_ms,
                 ],
             )?;
         }
