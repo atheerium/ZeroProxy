@@ -49,6 +49,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const [pathname, setPathname] = useState("");
   const [mounted, setMounted] = useState(false);
 
+  // This route scrolls internally (transcript + stats rail), so it opts out of
+  // the page padding/max-width that normal dashboard pages get.
+  const isFullHeightChat = pathname === "/dashboard/playground";
+
   useEffect(() => {
     setMounted(true);
     setPathname(window.location.pathname);
@@ -123,8 +127,10 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Faint grid background */}
         <div className="landing-grid absolute inset-0 pointer-events-none -z-10" aria-hidden="true" />
         <Header key={pathname} onMenuClick={() => setSidebarOpen(true)} />
-        <div className={`flex-1 overflow-y-auto custom-scrollbar ${pathname === "/dashboard/basic-chat" ? "" : "p-6 lg:p-10"} ${pathname === "/dashboard/basic-chat" ? "flex flex-col overflow-hidden" : ""}`}>
-          <div className={`${pathname === "/dashboard/basic-chat" ? "flex-1 w-full h-full flex flex-col" : "max-w-7xl mx-auto"}`}>{children}</div>
+        {/* Chat-shaped pages own the full viewport height and manage their own
+            internal scrolling, so they opt out of the page padding + max-width. */}
+        <div className={`flex-1 overflow-y-auto custom-scrollbar ${isFullHeightChat ? "" : "p-6 lg:p-10"} ${isFullHeightChat ? "flex flex-col overflow-hidden" : ""}`}>
+          <div className={`${isFullHeightChat ? "flex-1 w-full h-full flex flex-col" : "max-w-7xl mx-auto"}`}>{children}</div>
         </div>
       </main>
     </div>
