@@ -41,6 +41,12 @@ Treat this file as the sole source of truth for anything you were not told in th
 
 ## Current state (2026-09-26) — read before planning more work
 
+**Not on `main`: the analytics rewrite lives on `agent/feat/analytics-pages` (2 commits, unmerged,
+no PR).** Fixes the success-rate lie (failures were never persisted) and adds `/dashboard/analytics`
++ `/dashboard/provider-stats`. Until it merges, `main` still reports a fake 100% success rate for every
+provider and still has no per-provider latency/TTFT. Verify with
+`git log --oneline main..agent/feat/analytics-pages` before assuming either version.
+
 **The free-tier goal is met and PR #14 is MERGED into `main` (merge commit `c9d72419`, 2026-09-26).**
 
 - PR #14 (https://github.com/atheerium/ZeroProxy/pull/14) was **merged with a merge commit** (not
@@ -440,7 +446,7 @@ which is the entire point of having one:
 **Verify with `node scripts/sync/generate-web-providers.mjs --check`** (exit 1 if the committed file
 is stale) — the same shape as the existing `--prune` staleness idea, and suitable for a pre-push hook.
 
-### 11. The sync normalizer projects each provider field TWICE
+### 12. The sync normalizer projects each provider field TWICE
 `scripts/sync/normalize-sources.mjs` builds a provider twice: the inner `omnirouteLoaderSource`
 (the `tsx` script) assembles `out.registry[id]`, then the outer `loadOmniroute` re-projects an
 **explicit field list** into the final array. A field added to only one projection **vanishes
@@ -454,7 +460,7 @@ and verify by counting the field in the regenerated JSON rather than by the abse
   stale. Clone fresh or pass `--src-omniroute=<fresh clone>`; re-measure the free/provider counts
   afterwards rather than trusting the old checkout.
 
-### 12. `core::dns::is_private_ip` fails OPEN on link-local — do not use it to guard a URL
+### 13. `core::dns::is_private_ip` fails OPEN on link-local — do not use it to guard a URL
 It takes a **bare IP string**, not a URL or hostname, and returns `false` for anything unparseable
 (`src/core/dns/mod.rs:346`). It covers `10/8`, `127/8`, `172.16/12`, `192.168/16`, `::1`,
 `::ffff:127/104` — **not** `169.254.0.0/16`. So `is_private_ip("http://169.254.169.254/…")`
@@ -467,6 +473,40 @@ it blocks `169.254.169.254`, `100.64.0.1`, and `240.0.0.1`. It is `pub(crate)` f
   and then fetches **by hostname**, so the check guards *before* the request but leaves a TOCTOU
   re-resolution window. That is the house pattern; widening it into a real connection pin is its
   own change.
+
+### 14. A change rendering live is NOT a change that is saved — report the state, then ask
+A `--web-dir` server reads `web/dist` from disk, and a binary in a worktree runs whatever was compiled
+into it a minute ago. So **uncommitted code is served byte-for-byte like committed code**: every route
+200s, every screenshot looks right, and the work still dies with the worktree. This repo has already
+lost work exactly this way — a full analytics feature was built, gated green (`1909 passed`,
+`--full detach` exit 0), screenshotted in a real browser, and reported as done while sitting
+**uncommitted** in `wt-analytics`. It surfaced much later, while debugging something unrelated, and the
+reasoning was gone by then. Seeing it work was read as *merged*, which it was not.
+
+**Seeing the change is not evidence that it is saved.** Never let "it's live", "it's running", or "it
+works" stand in for either. Before the final report on any work that touched files, run the real state
+— do not recall it:
+
+```bash
+git -C <worktree> status --porcelain           # anything uncommitted?
+git -C <worktree> log --oneline <base>..HEAD   # committed on this branch, and how many
+git branch -r --contains HEAD                   # pushed?
+gh pr view --json state,mergedAt               # open, or merged?
+```
+
+Then close the loop **explicitly, every time**, in one of these forms:
+
+| State | What the report must actually say |
+|---|---|
+| uncommitted | "**Nothing is committed.** N files changed in `<worktree>` on branch `<b>` — do you want me to commit?" |
+| committed, not on `main` | "Committed as N commits on `<b>`, **not on `main`**. Want me to open a PR?" |
+| PR open | "PR #N is **open, not merged**." |
+| merged | only *now* may a report call the work part of `main` |
+
+Asking is the default. **Neither committing unprompted nor staying silent is right** — an unasked
+commit can land on the wrong branch or sweep in unrelated files, which is its own organizational
+error. Report the state, ask once, act on the answer. This applies to this file too: a `docs(agents)`
+rule written but left uncommitted protects nobody.
 
 ## Invariants (must not break)
 
@@ -607,6 +647,14 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
 **depends on the web artifact** because `build.rs` needs `web/dist/index.html`.
 
 ## Git hygiene
+
+**Closing the loop is part of the task.** Any work that touched files ends in exactly one of four
+states — uncommitted / committed-but-not-merged / PR-open / merged — and the report must say which
+one, out loud, every time. Never end a report on changed code without stating it. And never treat
+"it renders fine locally" as evidence of any of them: a `--web-dir` server serves uncommitted code
+exactly like committed code, which is how a finished feature once sat uncommitted for weeks. Read
+**Trap 14** and follow its four-state table. Committing without being asked is *also* an error — ask
+once, then act.
 
 Install hooks once per clone: `./scripts/setup-hooks.sh` (copies `.githooks/*` → `.git/hooks/`).
 Re-run after pulling hook changes.
