@@ -105,6 +105,11 @@ pub fn routes() -> Router<AppState> {
         .route("/api/usage/daily", routing::get(get_usage_daily))
         .route("/api/usage/pricing", routing::get(get_pricing))
         .route("/api/usage/stream", routing::get(stream_usage_stats))
+        .route("/api/usage/analytics", routing::get(get_usage_analytics))
+        .route(
+            "/api/usage/provider-stats",
+            routing::get(get_provider_stats),
+        )
         // Additional dashboard endpoints
         .route(
             "/api/usage/{connection_id}",
@@ -2479,6 +2484,7 @@ mod tests {
 
     #[test]
     fn test_refresh_oauth_connection_no_refresh_token_is_noop() {
+        use crate::server::api::usage::refresh_oauth_connection;
         use crate::types::ProviderConnection;
         // No refresh_token → returns the connection unchanged (JS keeps stale
         // accessToken; never 401s when no refresh is possible).
@@ -2493,4 +2499,635 @@ mod tests {
         let out = rt.block_on(refresh_oauth_connection(&conn, false)).unwrap();
         assert_eq!(out.access_token.as_deref(), Some("stale-token"));
     }
+}
+
+/// Query parameter for /api/usage/analytics
+#[derive(Debug, Deserialize)]
+struct AnalyticsQuery {
+    range: Option<String>,
+    start_date: Option<String>,
+    end_date: Option<String>,
+}
+
+/// GET /api/usage/analytics?range=30d
+///
+/// Returns aggregated usage analytics for the specified time range.
+async fn get_usage_analytics(
+    State(state): State<AppState>,
+    Query(query): Query<AnalyticsQuery>,
+    headers: HeaderMap,
+) -> Response {
+    if let Err(response) = require_usage_access(&headers, &state) {
+        return response;
+    }
+
+    let range = query.range.as_deref().unwrap_or("30d");
+    let (cutoff, range_label) = match range {
+        "1d" => (Some(Utc::now() - ChronoDuration::days(1)), "1d"),
+        "7d" => (Some(Utc::now() - ChronoDuration::days(7)), "7d"),
+        "30d" => (Some(Utc::now() - ChronoDuration::days(30)), "30d"),
+        "90d" => (Some(Utc::now() - ChronoDuration::days(90)), "90d"),
+        "ytd" => {
+            let now = Utc::now();
+            let year_start = now
+                .with_month(1)
+                .unwrap()
+                .with_day(1)
+                .unwrap()
+                .with_hour(0)
+                .unwrap()
+                .with_minute(0)
+                .unwrap()
+                .with_second(0)
+                .unwrap();
+            (Some(year_start), "ytd")
+        }
+        "all" => (None, "all"),
+        _ => {
+            return (
+                axum::http::StatusCode::BAD_REQUEST,
+                Json(json!({
+                    "error": "Invalid range. Use one of: 1d, 7d, 30d, 90d, ytd, all"
+                })),
+            )
+                .into_response();
+        }
+    };
+
+    // Override with custom date range if provided
+    let cutoff = if let (Some(start), Some(end)) =
+        (query.start_date.as_deref(), query.end_date.as_deref())
+    {
+        match (
+            DateTime::parse_from_rfc3339(start),
+            DateTime::parse_from_rfc3339(end),
+        ) {
+            (Ok(s), Ok(e)) => Some(s.with_timezone(&Utc).max(e.with_timezone(&Utc))),
+            _ => cutoff,
+        }
+    } else if let Some(start) = query.start_date.as_deref() {
+        DateTime::parse_from_rfc3339(start)
+            .ok()
+            .map(|dt| dt.with_timezone(&Utc))
+    } else {
+        cutoff
+    };
+
+    let tracker = UsageTracker::new(state.db.clone());
+    let usage_db = tracker.get_usage_db();
+
+    let in_period = |entry: &UsageEntry| -> bool {
+        let Some(cutoff) = cutoff else { return true };
+        match entry
+            .timestamp
+            .as_deref()
+            .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok())
+            .map(|dt| dt.with_timezone(&Utc))
+        {
+            Some(ts) => ts >= cutoff,
+            None => true,
+        }
+    };
+
+    let mut total_requests = 0u64;
+    let mut successful_requests = 0u64;
+    let mut failed_requests = 0u64;
+    let mut prompt_tokens = 0u64;
+    let mut completion_tokens = 0u64;
+    let mut unique_models: BTreeSet<String> = BTreeSet::new();
+    let mut unique_providers: BTreeSet<String> = BTreeSet::new();
+    let mut latency_sum = 0u64;
+    let mut latency_count = 0u64;
+    let mut ttft_sum = 0u64;
+    let mut ttft_count = 0u64;
+    let mut first_request: Option<DateTime<Utc>> = None;
+    let mut last_request: Option<DateTime<Utc>> = None;
+    let mut failure_counting_started: Option<DateTime<Utc>> = None;
+
+    // Per-provider aggregation
+    let mut by_provider: BTreeMap<String, ProviderAgg> = BTreeMap::new();
+    // Per-model aggregation
+    let mut by_model: BTreeMap<String, ModelAgg> = BTreeMap::new();
+    // Daily trend
+    let mut daily_trend: BTreeMap<String, DailyAgg> = BTreeMap::new();
+
+    for entry in &usage_db.history {
+        if !in_period(entry) {
+            continue;
+        }
+
+        let ts = entry
+            .timestamp
+            .as_deref()
+            .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        if let Some(ts) = ts {
+            if first_request.is_none() || ts < first_request.unwrap() {
+                first_request = Some(ts);
+            }
+            if last_request.is_none() || ts > last_request.unwrap() {
+                last_request = Some(ts);
+            }
+        }
+
+        let is_success = entry
+            .success
+            .unwrap_or(entry.status.as_deref() == Some("success"));
+        total_requests += 1;
+        if is_success {
+            successful_requests += 1;
+        } else {
+            failed_requests += 1;
+            if failure_counting_started.is_none() {
+                failure_counting_started = ts;
+            } else if let Some(ts) = ts {
+                if ts < failure_counting_started.unwrap() {
+                    failure_counting_started = Some(ts);
+                }
+            }
+        }
+
+        if let Some(tokens) = &entry.tokens {
+            prompt_tokens += tokens.prompt_tokens.or(tokens.input_tokens).unwrap_or(0);
+            completion_tokens += tokens
+                .completion_tokens
+                .or(tokens.output_tokens)
+                .unwrap_or(0);
+        }
+
+        if let Some(provider) = &entry.provider {
+            unique_providers.insert(provider.clone());
+        }
+        unique_models.insert(entry.model.clone());
+
+        let (latency, ttft) = extract_latency(entry);
+        if latency > 0 {
+            latency_sum += latency;
+            latency_count += 1;
+        }
+        if ttft > 0 {
+            ttft_sum += ttft;
+            ttft_count += 1;
+        }
+
+        // Provider aggregation
+        let provider_key = entry
+            .provider
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+        let p_agg = by_provider.entry(provider_key.clone()).or_default();
+        p_agg.requests += 1;
+        if is_success {
+            p_agg.successful += 1;
+        } else {
+            p_agg.failed += 1;
+        }
+        if let Some(tokens) = &entry.tokens {
+            p_agg.prompt_tokens += tokens.prompt_tokens.or(tokens.input_tokens).unwrap_or(0);
+            p_agg.completion_tokens += tokens
+                .completion_tokens
+                .or(tokens.output_tokens)
+                .unwrap_or(0);
+        }
+        if latency > 0 {
+            p_agg.latency_sum += latency;
+            p_agg.latency_count += 1;
+        }
+        if ttft > 0 {
+            p_agg.ttft_sum += ttft;
+            p_agg.ttft_count += 1;
+        }
+
+        // Model aggregation
+        let model_key = format!("{}/{}", provider_key, entry.model);
+        let m_agg = by_model.entry(model_key.clone()).or_default();
+        m_agg.requests += 1;
+        if is_success {
+            m_agg.successful += 1;
+        } else {
+            m_agg.failed += 1;
+        }
+        if let Some(tokens) = &entry.tokens {
+            m_agg.prompt_tokens += tokens.prompt_tokens.or(tokens.input_tokens).unwrap_or(0);
+            m_agg.completion_tokens += tokens
+                .completion_tokens
+                .or(tokens.output_tokens)
+                .unwrap_or(0);
+        }
+        m_agg.total_tokens = m_agg.prompt_tokens + m_agg.completion_tokens;
+        if latency > 0 {
+            m_agg.latency_sum += latency;
+            m_agg.latency_count += 1;
+        }
+        if ttft > 0 {
+            m_agg.ttft_sum += ttft;
+            m_agg.ttft_count += 1;
+        }
+        m_agg.provider = provider_key;
+        // Without this the emitted "model" field is ModelAgg::default() (empty string),
+        // so the Model Breakdown table renders a blank MODEL cell for every row.
+        m_agg.model = entry.model.clone();
+
+        // Daily trend
+        let date_key = ts
+            .map(|dt| dt.date_naive().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let d_agg = daily_trend.entry(date_key).or_default();
+        d_agg.requests += 1;
+        if let Some(tokens) = &entry.tokens {
+            d_agg.prompt_tokens += tokens.prompt_tokens.or(tokens.input_tokens).unwrap_or(0);
+            d_agg.completion_tokens += tokens
+                .completion_tokens
+                .or(tokens.output_tokens)
+                .unwrap_or(0);
+        }
+        d_agg.total_tokens = d_agg.prompt_tokens + d_agg.completion_tokens;
+    }
+
+    let success_rate_pct = if total_requests > 0 {
+        format!(
+            "{:.1}",
+            (successful_requests as f64 / total_requests as f64) * 100.0
+        )
+    } else {
+        "—".to_string()
+    };
+
+    let avg_latency_ms = if latency_count > 0 {
+        (latency_sum / latency_count) as i64
+    } else {
+        0
+    };
+    let avg_ttft_ms = if ttft_count > 0 {
+        (ttft_sum / ttft_count) as i64
+    } else {
+        0
+    };
+
+    // Build byProvider response sorted by requests DESC
+    let mut by_provider_vec: Vec<_> = by_provider
+        .into_iter()
+        .map(|(provider, agg)| {
+            let success_rate = if agg.requests > 0 {
+                format!(
+                    "{:.1}",
+                    (agg.successful as f64 / agg.requests as f64) * 100.0
+                )
+            } else {
+                "—".to_string()
+            };
+            let avg_latency = if agg.latency_count > 0 {
+                (agg.latency_sum / agg.latency_count) as i64
+            } else {
+                0
+            };
+            let avg_ttft = if agg.ttft_count > 0 {
+                (agg.ttft_sum / agg.ttft_count) as i64
+            } else {
+                0
+            };
+            let share_pct = if total_requests > 0 {
+                (agg.requests as f64 / total_requests as f64) * 100.0
+            } else {
+                0.0
+            };
+            json!({
+                "provider": provider,
+                "requests": agg.requests,
+                "successfulRequests": agg.successful,
+                "failedRequests": agg.failed,
+                "successRatePct": success_rate,
+                "promptTokens": agg.prompt_tokens,
+                "completionTokens": agg.completion_tokens,
+                "totalTokens": agg.prompt_tokens + agg.completion_tokens,
+                "avgLatencyMs": avg_latency,
+                "avgTtftMs": avg_ttft,
+                "sharePct": (share_pct * 10.0).round() / 10.0,
+            })
+        })
+        .collect();
+    by_provider_vec.sort_by(|a, b| {
+        b["requests"]
+            .as_u64()
+            .unwrap_or(0)
+            .cmp(&a["requests"].as_u64().unwrap_or(0))
+    });
+
+    // Build byModel response sorted by totalTokens DESC
+    let mut by_model_vec: Vec<_> = by_model
+        .into_iter()
+        .map(|(key, agg)| {
+            let success_rate = if agg.requests > 0 {
+                format!(
+                    "{:.1}",
+                    (agg.successful as f64 / agg.requests as f64) * 100.0
+                )
+            } else {
+                "—".to_string()
+            };
+            let avg_latency = if agg.latency_count > 0 {
+                (agg.latency_sum / agg.latency_count) as i64
+            } else {
+                0
+            };
+            let avg_ttft = if agg.ttft_count > 0 {
+                (agg.ttft_sum / agg.ttft_count) as i64
+            } else {
+                0
+            };
+            let share_pct = if (prompt_tokens + completion_tokens) > 0 {
+                (agg.total_tokens as f64 / (prompt_tokens + completion_tokens) as f64) * 100.0
+            } else {
+                0.0
+            };
+            json!({
+                "model": agg.model,
+                "provider": agg.provider,
+                "requests": agg.requests,
+                "successfulRequests": agg.successful,
+                "failedRequests": agg.failed,
+                "successRatePct": success_rate,
+                "promptTokens": agg.prompt_tokens,
+                "completionTokens": agg.completion_tokens,
+                "totalTokens": agg.total_tokens,
+                "avgLatencyMs": avg_latency,
+                "avgTtftMs": avg_ttft,
+                "sharePct": (share_pct * 10.0).round() / 10.0,
+            })
+        })
+        .collect();
+    by_model_vec.sort_by(|a, b| {
+        b["totalTokens"]
+            .as_u64()
+            .unwrap_or(0)
+            .cmp(&a["totalTokens"].as_u64().unwrap_or(0))
+    });
+
+    // Build dailyTrend response
+    let daily_trend_vec: Vec<_> = daily_trend
+        .into_iter()
+        .map(|(date, agg)| {
+            json!({
+                "date": date,
+                "requests": agg.requests,
+                "promptTokens": agg.prompt_tokens,
+                "completionTokens": agg.completion_tokens,
+                "totalTokens": agg.total_tokens,
+            })
+        })
+        .collect();
+
+    let payload = json!({
+        "range": range_label,
+        "summary": {
+            "totalRequests": total_requests,
+            "successfulRequests": successful_requests,
+            "failedRequests": failed_requests,
+            "successRatePct": success_rate_pct,
+            "promptTokens": prompt_tokens,
+            "completionTokens": completion_tokens,
+            "totalTokens": prompt_tokens + completion_tokens,
+            "uniqueModels": unique_models.len(),
+            "uniqueProviders": unique_providers.len(),
+            "avgLatencyMs": avg_latency_ms,
+            "avgTtftMs": avg_ttft_ms,
+            "firstRequest": first_request.map(|dt| dt.to_rfc3339()),
+            "lastRequest": last_request.map(|dt| dt.to_rfc3339()),
+            "failureCountingStartedAt": failure_counting_started.map(|dt| dt.to_rfc3339()),
+        },
+        "dailyTrend": daily_trend_vec,
+        "byProvider": by_provider_vec,
+        "byModel": by_model_vec,
+    });
+
+    Json(payload).into_response()
+}
+
+/// GET /api/provider-stats
+///
+/// Returns provider and model level statistics across all time.
+async fn get_provider_stats(State(state): State<AppState>, headers: HeaderMap) -> Response {
+    if let Err(response) = require_usage_access(&headers, &state) {
+        return response;
+    }
+
+    let tracker = UsageTracker::new(state.db.clone());
+    let usage_db = tracker.get_usage_db();
+
+    let mut by_provider: BTreeMap<String, ProviderStatsAgg> = BTreeMap::new();
+    let mut by_model: BTreeMap<String, ModelStatsAgg> = BTreeMap::new();
+    let mut failure_counting_started: Option<DateTime<Utc>> = None;
+
+    for entry in &usage_db.history {
+        let is_success = entry
+            .success
+            .unwrap_or(entry.status.as_deref() == Some("success"));
+        let ts = entry
+            .timestamp
+            .as_deref()
+            .and_then(|ts| DateTime::parse_from_rfc3339(ts).ok())
+            .map(|dt| dt.with_timezone(&Utc));
+
+        if !is_success {
+            if failure_counting_started.is_none() {
+                failure_counting_started = ts;
+            } else if let Some(ts) = ts {
+                if ts < failure_counting_started.unwrap() {
+                    failure_counting_started = Some(ts);
+                }
+            }
+        }
+
+        let provider_key = entry
+            .provider
+            .clone()
+            .unwrap_or_else(|| "unknown".to_string());
+        let (latency, ttft) = extract_latency(entry);
+
+        // Provider stats
+        let p_agg = by_provider.entry(provider_key.clone()).or_default();
+        p_agg.total_requests += 1;
+        if is_success {
+            p_agg.successful_requests += 1;
+        } else {
+            p_agg.failed_requests += 1;
+        }
+        if let Some(tokens) = &entry.tokens {
+            p_agg.total_tokens_in += tokens.prompt_tokens.or(tokens.input_tokens).unwrap_or(0);
+            p_agg.total_tokens_out += tokens
+                .completion_tokens
+                .or(tokens.output_tokens)
+                .unwrap_or(0);
+        }
+        if latency > 0 {
+            p_agg.latency_sum += latency;
+            p_agg.latency_count += 1;
+        }
+        if ttft > 0 {
+            p_agg.ttft_sum += ttft;
+            p_agg.ttft_count += 1;
+        }
+
+        // Model stats
+        let model_key = format!("{}/{}", provider_key, entry.model);
+        let m_agg = by_model.entry(model_key.clone()).or_default();
+        m_agg.requests += 1;
+        if is_success {
+            m_agg.successful_requests += 1;
+        } else {
+            m_agg.failed_requests += 1;
+        }
+        if latency > 0 {
+            m_agg.latency_sum += latency;
+            m_agg.latency_count += 1;
+        }
+        if ttft > 0 {
+            m_agg.ttft_sum += ttft;
+            m_agg.ttft_count += 1;
+        }
+        m_agg.provider = provider_key;
+        m_agg.model = entry.model.clone();
+    }
+
+    let providers_vec: Vec<_> = by_provider
+        .into_iter()
+        .map(|(provider, agg)| {
+            let success_rate = if agg.total_requests > 0 {
+                format!(
+                    "{:.1}",
+                    (agg.successful_requests as f64 / agg.total_requests as f64) * 100.0
+                )
+            } else {
+                "—".to_string()
+            };
+            let avg_latency = if agg.latency_count > 0 {
+                (agg.latency_sum / agg.latency_count) as i64
+            } else {
+                0
+            };
+            let avg_ttft = if agg.ttft_count > 0 {
+                (agg.ttft_sum / agg.ttft_count) as i64
+            } else {
+                0
+            };
+            json!({
+                "provider": provider,
+                "totalRequests": agg.total_requests,
+                "successfulRequests": agg.successful_requests,
+                "failedRequests": agg.failed_requests,
+                "successRatePct": success_rate,
+                "avgLatencyMs": avg_latency,
+                "avgTtftMs": avg_ttft,
+                "totalTokensIn": agg.total_tokens_in,
+                "totalTokensOut": agg.total_tokens_out,
+            })
+        })
+        .collect();
+
+    let models_vec: Vec<_> = by_model
+        .into_iter()
+        .map(|(_, agg)| {
+            let success_rate = if agg.requests > 0 {
+                format!(
+                    "{:.1}",
+                    (agg.successful_requests as f64 / agg.requests as f64) * 100.0
+                )
+            } else {
+                "—".to_string()
+            };
+            let avg_latency = if agg.latency_count > 0 {
+                (agg.latency_sum / agg.latency_count) as i64
+            } else {
+                0
+            };
+            let avg_ttft = if agg.ttft_count > 0 {
+                (agg.ttft_sum / agg.ttft_count) as i64
+            } else {
+                0
+            };
+            json!({
+                "provider": agg.provider,
+                "model": agg.model,
+                "requests": agg.requests,
+                "successfulRequests": agg.successful_requests,
+                "failedRequests": agg.failed_requests,
+                "successRatePct": success_rate,
+                "avgLatencyMs": avg_latency,
+                "avgTtftMs": avg_ttft,
+            })
+        })
+        .collect();
+
+    let payload = json!({
+        "updatedAt": Utc::now().to_rfc3339(),
+        "failureCountingStartedAt": failure_counting_started.map(|dt| dt.to_rfc3339()),
+        "providers": providers_vec,
+        "models": models_vec,
+    });
+
+    Json(payload).into_response()
+}
+
+#[derive(Default)]
+struct ProviderAgg {
+    requests: u64,
+    successful: u64,
+    failed: u64,
+    prompt_tokens: u64,
+    completion_tokens: u64,
+    latency_sum: u64,
+    latency_count: u64,
+    ttft_sum: u64,
+    ttft_count: u64,
+}
+
+#[derive(Default)]
+struct ModelAgg {
+    requests: u64,
+    successful: u64,
+    failed: u64,
+    prompt_tokens: u64,
+    completion_tokens: u64,
+    total_tokens: u64,
+    latency_sum: u64,
+    latency_count: u64,
+    ttft_sum: u64,
+    ttft_count: u64,
+    provider: String,
+    model: String,
+}
+
+#[derive(Default)]
+struct DailyAgg {
+    requests: u64,
+    prompt_tokens: u64,
+    completion_tokens: u64,
+    total_tokens: u64,
+}
+
+#[derive(Default)]
+struct ProviderStatsAgg {
+    total_requests: u64,
+    successful_requests: u64,
+    failed_requests: u64,
+    total_tokens_in: u64,
+    total_tokens_out: u64,
+    latency_sum: u64,
+    latency_count: u64,
+    ttft_sum: u64,
+    ttft_count: u64,
+}
+
+#[derive(Default)]
+struct ModelStatsAgg {
+    requests: u64,
+    successful_requests: u64,
+    failed_requests: u64,
+    latency_sum: u64,
+    latency_count: u64,
+    ttft_sum: u64,
+    ttft_count: u64,
+    provider: String,
+    model: String,
 }

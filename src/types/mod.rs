@@ -1105,6 +1105,8 @@ pub struct UsageEntry {
     #[serde(default)]
     pub status: Option<String>,
     #[serde(default)]
+    pub success: Option<bool>,
+    #[serde(default)]
     pub bytes_before: u64,
     #[serde(default)]
     pub bytes_after: u64,

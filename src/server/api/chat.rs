@@ -2638,6 +2638,15 @@ async fn forward_with_provider_fallback(
                     .await;
                 let current_backoff = connection.backoff_level.unwrap_or(0);
                 let decision = check_fallback_error(status.as_u16(), &message, current_backoff);
+                let error_class = classify_status_error(status);
+                state.usage_tracker().record_failure(
+                    provider,
+                    model,
+                    Some(&connection.id),
+                    error_class,
+                    Some(status.as_u16()),
+                    plan.combo_name.as_deref(),
+                );
                 let cooldown = retry_after
                     .map(|timestamp| (timestamp - Utc::now()).to_std().unwrap_or_default())
                     .unwrap_or(decision.cooldown);
@@ -2772,6 +2781,15 @@ async fn forward_with_provider_fallback(
                 crate::server::metrics::record_provider_request(provider, model, 502, stream);
                 let current_backoff = connection.backoff_level.unwrap_or(0);
                 let decision = check_fallback_error(502, &message, current_backoff);
+                let error_class = Some("transport_error");
+                state.usage_tracker().record_failure(
+                    provider,
+                    model,
+                    Some(&connection.id),
+                    error_class,
+                    Some(502),
+                    plan.combo_name.as_deref(),
+                );
                 let error_for_return = ComboAttemptError::new(502, message.clone());
                 last_error = Some(error);
 
@@ -3824,6 +3842,14 @@ async fn proxy_response_with_pending_tracking(
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
                                 .await;
+                            state.usage_tracker().record_failure(
+                                &provider,
+                                &model,
+                                connection_id.as_deref(),
+                                error_class,
+                                Some(504),
+                                combo_name.as_deref(),
+                            );
                             yield Ok::<Bytes, std::io::Error>(Bytes::from(write_streaming_error(
                                 "Upstream SSE stream stalled",
                                 "server_error",
@@ -3885,6 +3911,14 @@ async fn proxy_response_with_pending_tracking(
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
                                 .await;
+                            state.usage_tracker().record_failure(
+                                &provider,
+                                &model,
+                                connection_id.as_deref(),
+                                error_class,
+                                Some(502),
+                                combo_name.as_deref(),
+                            );
                             yield Ok::<Bytes, std::io::Error>(Bytes::from(write_streaming_error(
                                 "Upstream stream error",
                                 "server_error",
@@ -3964,6 +3998,14 @@ async fn proxy_response_with_pending_tracking(
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
                                 .await;
+                            state.usage_tracker().record_failure(
+                                &provider,
+                                &model,
+                                connection_id.as_deref(),
+                                error_class,
+                                Some(504),
+                                combo_name.as_deref(),
+                            );
                             yield Ok::<Bytes, std::io::Error>(Bytes::from(write_streaming_error(
                                 "Upstream SSE stream stalled",
                                 "server_error",
@@ -4021,6 +4063,14 @@ async fn proxy_response_with_pending_tracking(
                                 .usage_live
                                 .finish_request(&model, &provider, connection_id.as_deref(), true)
                                 .await;
+                            state.usage_tracker().record_failure(
+                                &provider,
+                                &model,
+                                connection_id.as_deref(),
+                                error_class,
+                                Some(502),
+                                combo_name.as_deref(),
+                            );
                             yield Ok::<Bytes, std::io::Error>(Bytes::from(write_streaming_error(
                                 "Upstream stream error",
                                 "server_error",

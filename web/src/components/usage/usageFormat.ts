@@ -168,21 +168,26 @@ export function formatDuration(ms: number): string {
   return `${(ms / 1000).toFixed(2)}s`;
 }
 
-// Map a UI period label to a backend UsagePeriod value.
 export function periodToBackend(label: string): string {
   switch (label) {
+    case "1d":
     case "1D":
     case "24h":
-      return "today";
+      return "1d";
+    case "7d":
     case "7D":
       return "7d";
+    case "30d":
     case "30D":
       return "30d";
+    case "90d":
     case "90D":
-      return "60d"; // backend max bounded window
+      return "90d";
+    case "ytd":
     case "YTD":
-    case "All":
+      return "ytd";
     case "all":
+    case "All":
       return "all";
     default:
       return "30d";

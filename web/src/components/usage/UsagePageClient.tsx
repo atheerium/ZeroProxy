@@ -8,11 +8,12 @@ import CompressionStats from "@/components/usage/CompressionStats";
 import AutoBreakdown from "@/components/usage/AutoBreakdown";
 
 const PERIODS = [
-  { value: "today", label: "Today" },
-  { value: "24h", label: "24h" },
-  { value: "7d", label: "7D" },
-  { value: "30d", label: "30D" },
-  { value: "60d", label: "60D" },
+  { value: "1d", label: "1d" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "90d", label: "90d" },
+  { value: "ytd", label: "ytd" },
+  { value: "all", label: "all" },
 ];
 
 export default function UsagePageClient() {
@@ -41,7 +42,7 @@ function UsageContent() {
   };
 
   const [tabLoading, setTabLoading] = useState(false);
-  const [period, setPeriod] = useState("today");
+  const [period, setPeriod] = useState("30d");
 
   const tabFromUrl = searchParams.get("tab");
   const activeTab =

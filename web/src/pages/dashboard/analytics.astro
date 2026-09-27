@@ -1,0 +1,10 @@
+---
+import Layout from "@/layouts/Layout.astro";
+import AnalyticsPageClient from "@/components/analytics/AnalyticsPageClient";
+import DashboardLayout from "@/shared/components/layouts/DashboardLayout";
+---
+<Layout>
+  <DashboardLayout client:only="react">
+    <AnalyticsPageClient client:only="react" />
+  </DashboardLayout>
+</Layout>

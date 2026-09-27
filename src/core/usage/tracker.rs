@@ -158,6 +158,77 @@ impl UsageTracker {
         });
     }
 
+    /// Record a per-provider attempt failure. This writes a durable usageHistory
+    /// row with `success = false`, zero token counts, and the provided error
+    /// class / HTTP status. It reuses the detached write path so callers don't
+    /// block on SQLite.
+    pub fn record_failure(
+        &self,
+        provider: &str,
+        model: &str,
+        connection_id: Option<&str>,
+        error_class: Option<&str>,
+        http_status: Option<u16>,
+        combo_name: Option<&str>,
+    ) {
+        let status = http_status
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "error".to_string());
+        let entry = UsageEntry {
+            timestamp: Some(Utc::now().to_rfc3339()),
+            provider: Some(provider.to_string()),
+            model: model.to_string(),
+            tokens: None,
+            connection_id: connection_id.map(String::from),
+            api_key: None,
+            endpoint: None,
+            cost: Some(0.0),
+            status: Some(status.clone()),
+            success: Some(false),
+            bytes_before: 0,
+            bytes_after: 0,
+            bytes_saved: 0,
+            image_prompts: 0,
+            extra: {
+                let mut m = std::collections::BTreeMap::new();
+                if let Some(ec) = error_class {
+                    m.insert(
+                        "error_class".to_string(),
+                        serde_json::Value::String(ec.to_string()),
+                    );
+                }
+                if let Some(name) = combo_name {
+                    m.insert(
+                        "combo_name".to_string(),
+                        serde_json::Value::String(name.to_string()),
+                    );
+                }
+                m
+            },
+            latency_ms: None,
+            ttft_ms: None,
+            ..Default::default()
+        };
+        let db = self.db.clone();
+        tokio::spawn(async move {
+            if let Err(e) = db
+                .update_usage(move |db| {
+                    if db.history.iter().any(|e| same_usage_row(e, &entry)) {
+                        return;
+                    }
+                    db.history.push(entry);
+                    if db.total_requests_lifetime < db.history.len() as u64 {
+                        db.total_requests_lifetime = db.history.len() as u64;
+                    }
+                    db.failed_requests += 1;
+                })
+                .await
+            {
+                tracing::error!("usage tracker: failure persist failed: {e}");
+            }
+        });
+    }
+
     fn build_usage_entry(
         &self,
         provider: &str,
@@ -245,6 +316,7 @@ impl UsageTracker {
             );
         }
         let status_value = status.map(|s| s.to_string());
+        let success = status_value.as_deref() == Some("success");
 
         UsageEntry {
             timestamp: Some(Utc::now().to_rfc3339()),
@@ -256,6 +328,7 @@ impl UsageTracker {
             endpoint: endpoint.map(String::from),
             cost: Some(cost),
             status: status_value.or_else(|| Some("success".to_string())),
+            success: Some(success),
             bytes_before,
             bytes_after,
             bytes_saved,
