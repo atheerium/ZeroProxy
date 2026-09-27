@@ -145,6 +145,14 @@ need it gone, delete the model.
 
 ## Verification traps — each of these produced a wrong conclusion at least once
 
+- **The shell is zsh, which does not word-split unquoted variables** the way bash does. `for b in
+  $LIST; do git branch -d "$b"; done` passes the ENTIRE list as ONE argument — it failed here with
+  25 branch names handed to a single `git branch -d`, and a `git commit` wrapped in a variable
+  (`G="git -c user.name=…"; $G commit`) dies with `command not found`. This bit twice in one
+  session. **Use a `while read` loop instead:** `git for-each-ref … | while read -r b; do …; done`
+  — piping splits correctly because the split happens in the subshell, not on parameter expansion.
+  Related: **`$PIPESTATUS` does not exist in zsh**, so `cmd | tail; echo $?` reports `tail`'s exit
+  code and `echo ${PIPESTATUS[0]}` prints empty. Redirect to a file and read `$?` instead.
 - **`git grep -c` counts matching LINES, not occurrences.** Use `git grep -o <pat> <ref> | wc -l`.
   Using `-c` reported 86/95 crate refs where the real numbers were 152/143.
 - **`git show --stat` prints the path BEFORE the pipe.** Classify with
