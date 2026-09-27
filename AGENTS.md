@@ -75,6 +75,15 @@ provider and still has no per-provider latency/TTFT. Verify with
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
   across ~105 providers. Run it with `zeroproxy sync omniroute --free-only`.
+- **The catalog is NOT falling behind — measured 2026-09-27, so do not open a staleness
+  investigation.** `sources/omniroute.json` is pinned to `443d669`, and OmniRoute's `main` HEAD is
+  `443d66996d69` — the *same* commit. `normalize-sources.mjs:27` is the OmniRoute entry with
+  `defaultRef: "main"` (line 21 is 9router's `master`), so the snapshot already tracks the intended
+  branch. Contents at that ref: **270 providers / 137 free / 2592 models / 96 `modelsUrl`**.
+  To re-check after upstream moves: compare the snapshot's `ref` against
+  `https://api.github.com/repos/diegosouzapw/OmniRoute/commits/main` (`git ls-remote` is the
+  flakier of the two on this network). Because `main` is frequently *behind* the default branch
+  `release/v3.8.51`, "our default branch looks newer" is not evidence our snapshot is stale.
 - The navbar badge now tells you **which version you are actually running**. It previously showed
   the backend's sha and process uptime (`0m`), which made a stale dashboard look freshly restarted.
   It now reports the dashboard's own build identity against repo HEAD as fresh / stale / unknown,
