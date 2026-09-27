@@ -12,13 +12,16 @@ their release notes has low return. OmniRoute is the only upstream that still mo
 be worth mirroring, so:
 
 - **Parity target = OmniRoute's FREE-TIER provider list + model catalog + model conventions.**
-- **Free tier only. Paid providers are explicitly out of scope.** Do not add them, do not research
-  them, do not report their absence as a gap.
+- **The free tier is the optimisation target, not an exclusive whitelist.** Free-tier providers come
+  first everywhere: they sort into the Free Tier section, which structurally sits above API Key, and
+  the "free only" filter hides everything else. Non-free providers OmniRoute lists are still carried
+  — in a **separate `GENERATED_OTHER_PROVIDERS` map** so they stay inert until someone opts in with
+  one import. Do not treat their absence as a gap; do not let them crowd out free-tier work.
 - **Lightweight is a hard constraint, not a nice-to-have.** If a port drags in MCP, A2A/ACP,
   Electron/PWA/VNC, memory/skills frameworks, cloud sync, Telegram, or chaos engineering, it is
   the wrong port. See the "do NOT port" list.
-- **Only free-tier LLM providers are real targets.** Search/fetch/TTS/embedding/image providers are
-  lower value — do not let them crowd out LLM work.
+- **LLM providers are the real targets**, free-tier ones first. Search/fetch/TTS/embedding/image
+  providers are lower value — do not let them crowd out LLM work.
 
 **Do not ask the user to restate these goals.** They are recorded here permanently. If a task seems
 to conflict with this section, this section wins, and you should say so rather than quietly
