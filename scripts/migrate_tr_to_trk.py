@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """One-time migration: replace tokenrouter alias 'tr' with canonical 'trk'
 across persisted SQLite DB (combos, disabledModels, custom_models, modelAliases, connections).
-Usage: python scripts/migrate_tr_to_trk.py <db_path>  (defaults to data/*.db or ~/.cipherroute/db.json equivalent)"""
+Usage: python scripts/migrate_tr_to_trk.py <db_path>  (defaults to data/*.db or ~/.zeroproxy/db.json equivalent)"""
 import sqlite3, json, sys, glob, pathlib
 
 DB_PATH = sys.argv[1] if len(sys.argv) > 1 else (glob.glob("data/*.db")[0] if glob.glob("data/*.db") else None)

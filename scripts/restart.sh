@@ -21,8 +21,8 @@ kill_robust() {
   pkill -f 'target/(debug|release)/zeroproxy' 2>/dev/null || true
   pkill -f 'zeroproxy.*server start' 2>/dev/null || true
   pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
-  # Kill leftover cipherroute references (legacy binary name in some environments).
-  pkill -f "cipherroute.*${PORT}" 2>/dev/null || true
+  # Kill leftover zeroproxy references (legacy binary name in some environments).
+  pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
   # Last resort: fuser kills anything holding the TCP port.
   if command -v fuser >/dev/null 2>&1; then
     fuser -k "${PORT}/tcp" 2>/dev/null || true

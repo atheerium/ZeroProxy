@@ -148,7 +148,7 @@ fn dependency_stack_smoke_test() {
 #[test]
 fn cli_parsing_supports_env_backed_flags() {
     let cli = Cli::try_parse_from([
-        "cipherroute",
+        "zeroproxy",
         "--host",
         "127.0.0.1",
         "--port",

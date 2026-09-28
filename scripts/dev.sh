@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# dev build + run loop for CipherRoute
+# dev build + run loop for ZeroProxy
 # Runnable from repo root OR any cwd:
 #   ./scripts/dev.sh --fast              # fast incremental build (default)
 #   ./scripts/dev.sh --full              # full rebuild + checks
@@ -166,7 +166,7 @@ kill_port() {
   pkill -f 'zeroproxy.*server start' 2>/dev/null || true
   pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
   pkill -f "openproxy" 2>/dev/null || true
-  pkill -f "cipherroute.*${PORT}" 2>/dev/null || true
+  pkill -f "zeroproxy.*${PORT}" 2>/dev/null || true
   # Confirm the unit is actually inactive (no crash-loop resurrection).
   if systemctl --user is-active --quiet zeroproxy.service 2>/dev/null; then
     echo "!! zeroproxy.service still active after stop — forcing stop" >&2

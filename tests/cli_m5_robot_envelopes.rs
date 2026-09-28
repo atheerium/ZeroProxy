@@ -1,6 +1,6 @@
 //! M5 CLI integration tests — mitm / tunnel (runtime) / tool / translator / media.
 //!
-//! Exercises the `cipherroute` binary against a wiremock server and asserts the
+//! Exercises the `zeroproxy` binary against a wiremock server and asserts the
 //! `--robot` JSON envelopes. We hit one happy-path per subcommand group; the
 //! detailed handler tests live in unit tests inside each `cli/*.rs` module.
 
@@ -26,7 +26,7 @@ async fn boot_server() -> MockServer {
 
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("zeroproxy")
-        .expect("locate cipherroute binary")
+        .expect("locate zeroproxy binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
         .env(
@@ -39,7 +39,7 @@ fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
         )
         .args(args)
         .output()
-        .expect("run cipherroute")
+        .expect("run zeroproxy")
 }
 
 fn op_stdin(server: &MockServer, args: &[&str], stdin: &str) -> std::process::Output {
@@ -47,7 +47,7 @@ fn op_stdin(server: &MockServer, args: &[&str], stdin: &str) -> std::process::Ou
     use std::process::Stdio;
 
     let mut child = Command::cargo_bin("zeroproxy")
-        .expect("locate cipherroute binary")
+        .expect("locate zeroproxy binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
         .env(
@@ -63,7 +63,7 @@ fn op_stdin(server: &MockServer, args: &[&str], stdin: &str) -> std::process::Ou
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn cipherroute");
+        .expect("spawn zeroproxy");
     child
         .stdin
         .as_mut()

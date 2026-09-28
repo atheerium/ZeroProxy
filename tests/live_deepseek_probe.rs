@@ -1,5 +1,5 @@
 //! Temporary live probe: replicate DeepSeek /users/current via reqwest.
-//! Run: cargo test -p cipherroute --test live_deepseek_probe -- --ignored --nocapture
+//! Run: cargo test -p zeroproxy --test live_deepseek_probe -- --ignored --nocapture
 //! DELETE THIS FILE after diagnosis.
 
 const TOKEN: &str = "olUA3kbKmEqrSpix1msiDQRK/IVir+dEULPfFurs/4+OCujgCKYaAKW7+ToTN5uT";
