@@ -449,7 +449,7 @@ case "$MODE" in
     build
     echo "== starting $BIN --web-dir web/dist server start --port $PORT (foreground, Ctrl+C to stop) =="
     echo "   Dashboard: http://127.0.0.1:${PORT}"
-    echo "   API:       http://127.0.0.1:${PORT}/v1  (Bearer \$CIPHERROUTE_API_KEY)"
+    echo "   API:       http://127.0.0.1:${PORT}/v1  (Bearer \$ZEROPROXY_API_KEY)"
     exec "$BIN" --web-dir "$REPO_ROOT/web/dist" server start --port "$PORT" --no-open
     ;;
   *)

@@ -16,7 +16,7 @@ use tokio::fs;
 use crate::server::state::AppState;
 
 /// ZeroProxy apiBase value — used to identify our own entries.
-const CIPHERROUTE_API_BASE: &str = "http://localhost:4623/v1";
+const ZEROPROXY_API_BASE: &str = "http://localhost:4623/v1";
 
 pub fn routes() -> Router<AppState> {
     Router::new().route(
@@ -155,7 +155,7 @@ fn has_zeroproxy_config(config: &Value) -> bool {
         .map(|models| {
             models
                 .iter()
-                .any(|m| m.get("apiBase").and_then(Value::as_str) == Some(CIPHERROUTE_API_BASE))
+                .any(|m| m.get("apiBase").and_then(Value::as_str) == Some(ZEROPROXY_API_BASE))
         })
         .unwrap_or(false)
 }
@@ -186,7 +186,7 @@ async fn write_continue_settings(body: &SaveContinueSettingsRequest) -> AnyhowRe
         "provider": "openai",
         "model": body.model,
         "apiKey": body.api_key,
-        "apiBase": CIPHERROUTE_API_BASE,
+        "apiBase": ZEROPROXY_API_BASE,
     });
 
     // Get or create the models array
@@ -199,7 +199,7 @@ async fn write_continue_settings(body: &SaveContinueSettingsRequest) -> AnyhowRe
         .unwrap_or_default();
 
     // Remove any existing entry with the same apiBase
-    models.retain(|m| m.get("apiBase").and_then(Value::as_str) != Some(CIPHERROUTE_API_BASE));
+    models.retain(|m| m.get("apiBase").and_then(Value::as_str) != Some(ZEROPROXY_API_BASE));
 
     // Append the new entry
     models.push(new_entry);
@@ -230,7 +230,7 @@ async fn reset_continue_settings() -> AnyhowResult<Value> {
 
     if let Some(Value::Array(models)) = config.get_mut("models") {
         let before = models.len();
-        models.retain(|m| m.get("apiBase").and_then(Value::as_str) != Some(CIPHERROUTE_API_BASE));
+        models.retain(|m| m.get("apiBase").and_then(Value::as_str) != Some(ZEROPROXY_API_BASE));
         if models.len() != before {
             changed = true;
         }

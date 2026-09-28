@@ -65,17 +65,17 @@ struct VercelApiEnvGuard {
 impl Drop for VercelApiEnvGuard {
     fn drop(&mut self) {
         if let Some(previous) = self.previous.as_deref() {
-            std::env::set_var("CIPHERROUTE_VERCEL_API_BASE_URL", previous);
+            std::env::set_var("ZEROPROXY_VERCEL_API_BASE_URL", previous);
         } else {
-            std::env::remove_var("CIPHERROUTE_VERCEL_API_BASE_URL");
+            std::env::remove_var("ZEROPROXY_VERCEL_API_BASE_URL");
         }
     }
 }
 
 async fn set_vercel_api_base_url(base_url: &str) -> VercelApiEnvGuard {
     let lock = VERCEL_API_ENV_LOCK.lock().await;
-    let previous = std::env::var("CIPHERROUTE_VERCEL_API_BASE_URL").ok();
-    std::env::set_var("CIPHERROUTE_VERCEL_API_BASE_URL", base_url);
+    let previous = std::env::var("ZEROPROXY_VERCEL_API_BASE_URL").ok();
+    std::env::set_var("ZEROPROXY_VERCEL_API_BASE_URL", base_url);
     VercelApiEnvGuard {
         previous,
         _lock: lock,

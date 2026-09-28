@@ -2,7 +2,7 @@
 //!
 //! Two schemes coexist, dispatch on a prefix:
 //! - `opxenc2:` — **AES-256-GCM** (authenticated encryption) with a key
-//!   derived via **Argon2id** from `CIPHERROUTE_ENCRYPTION_KEY` and a
+//!   derived via **Argon2id** from `ZEROPROXY_ENCRYPTION_KEY` and a
 //!   per-install salt. This is the default for all new writes. GCM detects
 //!   tampering (an attacker who can write to disk cannot silently corrupt or
 //!   swap blocks). The Argon2id derivation is cached per process, so the hot
@@ -12,7 +12,8 @@
 //!   format. Existing `opxenc1:` values are lazily re-wrapped to `opxenc2:`
 //!   the next time their connection is written.
 //!
-//! Key rotation caveat: changing `CIPHERROUTE_ENCRYPTION_KEY` requires
+//! Key rotation caveat: changing `ZEROPROXY_ENCRYPTION_KEY` (or the legacy
+//! `CIPHERROUTE_ENCRYPTION_KEY`, which is still read as a fallback) requires
 //! re-encrypting existing credentials (lazy re-wrap handles this on next
 //! write). The primary goal is to prevent accidental exposure of plaintext
 //! credentials in `db.json` or SQLite backups. For stronger protection, use
@@ -128,11 +129,11 @@ pub fn sha256_checksum(data: &[u8]) -> String {
 // Encryption key source
 // ---------------------------------------------------------------------------
 
-/// Return the encryption key from the `CIPHERROUTE_ENCRYPTION_KEY` environment
+/// Return the encryption key from the `ZEROPROXY_ENCRYPTION_KEY` environment
 /// variable, or `None` when unset / empty (encryption is disabled, values are
 /// stored in plaintext).
 pub fn encryption_key() -> Option<String> {
-    std::env::var("CIPHERROUTE_ENCRYPTION_KEY")
+    crate::core::env::var("ZEROPROXY_ENCRYPTION_KEY")
         .ok()
         .filter(|k| !k.is_empty())
 }
@@ -142,7 +143,7 @@ pub fn encryption_key() -> Option<String> {
 // ---------------------------------------------------------------------------
 
 /// Marker prefix for values encrypted by ZeroProxy (prevents double-encrypt and
-/// detects ciphertext when `CIPHERROUTE_ENCRYPTION_KEY` is missing).
+/// detects ciphertext when `ZEROPROXY_ENCRYPTION_KEY` is missing).
 pub const ENC_PREFIX: &str = "opxenc1:";
 
 /// Marker prefix for values encrypted with the v2 scheme (AES-256-GCM +
@@ -205,15 +206,15 @@ fn read_salt_file() -> Option<[u8; SALT_LEN]> {
 /// Argon2id parameters. High memory cost (64 MiB) is acceptable because the
 /// derivation is cached and runs once per boot.
 fn argon2_params() -> argon2::Params {
-    let m_cost: u32 = std::env::var("CIPHERROUTE_ARGON2_M_COST_KB")
+    let m_cost: u32 = crate::core::env::var("ZEROPROXY_ARGON2_M_COST_KB")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(65_536);
-    let t_cost: u32 = std::env::var("CIPHERROUTE_ARGON2_T_COST")
+    let t_cost: u32 = crate::core::env::var("ZEROPROXY_ARGON2_T_COST")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(3);
-    let p_cost: u32 = std::env::var("CIPHERROUTE_ARGON2_P_COST")
+    let p_cost: u32 = crate::core::env::var("ZEROPROXY_ARGON2_P_COST")
         .ok()
         .and_then(|v| v.parse().ok())
         .unwrap_or(1);
@@ -225,7 +226,7 @@ fn argon2_params() -> argon2::Params {
     })
 }
 
-/// Derive the 256-bit AES-GCM key from the raw `CIPHERROUTE_ENCRYPTION_KEY`
+/// Derive the 256-bit AES-GCM key from the raw `ZEROPROXY_ENCRYPTION_KEY`
 /// using Argon2id with the per-install salt. Cached per process keyed by the
 /// raw key string — the hot path never re-derives, but a different key
 /// (e.g. in tests) still derives its own.
@@ -300,7 +301,7 @@ fn decrypt_value_v2(raw_key: &str, payload_b64: &str) -> anyhow::Result<String> 
 /// struct is safe for serialization to disk.
 ///
 /// When `key` is empty (encryption disabled), the fields are left as-is.
-/// This matches 9router's behaviour where `CIPHERROUTE_ENCRYPTION_KEY` unset
+/// This matches 9router's behaviour where `ZEROPROXY_ENCRYPTION_KEY` unset
 /// means plaintext storage — SHA-256("") is NOT a valid encryption key.
 ///
 /// Already-prefixed ciphertext is never re-encrypted (stops monotonic growth
@@ -451,7 +452,7 @@ fn decrypt_opt(field: &mut Option<String>, key: &str) {
         if is_marked {
             tracing::error!(
                 target: "zeroproxy::crypto",
-                "Encrypted credential present but CIPHERROUTE_ENCRYPTION_KEY is unset — \
+                "Encrypted credential present but ZEROPROXY_ENCRYPTION_KEY is unset — \
                  clearing field so ciphertext is never sent upstream. Set the same key \
                  used when writing the DB."
             );
@@ -478,7 +479,7 @@ fn decrypt_opt(field: &mut Option<String>, key: &str) {
             if is_marked || looks_like_ciphertext(&payload) {
                 tracing::error!(
                     target: "zeroproxy::crypto",
-                    "Failed to decrypt credential (wrong CIPHERROUTE_ENCRYPTION_KEY?): {err:#} — \
+                    "Failed to decrypt credential (wrong ZEROPROXY_ENCRYPTION_KEY?): {err:#} — \
                      clearing field so ciphertext is never sent upstream"
                 );
                 *field = None;

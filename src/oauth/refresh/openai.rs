@@ -24,7 +24,7 @@ const CODEX_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 
 /// Resolve the codex token URL (allows env-override).
 fn codex_token_url() -> String {
-    std::env::var("CIPHERROUTE_CODEX_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_CODEX_TOKEN_URL")
         .ok()
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| CODEX_TOKEN_URL.to_string())

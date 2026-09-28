@@ -23,6 +23,7 @@ pub mod utils;
 pub mod cache;
 pub mod chat;
 pub mod circuit_breaker;
+pub mod env;
 pub mod eval;
 pub mod guardrails;
 pub mod health;

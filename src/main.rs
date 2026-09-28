@@ -31,6 +31,7 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let mut cli = Cli::parse();
+    cli.apply_legacy_env();
     zeroproxy::core::tls::ensure_rustls_provider();
     let ctx = cli.output_ctx();
     let resolved = ResolvedConfig::resolve(cli.cli_overrides())?;
@@ -468,7 +469,7 @@ async fn main() -> anyhow::Result<()> {
 
     // Auto-open the dashboard in the user's default browser when running
     // interactively. Skipped when:
-    //   • --no-open / CIPHERROUTE_NO_OPEN is set
+    //   • --no-open / ZEROPROXY_NO_OPEN is set (or the legacy CIPHERROUTE_NO_OPEN)
     //   • stdout is not a TTY (containers, CI, SSH redirected, systemd, …)
     //   • --robot is set (machine-readable output mode)
     if should_open_browser(&cli) {

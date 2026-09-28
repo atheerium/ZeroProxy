@@ -853,7 +853,7 @@ async fn vercel_deploy(
 }
 
 fn vercel_api_base_url() -> String {
-    std::env::var("CIPHERROUTE_VERCEL_API_BASE_URL")
+    crate::core::env::var("ZEROPROXY_VERCEL_API_BASE_URL")
         .ok()
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| VERCEL_API.to_string())
@@ -1169,7 +1169,7 @@ async fn cloudflare_deploy(
 // ── POST /api/proxy-pools/deno-deploy ─────────────────────────────
 
 fn deno_api_base_url() -> String {
-    std::env::var("CIPHERROUTE_DENO_API_BASE_URL")
+    crate::core::env::var("ZEROPROXY_DENO_API_BASE_URL")
         .ok()
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| DENO_V2_API.to_string())

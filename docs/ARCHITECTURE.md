@@ -5,8 +5,11 @@ and the Astro dashboard (`web/`). One process, one port.
 
 > Renamed `openproxy` → `cipherroute` → `zeroproxy` over time. Grep for the old
 > names and you will find deliberate legacy hits: `hasCipherRoute` is a **live API
-> field** (18 emit sites in `src/`, 11 consumers in `web/`) and `CIPHERROUTE_*`
-> env vars are still read by production. Do not "fix" either.
+> field** (18 emit sites in `src/`, 11 consumers in `web/`), and env vars resolve
+> through `core::env::var` (`src/core/env.rs`), which reads `ZEROPROXY_*` first and
+> falls back to `CIPHERROUTE_*`. `JCODE_CIPHERROUTE_API_KEY` keeps the old
+> spelling permanently — it is a `jcode.toml` key, not an env var. Do not "fix" any
+> of these.
 
 ## Where to look for what
 

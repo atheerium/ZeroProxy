@@ -110,6 +110,12 @@ fn is_base64url_no_pad(value: &str) -> bool {
         .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
 }
 
+/// Deliberately sets the **legacy** `CIPHERROUTE_` spelling.
+///
+/// Every sibling test in this file was renamed to `ZEROPROXY_`, so if the
+/// production fallback in `core::env::var` ever breaks, this is the only test
+/// that notices — it is the end-to-end proof that an existing user's shell (which
+/// still exports the old name) keeps working. Do not "tidy" it to the new name.
 #[tokio::test]
 async fn kiro_device_code_defaults_match_cipherroute_builder_id_flow() {
     let _lock = ENV_LOCK.lock().unwrap();
@@ -189,7 +195,7 @@ async fn kiro_device_code_defaults_match_cipherroute_builder_id_flow() {
 async fn kiro_device_code_supports_idc_query_params_like_cipherroute() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_KIRO_OIDC_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_KIRO_OIDC_BASE_URL", &server.uri());
 
     Mock::given(method("POST"))
         .and(path("/client/register"))
@@ -258,7 +264,7 @@ async fn kiro_poll_returns_missing_device_code_without_api_key() {
 async fn kiro_poll_returns_pending_shape_like_cipherroute() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_KIRO_OIDC_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_KIRO_OIDC_BASE_URL", &server.uri());
 
     Mock::given(method("POST"))
         .and(path("/token"))
@@ -313,7 +319,7 @@ async fn kiro_poll_returns_pending_shape_like_cipherroute() {
 async fn kiro_poll_success_saves_connection_like_cipherroute() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_KIRO_OIDC_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_KIRO_OIDC_BASE_URL", &server.uri());
     let access_token = make_jwt("me@example.com");
 
     Mock::given(method("POST"))

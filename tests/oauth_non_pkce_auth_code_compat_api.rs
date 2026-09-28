@@ -226,15 +226,15 @@ async fn gemini_exchange_matches_cipherroute_and_saves_connection() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_GEMINI_TOKEN_URL",
+        "ZEROPROXY_GEMINI_TOKEN_URL",
         &format!("{}/token", server.uri()),
     );
     let _user_info_url = EnvVarGuard::set(
-        "CIPHERROUTE_GEMINI_USER_INFO_URL",
+        "ZEROPROXY_GEMINI_USER_INFO_URL",
         &format!("{}/userinfo", server.uri()),
     );
     let _load_url = EnvVarGuard::set(
-        "CIPHERROUTE_GEMINI_LOAD_CODE_ASSIST_ENDPOINT",
+        "ZEROPROXY_GEMINI_LOAD_CODE_ASSIST_ENDPOINT",
         &format!("{}/v1internal:loadCodeAssist", server.uri()),
     );
 
@@ -323,19 +323,19 @@ async fn antigravity_exchange_matches_cipherroute_and_saves_connection() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_ANTIGRAVITY_TOKEN_URL",
+        "ZEROPROXY_ANTIGRAVITY_TOKEN_URL",
         &format!("{}/token", server.uri()),
     );
     let _user_info_url = EnvVarGuard::set(
-        "CIPHERROUTE_ANTIGRAVITY_USER_INFO_URL",
+        "ZEROPROXY_ANTIGRAVITY_USER_INFO_URL",
         &format!("{}/userinfo", server.uri()),
     );
     let _load_url = EnvVarGuard::set(
-        "CIPHERROUTE_ANTIGRAVITY_LOAD_CODE_ASSIST_ENDPOINT",
+        "ZEROPROXY_ANTIGRAVITY_LOAD_CODE_ASSIST_ENDPOINT",
         &format!("{}/v1internal:loadCodeAssist", server.uri()),
     );
     let _onboard_url = EnvVarGuard::set(
-        "CIPHERROUTE_ANTIGRAVITY_ONBOARD_USER_ENDPOINT",
+        "ZEROPROXY_ANTIGRAVITY_ONBOARD_USER_ENDPOINT",
         &format!("{}/v1internal:onboardUser", server.uri()),
     );
 
@@ -463,11 +463,11 @@ async fn iflow_exchange_matches_cipherroute_and_saves_connection() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_IFLOW_TOKEN_URL",
+        "ZEROPROXY_IFLOW_TOKEN_URL",
         &format!("{}/oauth/token", server.uri()),
     );
     let _user_info_url = EnvVarGuard::set(
-        "CIPHERROUTE_IFLOW_USER_INFO_URL",
+        "ZEROPROXY_IFLOW_USER_INFO_URL",
         &format!("{}/api/oauth/getUserInfo", server.uri()),
     );
 

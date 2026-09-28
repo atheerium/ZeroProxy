@@ -50,7 +50,7 @@ pub const KIRO_GRANT_TYPES: &[&str] = &[
 ];
 
 pub fn kiro_oidc_base_url(region: &str) -> String {
-    std::env::var("CIPHERROUTE_KIRO_OIDC_BASE_URL")
+    crate::core::env::var("ZEROPROXY_KIRO_OIDC_BASE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| format!("https://oidc.{region}.amazonaws.com"))

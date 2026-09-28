@@ -85,7 +85,7 @@ async fn response_json(response: axum::response::Response) -> (StatusCode, serde
 async fn iflow_cookie_route_matches_cipherroute_success_flow() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_IFLOW_API_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_IFLOW_API_BASE_URL", &server.uri());
 
     Mock::given(method("GET"))
         .and(path("/api/openapi/apikey"))
@@ -178,7 +178,7 @@ async fn iflow_cookie_route_validates_cookie_input_like_cipherroute() {
 async fn iflow_cookie_route_propagates_get_failure_status_and_message() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_IFLOW_API_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_IFLOW_API_BASE_URL", &server.uri());
 
     Mock::given(method("GET"))
         .and(path("/api/openapi/apikey"))
@@ -206,7 +206,7 @@ async fn iflow_cookie_route_propagates_get_failure_status_and_message() {
 async fn iflow_cookie_route_propagates_refresh_failure_message() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_IFLOW_API_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_IFLOW_API_BASE_URL", &server.uri());
 
     Mock::given(method("GET"))
         .and(path("/api/openapi/apikey"))

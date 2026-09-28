@@ -17,7 +17,7 @@
 //!
 //! SECURITY: storing API keys in plaintext is acceptable for personal dev
 //! boxes — it's the same trust model as `~/.netrc` or `~/.aws/credentials`.
-//! For shared machines, prefer setting `CIPHERROUTE_API_KEY` per-shell or
+//! For shared machines, prefer setting `ZEROPROXY_API_KEY` per-shell or
 //! using a per-profile `api_key_env = "MY_VAR"` indirection.
 
 use std::time::Duration;
@@ -451,7 +451,7 @@ mod tests {
         let _g = crate::cli::test_lock::ENV_LOCK.lock().unwrap();
         let tmp = tempfile::tempdir().unwrap();
         let cfg_path = tmp.path().join("config.toml");
-        std::env::set_var("CIPHERROUTE_CONFIG", &cfg_path);
+        std::env::set_var("ZEROPROXY_CONFIG", &cfg_path);
 
         run_login(
             OutputCtx::robot(),
@@ -485,6 +485,6 @@ mod tests {
         assert!(file.profiles.get("p1").is_none());
         assert!(file.default_profile.is_none());
 
-        std::env::remove_var("CIPHERROUTE_CONFIG");
+        std::env::remove_var("ZEROPROXY_CONFIG");
     }
 }

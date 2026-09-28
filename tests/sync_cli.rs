@@ -22,8 +22,12 @@ fn op(data_dir: &std::path::Path, args: &[&str]) -> Output {
     Command::cargo_bin("zeroproxy")
         .expect("locate zeroproxy binary")
         .env("DATA_DIR", data_dir)
-        // Isolate from the developer shell — ambient CIPHERROUTE_URL/API_KEY
-        // would flip `db export` into remote mode against a live server.
+        // Isolate from the developer shell — ambient URL/API_KEY would flip
+        // `db export` into remote mode against a live server. BOTH spellings must
+        // go: `core::env::var` falls back to `CIPHERROUTE_`, so removing only
+        // the new name leaves the legacy one live and the test stops isolating.
+        .env_remove("ZEROPROXY_URL")
+        .env_remove("ZEROPROXY_API_KEY")
         .env_remove("CIPHERROUTE_URL")
         .env_remove("CIPHERROUTE_API_KEY")
         .args(args)

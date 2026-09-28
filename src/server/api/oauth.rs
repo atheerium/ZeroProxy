@@ -689,7 +689,7 @@ fn is_device_code_provider(provider: &str) -> bool {
 }
 
 fn iflow_api_base_url() -> String {
-    std::env::var("CIPHERROUTE_IFLOW_API_BASE_URL")
+    crate::core::env::var("ZEROPROXY_IFLOW_API_BASE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "https://platform.iflow.cn".to_string())
@@ -698,84 +698,84 @@ fn iflow_api_base_url() -> String {
 }
 
 fn claude_authorize_url() -> String {
-    std::env::var("CIPHERROUTE_CLAUDE_AUTHORIZE_URL")
+    crate::core::env::var("ZEROPROXY_CLAUDE_AUTHORIZE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| CLAUDE_AUTHORIZE_URL.to_string())
 }
 
 fn claude_token_url() -> String {
-    std::env::var("CIPHERROUTE_CLAUDE_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_CLAUDE_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| CLAUDE_TOKEN_URL.to_string())
 }
 
 fn codex_authorize_url() -> String {
-    std::env::var("CIPHERROUTE_CODEX_AUTHORIZE_URL")
+    crate::core::env::var("ZEROPROXY_CODEX_AUTHORIZE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| CODEX_AUTHORIZE_URL.to_string())
 }
 
 fn codex_token_url() -> String {
-    std::env::var("CIPHERROUTE_CODEX_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_CODEX_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| CODEX_TOKEN_URL.to_string())
 }
 
 fn gemini_token_url() -> String {
-    std::env::var("CIPHERROUTE_GEMINI_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_GEMINI_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| GEMINI_TOKEN_URL.to_string())
 }
 
 fn gemini_user_info_url() -> String {
-    std::env::var("CIPHERROUTE_GEMINI_USER_INFO_URL")
+    crate::core::env::var("ZEROPROXY_GEMINI_USER_INFO_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| GEMINI_USER_INFO_URL.to_string())
 }
 
 fn gemini_load_code_assist_endpoint() -> String {
-    std::env::var("CIPHERROUTE_GEMINI_LOAD_CODE_ASSIST_ENDPOINT")
+    crate::core::env::var("ZEROPROXY_GEMINI_LOAD_CODE_ASSIST_ENDPOINT")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| GEMINI_LOAD_CODE_ASSIST_ENDPOINT.to_string())
 }
 
 fn antigravity_token_url() -> String {
-    std::env::var("CIPHERROUTE_ANTIGRAVITY_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_ANTIGRAVITY_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| ANTIGRAVITY_TOKEN_URL.to_string())
 }
 
 fn antigravity_user_info_url() -> String {
-    std::env::var("CIPHERROUTE_ANTIGRAVITY_USER_INFO_URL")
+    crate::core::env::var("ZEROPROXY_ANTIGRAVITY_USER_INFO_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| ANTIGRAVITY_USER_INFO_URL.to_string())
 }
 
 fn antigravity_load_code_assist_endpoint() -> String {
-    std::env::var("CIPHERROUTE_ANTIGRAVITY_LOAD_CODE_ASSIST_ENDPOINT")
+    crate::core::env::var("ZEROPROXY_ANTIGRAVITY_LOAD_CODE_ASSIST_ENDPOINT")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| ANTIGRAVITY_LOAD_CODE_ASSIST_ENDPOINT.to_string())
 }
 
 fn antigravity_onboard_user_endpoint() -> String {
-    std::env::var("CIPHERROUTE_ANTIGRAVITY_ONBOARD_USER_ENDPOINT")
+    crate::core::env::var("ZEROPROXY_ANTIGRAVITY_ONBOARD_USER_ENDPOINT")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| ANTIGRAVITY_ONBOARD_USER_ENDPOINT.to_string())
 }
 
 fn kiro_auth_service_base_url() -> String {
-    std::env::var("CIPHERROUTE_KIRO_AUTH_SERVICE_BASE_URL")
+    crate::core::env::var("ZEROPROXY_KIRO_AUTH_SERVICE_BASE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| "https://prod.us-east-1.auth.desktop.kiro.dev".to_string())
@@ -823,21 +823,21 @@ fn encode_component_value(value: &str) -> String {
 }
 
 fn iflow_token_url() -> String {
-    std::env::var("CIPHERROUTE_IFLOW_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_IFLOW_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| IFLOW_TOKEN_URL.to_string())
 }
 
 fn iflow_user_info_url() -> String {
-    std::env::var("CIPHERROUTE_IFLOW_USER_INFO_URL")
+    crate::core::env::var("ZEROPROXY_IFLOW_USER_INFO_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| IFLOW_USER_INFO_URL.to_string())
 }
 
 fn cline_token_url() -> String {
-    std::env::var("CIPHERROUTE_CLINE_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_CLINE_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| CLINE_TOKEN_URL.to_string())
@@ -3581,14 +3581,14 @@ async fn exchange_codex_compat(
 }
 
 fn xai_token_url() -> String {
-    std::env::var("CIPHERROUTE_XAI_TOKEN_URL")
+    crate::core::env::var("ZEROPROXY_XAI_TOKEN_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| XAI_TOKEN_URL_DEFAULT.to_string())
 }
 
 fn xai_authorize_url() -> String {
-    std::env::var("CIPHERROUTE_XAI_AUTHORIZE_URL")
+    crate::core::env::var("ZEROPROXY_XAI_AUTHORIZE_URL")
         .ok()
         .filter(|value| !value.trim().is_empty())
         .unwrap_or_else(|| XAI_AUTHORIZE_URL_DEFAULT.to_string())

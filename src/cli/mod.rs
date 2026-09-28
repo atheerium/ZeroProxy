@@ -105,21 +105,17 @@ pub struct Cli {
     pub color: ColorChoice,
 
     /// Optional config profile (from ~/.config/zeroproxy/config.toml).
-    #[arg(long, env = "CIPHERROUTE_PROFILE", global = true)]
+    #[arg(long, env = "ZEROPROXY_PROFILE", global = true)]
     pub profile: Option<String>,
 
     /// Remote management mode: target a server at this base URL instead of
-    /// the local DB. Pairs with --api-key (or $CIPHERROUTE_API_KEY).
-    #[arg(long, env = "CIPHERROUTE_URL", global = true)]
+    /// the local DB. Pairs with --api-key (or $ZEROPROXY_API_KEY).
+    #[arg(long, env = "ZEROPROXY_URL", global = true)]
     pub url: Option<String>,
 
-    /// API key for remote management. Read from $CIPHERROUTE_API_KEY by default.
-    #[arg(
-        long,
-        env = "CIPHERROUTE_API_KEY",
-        global = true,
-        hide_env_values = true
-    )]
+    /// API key for remote management. Read from $ZEROPROXY_API_KEY by default;
+    /// the legacy $CIPHERROUTE_API_KEY is still honoured when it is not set.
+    #[arg(long, env = "ZEROPROXY_API_KEY", global = true, hide_env_values = true)]
     pub api_key: Option<String>,
 
     /// Reverse-proxy dashboard requests to this URL instead of serving the
@@ -131,13 +127,13 @@ pub struct Cli {
     /// Serve the dashboard from a directory on disk instead of the embedded
     /// assets. Useful for iterating on a pre-built `web/dist/` without
     /// rebuilding the Rust binary. Ignored if `--dashboard-sidecar-url` is set.
-    #[arg(long, env = "CIPHERROUTE_WEB_DIR")]
+    #[arg(long, env = "ZEROPROXY_WEB_DIR")]
     pub web_dir: Option<PathBuf>,
 
     /// Do not auto-open the dashboard in a web browser when starting the
     /// server in the foreground. Default behaviour: open the browser if
     /// stdout is a TTY.
-    #[arg(long, env = "CIPHERROUTE_NO_OPEN")]
+    #[arg(long, env = "ZEROPROXY_NO_OPEN")]
     pub no_open: bool,
 
     #[command(subcommand)]
@@ -152,6 +148,52 @@ pub enum ColorChoice {
 }
 
 impl Cli {
+    /// Apply the pre-rename `CIPHERROUTE_*` variables to the five flags that
+    /// previously read them.
+    ///
+    /// clap's `env = "..."` accepts exactly one variable name and offers no fallback,
+    /// so it is pointed at the new `ZEROPROXY_*` spelling and the legacy name is
+    /// reconciled here, immediately after parsing, rather than in each consumer.
+    ///
+    /// This is deliberately *not* `crate::core::env::var`. That helper reads the
+    /// environment directly; here clap already owns the value, so the fallback has to
+    /// be applied to the parsed struct instead.
+    ///
+    /// A legacy value is consulted only when the new variable is **entirely absent**
+    /// from the environment — not merely when the parsed field looks empty. Checking
+    /// the field instead would let `ZEROPROXY_NO_OPEN=false` be overridden by
+    /// `CIPHERROUTE_NO_OPEN=true`, which inverts the documented precedence.
+    pub fn apply_legacy_env(&mut self) {
+        /// The legacy value for `key`, unless the new spelling is present at all.
+        fn legacy_only(key: &str) -> Option<String> {
+            if std::env::var_os(key).is_some() {
+                return None;
+            }
+            std::env::var(crate::core::env::legacy_name(key)?).ok()
+        }
+
+        if self.profile.is_none() {
+            self.profile = legacy_only("ZEROPROXY_PROFILE");
+        }
+        if self.url.is_none() {
+            self.url = legacy_only("ZEROPROXY_URL");
+        }
+        if self.api_key.is_none() {
+            self.api_key = legacy_only("ZEROPROXY_API_KEY");
+        }
+        if self.web_dir.is_none() {
+            self.web_dir = legacy_only("ZEROPROXY_WEB_DIR").map(std::path::PathBuf::from);
+        }
+        if !self.no_open {
+            // Mirror clap's own flag-from-env rule: anything other than an explicit
+            // `false`/`0` counts as set, so `NO_OPEN=` with an empty value still works.
+            if let Some(value) = legacy_only("ZEROPROXY_NO_OPEN") {
+                let normalized = value.trim().to_ascii_lowercase();
+                self.no_open = !matches!(normalized.as_str(), "false" | "0" | "no" | "off");
+            }
+        }
+    }
+
     /// Build the resolved output context shared by every subcommand.
     pub fn output_ctx(&self) -> output::OutputCtx {
         let mode = if self.robot {

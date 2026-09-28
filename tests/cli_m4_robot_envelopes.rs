@@ -35,8 +35,8 @@ async fn boot_server() -> MockServer {
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("zeroproxy")
         .expect("locate zeroproxy binary")
-        .env("CIPHERROUTE_URL", server.uri())
-        .env("CIPHERROUTE_API_KEY", API_KEY)
+        .env("ZEROPROXY_URL", server.uri())
+        .env("ZEROPROXY_API_KEY", API_KEY)
         // Force a clean data dir so the CLI does not fall back to a real
         // local install on the test host.
         .env(
@@ -263,8 +263,8 @@ async fn server_down_exits_with_code_6() {
 
     let out = Command::cargo_bin("zeroproxy")
         .expect("zeroproxy binary")
-        .env("CIPHERROUTE_URL", format!("http://127.0.0.1:{port}"))
-        .env("CIPHERROUTE_API_KEY", API_KEY)
+        .env("ZEROPROXY_URL", format!("http://127.0.0.1:{port}"))
+        .env("ZEROPROXY_API_KEY", API_KEY)
         .env(
             "DATA_DIR",
             tempfile::tempdir()

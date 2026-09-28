@@ -32,7 +32,7 @@ pub struct Db {
 /// Decrypt every provider connection in an `AppDb` built from a SQLite
 /// `export_all`. The in-memory snapshot must hold plaintext credentials;
 /// SQLite's `data` column holds ciphertext. Decryption is a no-op when
-/// `CIPHERROUTE_ENCRYPTION_KEY` is unset (plaintext mode), and `decrypt_opt`
+/// `ZEROPROXY_ENCRYPTION_KEY` is unset (plaintext mode), and `decrypt_opt`
 /// fails-loud (clears) ciphertext that can't be decrypted.
 fn decrypt_snapshot_connections(app_db: &mut AppDb) {
     let key = crate::db::crypto::encryption_key().unwrap_or_default();

@@ -99,7 +99,7 @@ fn make_jwt(email: &str) -> String {
 async fn kiro_import_route_matches_cipherroute_success_flow() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_KIRO_AUTH_SERVICE_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_KIRO_AUTH_SERVICE_BASE_URL", &server.uri());
     let access_token = make_jwt("me@example.com");
 
     Mock::given(method("POST"))
@@ -191,7 +191,7 @@ async fn kiro_import_route_validates_missing_and_invalid_tokens_like_cipherroute
 async fn kiro_import_route_wraps_refresh_failure_like_cipherroute() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
-    let _env = EnvVarGuard::set("CIPHERROUTE_KIRO_AUTH_SERVICE_BASE_URL", &server.uri());
+    let _env = EnvVarGuard::set("ZEROPROXY_KIRO_AUTH_SERVICE_BASE_URL", &server.uri());
 
     Mock::given(method("POST"))
         .and(path("/refreshToken"))

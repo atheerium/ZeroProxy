@@ -131,7 +131,7 @@ Result: **10 apply cleanly, 17 now conflict.**
   neither**). Six of these show `brand_refs=1`, but every one is a `Refs openproxy-…` **beads line
   in the commit message body**, not diff content.
 - **Applies clean but excluded (1):** `6925a3ef` has **11 in-diff** brand refs, including
-  `OPENPROXY_CODEX_TOKEN_URL` — a name `src/` does **not** read (it reads `CIPHERROUTE_CODEX_TOKEN_URL`),
+  `OPENPROXY_CODEX_TOKEN_URL` — a name `src/` does **not** read (it reads `ZEROPROXY_CODEX_TOKEN_URL`),
   so it is the Trap-6 env-var trap. It is also `tests/`-only; the `src/` fix it tests lives in a
   different commit, so picking it alone is useless.
 - **Now conflicted (17)** — the previously-promised Tier 1 `29c97c10` (a11y model picker) is in
@@ -712,6 +712,54 @@ worktrees through the common dir, so install there instead:
 Always verify a hook against the **installed** bytes, never the committed file — a stale installed
 copy already bit this repo once (it blocked a legitimate push).
 
+### 18. Env vars are `ZEROPROXY_*` but a blind rename silently drops the legacy fallback
+Every environment variable was renamed `CIPHERROUTE_*` → `ZEROPROXY_*` on 2026-09-28. **The old
+name is still honoured**, deliberately, so an existing shell profile keeps working.
+
+- **Read a ZeroProxy env var through `crate::core::env::var` / `::var_os`, never
+  `std::env::var` directly.** `src/core/env.rs` tries the new name, then rewrites the brand
+  token to the legacy spelling and retries. `var` keeps `std::env::var`'s exact signature
+  (`Result<String, VarError>`) so the ~35 existing `.ok()` / `.and_then(|v| v.parse().ok())`
+  call sites needed a one-token path change instead of a rewrite. A bare `std::env::var`
+  "works" and silently loses backward compatibility — this is the failure mode to look for
+  in review, and it already happened once (five sites in `src/cli/config.rs`).
+- **`legacy_name` is a SUBSTRING rewrite, not a prefix strip.** That is what makes
+  `JCODE_ZEROPROXY_API_KEY` correctly fall back to `JCODE_CIPHERROUTE_API_KEY`. Do not
+  "simplify" it to `key.strip_prefix(BRAND)` — that silently breaks the Jcode key.
+- **`JCODE_CIPHERROUTE_API_KEY` is permanently exempt from the rename** (5 sites in
+  `src/server/api/cli_tools/jcode_settings.rs`, 2 in `web/src/components/cli-tools/JcodeToolCard.tsx`).
+  It is not an environment variable at all: it is a **key name written into a generated
+  `jcode.toml`** and read back from the file already on disk. Renaming it orphans the
+  maintainer's existing config. The bulk rename used the negative lookbehind
+  `(?<!JCODE_)CIPHERROUTE_` for exactly this reason — keep it if you ever re-run it.
+- **The new name wins when both are set.** That is also how you override an inherited
+  legacy value.
+- **clap has NO dual-env support — `#[arg(env = "...")]` takes exactly one name.** So the
+  five clap-backed globals (`--profile`, `--url`, `--api-key`, `--web-dir`, `--no-open` in
+  `src/cli/mod.rs`) are reconciled by `Cli::apply_legacy_env`, called from
+  `src/main.rs:33` right after `Cli::parse()`. Its rule is **not** the helper's rule: the
+  legacy value applies only when the new variable is **entirely absent from the
+  environment** (`std::env::var_os(key).is_some()`), *not* when the parsed field merely
+  looks empty. Checking the field instead would let `ZEROPROXY_NO_OPEN=false` be
+  overridden by `CIPHERROUTE_NO_OPEN=true`, inverting precedence.
+- **Any test that mutates the environment must clear BOTH spellings.** `core::env::var`
+  falls back, so removing only the new name leaves the legacy one live and the test
+  silently starts depending on the developer's shell. `src/cli/config.rs`'s `clear_env()`
+  and `tests/sync_cli.rs` both do this deliberately, with a comment saying so.
+- **One test is intentionally left on the legacy name**:
+  `tests/oauth_kiro_device_code_api.rs` `kiro_device_code_defaults_match_cipherroute_builder_id_flow`
+  sets `CIPHERROUTE_KIRO_OIDC_BASE_URL`. Every sibling was renamed. That one is the only
+  end-to-end proof the production fallback works, so **do not "tidy" it.**
+- The **dashboard** has the same pattern, already shipped and independent of this one:
+  `web/src/lib/brandMigration.ts` exports `ZEROPROXY_*` / `LEGACY_*` key pairs with the rule
+  *read new-then-legacy, write new only*. Every lowercase `cipherroute` left in `web/src`
+  is an intentional legacy key — it is a localStorage key, not an env var.
+- Deliberately **out of scope**: lowercase `cipherroute` as the product name in prose
+  (`README.md`, historical `docs/parity-9router*.md` audits, `web/package.json`'s
+  description, `web/public/i18n/` strings where the English text IS the lookup key). That
+  is a branding change, not the env-var prefix, and mass-renaming i18n values without
+  their keys breaks translation lookups.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
@@ -835,10 +883,10 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1954 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1973 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. **Count it, do not recall it.** This line has now been wrong four times (1905 →
-  1913 → 1936 → 1947 → 1950), because the recorded number is the count *at the moment the suite was last
+  worth having. **Count it, do not recall it.** This line has now been wrong five times (1905 →
+  1913 → 1936 → 1947 → 1950 → 1954), because the recorded number is the count *at the moment the suite was last
   run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
   file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
   it whenever the count moves.

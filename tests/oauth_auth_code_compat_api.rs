@@ -200,7 +200,7 @@ async fn claude_exchange_matches_cipherroute_and_saves_connection() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_CLAUDE_TOKEN_URL",
+        "ZEROPROXY_CLAUDE_TOKEN_URL",
         &format!("{}/v1/oauth/token", server.uri()),
     );
 
@@ -273,7 +273,7 @@ async fn codex_exchange_matches_cipherroute_and_maps_id_token() {
     let _lock = ENV_LOCK.lock().unwrap();
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_CODEX_TOKEN_URL",
+        "ZEROPROXY_CODEX_TOKEN_URL",
         &format!("{}/oauth/token", server.uri()),
     );
     let id_token = make_codex_id_token("me@example.com", "acct_123", "plus");

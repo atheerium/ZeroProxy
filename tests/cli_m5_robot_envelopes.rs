@@ -27,8 +27,8 @@ async fn boot_server() -> MockServer {
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("zeroproxy")
         .expect("locate zeroproxy binary")
-        .env("CIPHERROUTE_URL", server.uri())
-        .env("CIPHERROUTE_API_KEY", API_KEY)
+        .env("ZEROPROXY_URL", server.uri())
+        .env("ZEROPROXY_API_KEY", API_KEY)
         .env(
             "DATA_DIR",
             tempfile::tempdir()
@@ -48,8 +48,8 @@ fn op_stdin(server: &MockServer, args: &[&str], stdin: &str) -> std::process::Ou
 
     let mut child = Command::cargo_bin("zeroproxy")
         .expect("locate zeroproxy binary")
-        .env("CIPHERROUTE_URL", server.uri())
-        .env("CIPHERROUTE_API_KEY", API_KEY)
+        .env("ZEROPROXY_URL", server.uri())
+        .env("ZEROPROXY_API_KEY", API_KEY)
         .env(
             "DATA_DIR",
             tempfile::tempdir()

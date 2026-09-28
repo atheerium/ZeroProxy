@@ -29,4 +29,4 @@ Use `RUST_LOG=zeroproxy::chat=debug,zeroproxy::fusion=debug,zeroproxy::github=de
 
 ## Live (optional)
 
-`CIPHERROUTE_LIVE_PARITY=1` reserved for future e2e; not required for CI.
+`ZEROPROXY_LIVE_PARITY=1` reserved for future e2e; not required for CI.

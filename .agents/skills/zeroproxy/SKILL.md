@@ -102,7 +102,7 @@ printf '%s\n' "$APIKEY" > "$HOME/.zeroproxy/admin.key"
 chmod 600 "$HOME/.zeroproxy/admin.key"
 
 # Export for subsequent commands in this session
-export CIPHERROUTE_API_KEY="$APIKEY"
+export ZEROPROXY_API_KEY="$APIKEY"
 ```
 
 > Re-running `server init` against an existing data dir errors out (envelope kind `error`, reason `conflict`) unless `--force` is passed. **Do not force without asking the user** — it wipes the existing config.
@@ -223,11 +223,11 @@ curl -sS http://127.0.0.1:4623/health
 
 # Models list (auth required)
 curl -sS http://127.0.0.1:4623/v1/models \
-  -H "Authorization: Bearer $CIPHERROUTE_API_KEY"
+  -H "Authorization: Bearer $ZEROPROXY_API_KEY"
 
 # End-to-end chat completion through a combo
 curl -sS http://127.0.0.1:4623/v1/chat/completions \
-  -H "Authorization: Bearer $CIPHERROUTE_API_KEY" \
+  -H "Authorization: Bearer $ZEROPROXY_API_KEY" \
   -H 'content-type: application/json' \
   -d '{"model":"my-stack","messages":[{"role":"user","content":"ping"}]}'
 ```
@@ -285,15 +285,15 @@ Maintainers refresh the embedded snapshots by running
 
 | Var | Default | Purpose |
 |---|---|---|
-| `CIPHERROUTE_API_KEY` | _(empty)_ | Bearer used for `--robot` CLI calls. Honor `--api-key` flag too. |
-| `CIPHERROUTE_DATA_DIR` / `DATA_DIR` | `~/.zeroproxy` | Where `db.json`, `usage.json`, `log.txt` live. |
+| `ZEROPROXY_API_KEY` | _(empty)_ | Bearer used for `--robot` CLI calls. Honor `--api-key` flag too. |
+| `ZEROPROXY_DATA_DIR` / `DATA_DIR` | `~/.zeroproxy` | Where `db.json`, `usage.json`, `log.txt` live. |
 | `PORT` | `4623` | HTTP listen port. |
 | `HOSTNAME` | `127.0.0.1` | Bind host. `0.0.0.0` exposes on LAN. |
 | `INITIAL_PASSWORD` | _random, generated once_ | First-login password (replaced on first save). If unset, a random password is minted at first boot and printed in the startup banner; recover with `zeroproxy auth reset-password --show`. |
 | `JWT_SECRET` | `zeroproxy-default-secret-change-me` | **Change in any non-throwaway deploy.** |
 | `REQUIRE_API_KEY` | `false` | Reject `/v1/*` without a bearer. Required for any non-loopback bind. |
-| `CIPHERROUTE_NO_OPEN` | _(unset)_ | Equivalent to `--no-open`. |
-| `CIPHERROUTE_WEB_DIR` | _(unset)_ | Serve dashboard from a directory (UI dev). |
+| `ZEROPROXY_NO_OPEN` | _(unset)_ | Equivalent to `--no-open`. |
+| `ZEROPROXY_WEB_DIR` | _(unset)_ | Serve dashboard from a directory (UI dev). |
 
 ## When _not_ to use this skill
 

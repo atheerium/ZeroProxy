@@ -167,7 +167,7 @@ async fn codex_proxy_server_side_callback_exchanges_and_clears_session() {
         .unwrap_or_else(|poisoned| poisoned.into_inner());
     let server = MockServer::start().await;
     let _token_url = EnvVarGuard::set(
-        "CIPHERROUTE_CODEX_TOKEN_URL",
+        "ZEROPROXY_CODEX_TOKEN_URL",
         &format!("{}/oauth/token", server.uri()),
     );
 

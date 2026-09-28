@@ -301,7 +301,7 @@ impl Runtime {
 
 /// Resolve the base URL we should dial.
 ///
-/// 1. `--url` / `CIPHERROUTE_URL` if set on the resolved config.
+/// 1. `--url` / `ZEROPROXY_URL` if set on the resolved config.
 /// 2. The `zeroproxy.endpoint` sidecar written by `server start --detach`.
 /// 3. `http://127.0.0.1:<DEFAULT_LOCAL_PORT>` as a last-ditch default so the
 ///    `usage` etc. commands still produce a deterministic "not running"
@@ -323,7 +323,7 @@ fn resolve_base_url(cfg: &ResolvedConfig) -> anyhow::Result<String> {
 
 /// Pick an API key to authenticate runtime calls.
 ///
-/// 1. `--api-key` / `CIPHERROUTE_API_KEY` if set.
+/// 1. `--api-key` / `ZEROPROXY_API_KEY` if set.
 /// 2. First active key from `db.json` (local mode only — assumes the CLI
 ///    user already has filesystem access to the data dir).
 async fn resolve_api_key(cfg: &ResolvedConfig) -> Option<String> {

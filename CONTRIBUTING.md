@@ -183,7 +183,7 @@ PRs use `.github/pull_request_template.md` — fill in summary, test plan, and r
 This is a hard rule (also in `AGENTS.md`):
 
 - **Never commit:** `opencode.json`, `opencode.jsonc`, `.env`, `.env.*`, `*.pem`, `~/.zeroproxy/db.json`, `~/.zeroproxy/admin.key`, any file containing `sk-`, `Bearer`, `refresh_token`, or live `provider_specific_data`.
-- `opencode.json` is **machine-local agent config** — keep untracked. Real secrets live in SQLite (`zeroproxy.sqlite`, encrypted) + `CIPHERROUTE_API_KEY` env.
+- `opencode.json` is **machine-local agent config** — keep untracked. Real secrets live in SQLite (`zeroproxy.sqlite`, encrypted) + `ZEROPROXY_API_KEY` env.
 - Before `git add`/`commit`: `git status` → `git diff --cached` → `git restore --staged <file>` if it contains secrets → add to `.gitignore` → `git check-ignore -v <file>` to verify.
 - If a secret is accidentally committed: **rotate immediately** and purge history (`git filter-repo` or BFG) — don't just revert.
 
@@ -208,6 +208,6 @@ This is a hard rule (also in `AGENTS.md`):
 
 ---
 
-**New contributor?** Start with `./scripts/dev.sh` → open `http://127.0.0.1:4623/dashboard/providers` → add one API-key provider → `curl http://127.0.0.1:4623/v1/models -H "Authorization: Bearer $CIPHERROUTE_API_KEY"` → read `src/core/translator/` for format translation.
+**New contributor?** Start with `./scripts/dev.sh` → open `http://127.0.0.1:4623/dashboard/providers` → add one API-key provider → `curl http://127.0.0.1:4623/v1/models -H "Authorization: Bearer $ZEROPROXY_API_KEY"` → read `src/core/translator/` for format translation.
 
 Questions? Open a Discussion or an issue with `type: question`.

@@ -151,7 +151,7 @@ impl std::error::Error for KiroError {}
 
 /// Resolve the configurable Kiro auth-service base URL.
 fn auth_service_base_url() -> String {
-    std::env::var("CIPHERROUTE_KIRO_AUTH_SERVICE_BASE_URL")
+    crate::core::env::var("ZEROPROXY_KIRO_AUTH_SERVICE_BASE_URL")
         .ok()
         .filter(|v| !v.trim().is_empty())
         .unwrap_or_else(|| KIRO_AUTH_SERVICE.to_string())
@@ -163,7 +163,7 @@ fn auth_service_base_url() -> String {
 ///
 /// Delegates to [`super::kiro_oidc_base_url`], the single source of truth that the
 /// live device-code routes in `mod.rs` also use. It used to re-read
-/// `CIPHERROUTE_KIRO_OIDC_BASE_URL` independently, which meant the env override
+/// `ZEROPROXY_KIRO_OIDC_BASE_URL` independently, which meant the env override
 /// was implemented twice and the two copies could drift.
 fn oidc_base_url(region: &str) -> String {
     super::kiro_oidc_base_url(region)

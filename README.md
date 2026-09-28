@@ -530,8 +530,8 @@ A few work directly against the local database and need **no** server: `sync`, `
 | `--data-dir` | `~/.zeroproxy` | `$DATA_DIR` |
 | `--log-filter` | `info` | `$RUST_LOG` |
 | `--robot` | off | Stable `zeroproxy.v1.*` JSON. NDJSON for streaming commands. |
-| `--api-key` | `$ZEROPROXY_API_KEY` | For remote management. `$CIPHERROUTE_API_KEY` also accepted. |
-| `--url` | `$ZEROPROXY_URL` | Manage a remote server instead of the local DB. `$CIPHERROUTE_URL` also accepted. |
+| `--api-key` | `$ZEROPROXY_API_KEY` | For remote management. Legacy `$CIPHERROUTE_API_KEY` also accepted. |
+| `--url` | `$ZEROPROXY_URL` | Manage a remote server instead of the local DB. Legacy `$CIPHERROUTE_URL` also accepted. |
 | `--profile` | — | `$ZEROPROXY_PROFILE`; profiles live in `~/.config/zeroproxy/config.toml`. |
 | `--web-dir` | embedded | Serve the dashboard from disk instead of the binary. |
 | `--dashboard-sidecar-url` | — | Point at an Astro dev server (`:4624`). |
@@ -565,7 +565,7 @@ cp .env.example .env
 |---|---|
 | `JWT_SECRET` | Signs dashboard sessions. |
 | `INITIAL_PASSWORD` | First admin password. Unset ⇒ generated and printed **once** at startup. |
-| `CIPHERROUTE_ENCRYPTION_KEY` | 64 hex chars. Encrypts stored credentials with **AES-256-GCM** using an Argon2id-derived key. |
+| `ZEROPROXY_ENCRYPTION_KEY` | 64 hex chars. Encrypts stored credentials with **AES-256-GCM** using an Argon2id-derived key. |
 | `API_KEY_SECRET` | HMAC secret for API keys. Generated and persisted to `$DATA_DIR/api_key_secret` if unset. |
 | `AUTH_COOKIE_SECURE` | Force the `Secure` cookie flag. |
 | `SHUTDOWN_SECRET` | Guards the shutdown endpoint. |
@@ -573,24 +573,26 @@ cp .env.example .env
 Legacy AES-CBC (`opxenc1`-prefixed) credential values remain readable and migrate to
 AES-256-GCM on the next write — you do not need to rotate anything by hand.
 
-Argon2id cost parameters are tunable: `CIPHERROUTE_ARGON2_M_COST_KB`,
-`CIPHERROUTE_ARGON2_T_COST`, `CIPHERROUTE_ARGON2_P_COST`.
+Argon2id cost parameters are tunable: `ZEROPROXY_ARGON2_M_COST_KB`,
+`ZEROPROXY_ARGON2_T_COST`, `ZEROPROXY_ARGON2_P_COST`.
 
-> **Note on naming.** The binary is `zeroproxy` and the data directory is
-> `~/.zeroproxy`, but the environment prefix is a mix, on purpose:
+> **Note on naming.** The binary is `zeroproxy`, the data directory is
+> `~/.zeroproxy`, and the environment prefix is `ZEROPROXY_*` — the variables were
+> renamed to follow. Every setting below is spelled `ZEROPROXY_*`.
 >
-> - **The CLI/profile layer reads `ZEROPROXY_*` natively** — `ZEROPROXY_PROFILE`,
->   `ZEROPROXY_URL`, `ZEROPROXY_API_KEY`, `ZEROPROXY_DATA_DIR`, `ZEROPROXY_CONFIG`.
->   The older `CIPHERROUTE_*` spellings of those five are still accepted, so both work.
->   Precedence for the data directory is CLI flag → `DATA_DIR` →
->   `ZEROPROXY_DATA_DIR` → profile file (`src/cli/config.rs`), so a bare
->   `DATA_DIR` in your shell wins over the prefixed name.
-> - **Everything below keeps the `CIPHERROUTE_*` prefix**, including
->   `CIPHERROUTE_ENCRYPTION_KEY`, the Argon2id parameters, and the per-provider
->   OAuth endpoint overrides. There is no `ZEROPROXY_*` alias for these, and adding
->   one is not a rename you can do safely: the code reads *only* the old name, so
->   docs pointing at the new one would mean an encrypted database that will not
->   decrypt.
+> The older `CIPHERROUTE_*` spellings are still read as a fallback
+> (`core::env::var` tries the new name first, then the old one), so an existing
+> shell profile keeps working. The **new name wins if both are set**, which is
+> also how you override an inherited legacy value.
+>
+> One exception: `JCODE_CIPHERROUTE_API_KEY` keeps its old spelling. It is not
+> an environment variable — it is a key name written into a generated
+> `jcode.toml` and read back from your existing file on disk, so renaming it
+> would orphan the config you already have.
+>
+> Precedence for the data directory is CLI flag → `DATA_DIR` →
+> `ZEROPROXY_DATA_DIR` → profile file (`src/cli/config.rs`), so a bare
+> `DATA_DIR` in your shell wins over the prefixed name.
 >
 > `REQUIRE_API_KEY` is **not** read from the environment at all; it is a dashboard
 > setting.
@@ -619,10 +621,10 @@ Any provider's OAuth or API base URL can be overridden — useful for proxies, r
 endpoints, and self-hosted gateways:
 
 ```
-CIPHERROUTE_CLAUDE_*_URL     CIPHERROUTE_CODEX_*_URL     CIPHERROUTE_GEMINI_*_URL
-CIPHERROUTE_XAI_*_URL        CIPHERROUTE_KIRO_*_URL     CIPHERROUTE_OPENAI_*_URL
-CIPHERROUTE_IFLOW_*_URL      CIPHERROUTE_CLINE_*_URL     CIPHERROUTE_VERCEL_*_URL
-CIPHERROUTE_DENO_*_URL       CIPHERROUTE_ANTIGRAVITY_*_URL
+ZEROPROXY_CLAUDE_*_URL     ZEROPROXY_CODEX_*_URL     ZEROPROXY_GEMINI_*_URL
+ZEROPROXY_XAI_*_URL        ZEROPROXY_KIRO_*_URL     ZEROPROXY_OPENAI_*_URL
+ZEROPROXY_IFLOW_*_URL      ZEROPROXY_CLINE_*_URL     ZEROPROXY_VERCEL_*_URL
+ZEROPROXY_DENO_*_URL       ZEROPROXY_ANTIGRAVITY_*_URL
 AZURE_OPENAI_*               GOOGLE_APPLICATION_CREDENTIALS
 ```
 

@@ -74,7 +74,7 @@ impl ResolvedConfig {
         let profile_name = overrides
             .profile
             .clone()
-            .or_else(|| std::env::var("ZEROPROXY_PROFILE").ok())
+            .or_else(|| crate::core::env::var("ZEROPROXY_PROFILE").ok())
             .or_else(|| file.default_profile.clone());
 
         let profile = profile_name
@@ -85,18 +85,18 @@ impl ResolvedConfig {
         let data_dir = overrides
             .data_dir
             .or_else(|| std::env::var_os("DATA_DIR").map(PathBuf::from))
-            .or_else(|| std::env::var_os("ZEROPROXY_DATA_DIR").map(PathBuf::from))
+            .or_else(|| crate::core::env::var_os("ZEROPROXY_DATA_DIR").map(PathBuf::from))
             .or_else(|| profile.data_dir.as_deref().map(PathBuf::from))
             .unwrap_or_else(default_data_dir);
 
         let remote_url = overrides
             .url
-            .or_else(|| std::env::var("ZEROPROXY_URL").ok())
+            .or_else(|| crate::core::env::var("ZEROPROXY_URL").ok())
             .or(profile.url);
 
         let api_key = overrides
             .api_key
-            .or_else(|| std::env::var("ZEROPROXY_API_KEY").ok())
+            .or_else(|| crate::core::env::var("ZEROPROXY_API_KEY").ok())
             .or_else(|| {
                 profile
                     .api_key_env
@@ -131,11 +131,11 @@ fn default_data_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from(".zeroproxy"))
 }
 
-/// Resolve the path of the CLI config file. Honors `$ZEROPROXY_CONFIG` so
-/// `auth login` / tests can point at a temporary file without touching the
-/// real `~/.config/zeroproxy/config.toml`.
+/// Resolve the path of the CLI config file. Honors `$ZEROPROXY_CONFIG` (or the legacy
+/// `$CIPHERROUTE_CONFIG`) so `auth login` / tests can point at a temporary file without
+/// touching the real `~/.config/zeroproxy/config.toml`.
 pub fn config_file_path() -> Option<PathBuf> {
-    if let Ok(custom) = std::env::var("ZEROPROXY_CONFIG") {
+    if let Ok(custom) = crate::core::env::var("ZEROPROXY_CONFIG") {
         return Some(PathBuf::from(custom));
     }
     let dirs = directories::ProjectDirs::from("", "", "zeroproxy")?;
@@ -180,12 +180,24 @@ mod tests {
     use crate::cli::test_lock::ENV_LOCK;
 
     fn clear_env() {
-        std::env::remove_var("DATA_DIR");
-        std::env::remove_var("ZEROPROXY_DATA_DIR");
-        std::env::remove_var("ZEROPROXY_URL");
-        std::env::remove_var("ZEROPROXY_API_KEY");
-        std::env::remove_var("ZEROPROXY_PROFILE");
-        std::env::remove_var("ZEROPROXY_CONFIG");
+        // Both spellings: `core::env::var` falls back to `CIPHERROUTE_*`, so clearing only
+        // the new name would leave a developer's exported legacy variable live and these
+        // assertions would depend on their shell.
+        for key in [
+            "DATA_DIR",
+            "ZEROPROXY_DATA_DIR",
+            "CIPHERROUTE_DATA_DIR",
+            "ZEROPROXY_URL",
+            "CIPHERROUTE_URL",
+            "ZEROPROXY_API_KEY",
+            "CIPHERROUTE_API_KEY",
+            "ZEROPROXY_PROFILE",
+            "CIPHERROUTE_PROFILE",
+            "ZEROPROXY_CONFIG",
+            "CIPHERROUTE_CONFIG",
+        ] {
+            std::env::remove_var(key);
+        }
     }
 
     #[test]
