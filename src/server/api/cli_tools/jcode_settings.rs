@@ -63,7 +63,7 @@ pub(super) async fn get_jcode_settings(
     Json(json!({
         "installed": true,
         "config": config,
-        "hasCipherRoute": has_zeroproxy,
+        "hasZeroProxy": has_zeroproxy,
         "configPath": config_path().to_string_lossy().to_string(),
         "envApiKey": env_api_key,
     }))
@@ -377,7 +377,7 @@ async fn reset_jcode_config() -> AnyhowResult<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute configuration removed from jcode",
+        "message": "ZeroProxy configuration removed from jcode",
     }))
 }
 

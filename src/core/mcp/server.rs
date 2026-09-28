@@ -1,8 +1,8 @@
-//! Native MCP protocol handler for CipherRoute.
+//! Native MCP protocol handler for ZeroProxy.
 //!
 //! Implements the JSON-RPC 2.0-based Model Context Protocol so external MCP
 //! clients (Claude Desktop, Cursor, Cline, etc.) can discover and invoke
-//! CipherRoute's built-in administrative tools directly — without going through
+//! ZeroProxy's built-in administrative tools directly — without going through
 //! a child process bridge.
 //!
 //! Protocol verbs handled:
@@ -621,7 +621,7 @@ fn tool_table() -> Vec<ToolHandler> {
 
 // ─── Public API ────────────────────────────────────────────────────────────
 
-/// Handle an incoming JSON-RPC 2.0 MCP request against the CipherRoute tool
+/// Handle an incoming JSON-RPC 2.0 MCP request against the ZeroProxy tool
 /// surface. Returns a JSON-serialised response.
 pub fn handle_mcp_request(state: &AppState, body: &Value) -> Value {
     let request: JsonRpcRequest = match serde_json::from_value(body.clone()) {

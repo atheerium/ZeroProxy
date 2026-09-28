@@ -15,7 +15,7 @@ use tokio::fs;
 
 use crate::server::state::AppState;
 
-/// CipherRoute apiBase value — used to identify our own entries.
+/// ZeroProxy apiBase value — used to identify our own entries.
 const CIPHERROUTE_API_BASE: &str = "http://localhost:4623/v1";
 
 pub fn routes() -> Router<AppState> {
@@ -53,7 +53,7 @@ async fn get_continue_settings(State(state): State<AppState>, headers: HeaderMap
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "settingsPath": settings_path.to_string_lossy().to_string(),
             }))
             .into_response()
@@ -147,7 +147,7 @@ async fn delete_continue_settings(State(state): State<AppState>, headers: Header
 // Helpers
 // ---------------------------------------------------------------------------
 
-/// Check whether the config has at least one CipherRoute model entry.
+/// Check whether the config has at least one ZeroProxy model entry.
 fn has_zeroproxy_config(config: &Value) -> bool {
     config
         .get("models")
@@ -160,7 +160,7 @@ fn has_zeroproxy_config(config: &Value) -> bool {
         .unwrap_or(false)
 }
 
-/// Write (merge) an CipherRoute model entry into the Continue config.
+/// Write (merge) an ZeroProxy model entry into the Continue config.
 ///
 /// - Loads the existing config (if any).
 /// - Removes any entry that already has `apiBase` set to ours.
@@ -212,7 +212,7 @@ async fn write_continue_settings(body: &SaveContinueSettingsRequest) -> AnyhowRe
     Ok(config_path)
 }
 
-/// Remove all CipherRoute model entries from the Continue config, preserving all others.
+/// Remove all ZeroProxy model entries from the Continue config, preserving all others.
 async fn reset_continue_settings() -> AnyhowResult<Value> {
     let config_path = continue_config_path();
 
@@ -239,7 +239,7 @@ async fn reset_continue_settings() -> AnyhowResult<Value> {
     if !changed {
         return Ok(json!({
             "success": true,
-            "message": "No CipherRoute entries found in Continue settings",
+            "message": "No ZeroProxy entries found in Continue settings",
         }));
     }
 
@@ -248,7 +248,7 @@ async fn reset_continue_settings() -> AnyhowResult<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute entries removed from Continue settings",
+        "message": "ZeroProxy entries removed from Continue settings",
     }))
 }
 

@@ -200,7 +200,7 @@ export default function LoginPageClient() {
 
     setLoading(true);
     try {
-      // Prefer the dedicated password endpoint (CipherRoute). Keep settings PATCH
+      // Prefer the dedicated password endpoint (ZeroProxy). Keep settings PATCH
       // as a soft fallback for older servers.
       let res = await fetch("/api/auth/password", {
         method: "POST",
@@ -286,7 +286,7 @@ export default function LoginPageClient() {
             </svg>
           </div>
           <h1 className="font-serif font-normal text-[40px] leading-tight tracking-[-0.02em] text-ink mb-2">
-            CipherRoute
+            ZeroProxy
           </h1>
           <p className="text-[15px] text-body">{subtitle}</p>
         </div>
@@ -395,7 +395,7 @@ export default function LoginPageClient() {
                     <p className="text-[12px] text-muted text-center">
                       Forgot password? Run{" "}
                       <code className="px-1.5 py-0.5 rounded bg-canvas border border-hairline-soft font-mono text-ink">
-                        cipherroute auth reset-password
+                        zeroproxy auth reset-password
                       </code>{" "}
                       on the host to restore the generated initial password.
                     </p>
@@ -430,7 +430,7 @@ export default function LoginPageClient() {
         </Card>
 
         <p className="mt-8 text-center text-[12px] text-muted-soft">
-          CipherRoute · local AI router for Claude Code, Codex, Cursor &amp; more
+          ZeroProxy · local AI router for Claude Code, Codex, Cursor &amp; more
         </p>
       </div>
     </div>

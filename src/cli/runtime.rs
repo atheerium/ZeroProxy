@@ -37,7 +37,7 @@ use crate::cli::config::ResolvedConfig;
 use crate::cli::server::{read_endpoint, PID_FILE};
 use crate::db::Db;
 
-/// Default port a local CipherRoute server binds to (matches `Cli::port`).
+/// Default port a local ZeroProxy server binds to (matches `Cli::port`).
 pub const DEFAULT_LOCAL_PORT: u16 = 4623;
 
 /// Wall-clock timeout for a single non-streaming HTTP call. Streaming calls

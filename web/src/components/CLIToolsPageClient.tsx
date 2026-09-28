@@ -90,7 +90,7 @@ export default function CLIToolsPageClient(_props: CLIToolsPageClientProps) {
       <div className="flex flex-col gap-1">
         <h1 className="text-xl font-semibold text-text-main sm:text-2xl">CLI Tools</h1>
         <p className="text-sm text-text-muted">
-          Configure local coding tools to use your CipherRoute providers.
+          Configure local coding tools to use your ZeroProxy providers.
         </p>
       </div>
 

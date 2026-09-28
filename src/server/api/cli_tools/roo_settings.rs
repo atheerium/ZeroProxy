@@ -62,7 +62,7 @@ async fn get_roo_settings(State(state): State<AppState>, headers: HeaderMap) -> 
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "globalStatePath": global_state_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -262,7 +262,7 @@ async fn reset_roo_settings() -> AnyhowResult<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed from Roo",
+        "message": "ZeroProxy settings removed from Roo",
     }))
 }
 

@@ -58,7 +58,7 @@ async fn get_droid_settings(State(state): State<AppState>, headers: HeaderMap) -
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "settingsPath": droid_settings_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -158,7 +158,7 @@ async fn write_droid_settings(
         !entry
             .get("id")
             .and_then(Value::as_str)
-            .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+            .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
     });
 
     let normalized_base_url = normalize_v1_base_url(&req.base_url);
@@ -185,7 +185,7 @@ async fn write_droid_settings(
         }
         custom_models.push(json!({
             "model": model,
-            "id": format!("custom:CipherRoute-{index}"),
+            "id": format!("custom:ZeroProxy-{index}"),
             "index": index,
             "baseUrl": normalized_base_url,
             "apiKey": api_key,
@@ -197,7 +197,7 @@ async fn write_droid_settings(
     }
 
     // Intentionally matches zeroproxy's whole-array reordering behavior, including
-    // pre-existing non-CipherRoute entries that may shift indexes.
+    // pre-existing non-ZeroProxy entries that may shift indexes.
     if let Some(default_index) = default_index {
         if default_index < custom_models.len() {
             let default_entry = custom_models.remove(default_index);
@@ -244,7 +244,7 @@ async fn reset_droid_settings() -> AnyhowResult<Value> {
             !entry
                 .get("id")
                 .and_then(Value::as_str)
-                .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+                .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
         });
         if !custom_models.is_empty() {
             settings.insert("customModels".to_string(), Value::Array(custom_models));
@@ -258,7 +258,7 @@ async fn reset_droid_settings() -> AnyhowResult<Value> {
     .await?;
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed successfully",
+        "message": "ZeroProxy settings removed successfully",
     }))
 }
 
@@ -271,7 +271,7 @@ fn has_zeroproxy_droid_settings(settings: &Value) -> bool {
                 entry
                     .get("id")
                     .and_then(Value::as_str)
-                    .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+                    .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
             })
         })
 }

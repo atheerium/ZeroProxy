@@ -56,7 +56,7 @@ async fn get_codex_settings(State(state): State<AppState>, headers: HeaderMap) -
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "settingsPath": codex_config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -243,8 +243,8 @@ async fn set_permissions_600(path: &Path) {
     let _ = path;
 }
 
-/// Marker line used to identify the CipherRoute Codex block in shell profiles.
-const BASHRC_ENV_LINE: &str = "# CipherRoute Codex settings";
+/// Marker line used to identify the ZeroProxy Codex block in shell profiles.
+const BASHRC_ENV_LINE: &str = "# ZeroProxy Codex settings";
 
 async fn upsert_env_var_in_profiles(base_url: &str) -> AnyhowResult<()> {
     let export_line = format!("export OPENAI_BASE_URL=\"{}\"", base_url);
@@ -287,7 +287,7 @@ async fn upsert_env_block(profile_path: &Path, export_line: &str) -> AnyhowResul
         let re = regex_block_pattern();
         if re.is_match(&content) {
             let new_block = format!(
-                "{}\n{export_line}\n# End CipherRoute Codex settings",
+                "{}\n{export_line}\n# End ZeroProxy Codex settings",
                 BASHRC_ENV_LINE
             );
             let updated = re.replace(&content, &new_block);
@@ -298,7 +298,7 @@ async fn upsert_env_block(profile_path: &Path, export_line: &str) -> AnyhowResul
 
     // Append at the end
     let block = format!(
-        "\n{}\n{export_line}\n# End CipherRoute Codex settings\n",
+        "\n{}\n{export_line}\n# End ZeroProxy Codex settings\n",
         BASHRC_ENV_LINE
     );
     let updated = format!("{content}{block}");
@@ -332,7 +332,7 @@ async fn remove_env_block(profile_path: &Path) -> AnyhowResult<()> {
 
 fn regex_block_pattern() -> regex::Regex {
     regex::Regex::new(&format!(
-        r"(?m)^{}\n(?:export OPENAI_BASE_URL=.*\n)?# End CipherRoute Codex settings\n?",
+        r"(?m)^{}\n(?:export OPENAI_BASE_URL=.*\n)?# End ZeroProxy Codex settings\n?",
         regex::escape(BASHRC_ENV_LINE)
     ))
     .unwrap()
@@ -394,7 +394,7 @@ mod tests {
     #[test]
     fn test_regex_block_pattern_matches() {
         let re = regex_block_pattern();
-        let content = "# CipherRoute Codex settings\nexport OPENAI_BASE_URL=\"http://localhost:4623\"\n# End CipherRoute Codex settings\n";
+        let content = "# ZeroProxy Codex settings\nexport OPENAI_BASE_URL=\"http://localhost:4623\"\n# End ZeroProxy Codex settings\n";
         assert!(re.is_match(content));
     }
 

@@ -568,7 +568,7 @@ pub async fn restart(State(state): State<AppState>, headers: HeaderMap) -> Respo
         return (
             StatusCode::BAD_REQUEST,
             Json(json!({
-                "error": "External Headroom proxies must be restarted outside CipherRoute.",
+                "error": "External Headroom proxies must be restarted outside ZeroProxy.",
                 "code": "EXTERNAL_PROXY"
             })),
         )
@@ -1100,7 +1100,7 @@ pub async fn proxy_handler(
             };
 
             // Rewrite dashboard HTML so absolute fetch('/stats…') calls hit the
-            // same-origin reverse proxy instead of the CipherRoute origin root.
+            // same-origin reverse proxy instead of the ZeroProxy origin root.
             let is_dashboard_html =
                 path_joined == "dashboard" && content_type.contains("text/html");
             let final_body: Bytes = if is_dashboard_html {

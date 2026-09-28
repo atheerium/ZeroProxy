@@ -356,7 +356,7 @@ async fn get_codex_settings(State(state): State<AppState>, headers: HeaderMap) -
             Json(json!({
                 "installed": true,
                 "config": config,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "configPath": codex_config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -453,7 +453,7 @@ async fn get_copilot_settings(State(state): State<AppState>, headers: HeaderMap)
             Json(json!({
                 "installed": true,
                 "config": config,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "configPath": copilot_config_path().to_string_lossy().to_string(),
                 "currentModel": entry
                     .and_then(|entry| entry.get("models"))
@@ -561,7 +561,7 @@ async fn get_droid_settings(State(state): State<AppState>, headers: HeaderMap) -
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "settingsPath": droid_settings_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -689,7 +689,7 @@ async fn get_opencode_settings(State(state): State<AppState>, headers: HeaderMap
             Json(json!({
                 "installed": true,
                 "config": config,
-                "hasCipherRoute": provider_config.is_some(),
+                "hasZeroProxy": provider_config.is_some(),
                 "configPath": opencode_config_path().to_string_lossy().to_string(),
                 "opencode": {
                     "models": models,
@@ -859,7 +859,7 @@ async fn get_openclaw_settings(State(state): State<AppState>, headers: HeaderMap
                 "installed": true,
                 "settings": settings,
                 "agents": enriched_agents,
-                "hasCipherRoute": settings
+                "hasZeroProxy": settings
                     .as_ref()
                     .is_some_and(has_zeroproxy_openclaw_settings),
                 "settingsPath": openclaw_settings_path().to_string_lossy().to_string(),
@@ -959,7 +959,7 @@ async fn write_codex_settings(settings: &CodexSettings) -> anyhow::Result<String
         TomlValue::Table(TomlMap::from_iter([
             (
                 "name".to_string(),
-                TomlValue::String("CipherRoute".to_string()),
+                TomlValue::String("ZeroProxy".to_string()),
             ),
             (
                 "base_url".to_string(),
@@ -1049,7 +1049,7 @@ async fn reset_codex_settings() -> anyhow::Result<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed successfully",
+        "message": "ZeroProxy settings removed successfully",
     }))
 }
 
@@ -1200,7 +1200,7 @@ async fn write_copilot_settings(req: &CopilotSettingsRequest) -> anyhow::Result<
         .filter(|value| !value.is_empty())
         .unwrap_or_else(|| "sk_zeroproxy".to_string());
     let new_entry = json!({
-        "name": "CipherRoute",
+        "name": "ZeroProxy",
         "vendor": "azure",
         "apiKey": api_key,
         "models": req.models.iter().map(|id| {
@@ -1220,7 +1220,7 @@ async fn write_copilot_settings(req: &CopilotSettingsRequest) -> anyhow::Result<
         entry
             .get("name")
             .and_then(Value::as_str)
-            .is_some_and(|name| name == "CipherRoute")
+            .is_some_and(|name| name == "ZeroProxy")
     }) {
         config[index] = new_entry;
     } else {
@@ -1252,7 +1252,7 @@ async fn reset_copilot_settings() -> anyhow::Result<Value> {
         entry
             .get("name")
             .and_then(Value::as_str)
-            .is_none_or(|name| name != "CipherRoute")
+            .is_none_or(|name| name != "ZeroProxy")
     });
     fs::write(
         &config_path,
@@ -1262,7 +1262,7 @@ async fn reset_copilot_settings() -> anyhow::Result<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute removed from Copilot config",
+        "message": "ZeroProxy removed from Copilot config",
     }))
 }
 
@@ -1292,7 +1292,7 @@ async fn write_droid_settings(
         !entry
             .get("id")
             .and_then(Value::as_str)
-            .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+            .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
     });
 
     let normalized_base_url = normalize_v1_base_url(&req.base_url);
@@ -1319,7 +1319,7 @@ async fn write_droid_settings(
         }
         custom_models.push(json!({
             "model": model,
-            "id": format!("custom:CipherRoute-{index}"),
+            "id": format!("custom:ZeroProxy-{index}"),
             "index": index,
             "baseUrl": normalized_base_url,
             "apiKey": api_key,
@@ -1331,7 +1331,7 @@ async fn write_droid_settings(
     }
 
     // Intentionally matches zeroproxy's whole-array reordering behavior, including
-    // pre-existing non-CipherRoute entries that may shift indexes.
+    // pre-existing non-ZeroProxy entries that may shift indexes.
     if let Some(default_index) = default_index {
         if default_index < custom_models.len() {
             let default_entry = custom_models.remove(default_index);
@@ -1378,7 +1378,7 @@ async fn reset_droid_settings() -> anyhow::Result<Value> {
             !entry
                 .get("id")
                 .and_then(Value::as_str)
-                .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+                .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
         });
         if !custom_models.is_empty() {
             settings.insert("customModels".to_string(), Value::Array(custom_models));
@@ -1392,7 +1392,7 @@ async fn reset_droid_settings() -> anyhow::Result<Value> {
     .await?;
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed successfully",
+        "message": "ZeroProxy settings removed successfully",
     }))
 }
 
@@ -1648,7 +1648,7 @@ async fn reset_opencode_settings(model_to_remove: Option<String>) -> anyhow::Res
         "success": true,
         "message": model_to_remove
             .map(|model| Value::String(format!("Model \"{model}\" removed")))
-            .unwrap_or_else(|| Value::String("CipherRoute settings removed from OpenCode".to_string())),
+            .unwrap_or_else(|| Value::String("ZeroProxy settings removed from OpenCode".to_string())),
     }))
 }
 
@@ -1833,7 +1833,7 @@ async fn reset_openclaw_settings() -> anyhow::Result<Value> {
     .await?;
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed successfully",
+        "message": "ZeroProxy settings removed successfully",
     }))
 }
 
@@ -1998,7 +1998,7 @@ fn has_zeroproxy_droid_settings(settings: &Value) -> bool {
                 entry
                     .get("id")
                     .and_then(Value::as_str)
-                    .is_some_and(|id| id.starts_with("custom:CipherRoute"))
+                    .is_some_and(|id| id.starts_with("custom:ZeroProxy"))
             })
         })
 }
@@ -2044,7 +2044,7 @@ fn get_zeroproxy_copilot_entry(config: &Value) -> Option<&Value> {
     config
         .as_array()?
         .iter()
-        .find(|entry| entry.get("name").and_then(Value::as_str) == Some("CipherRoute"))
+        .find(|entry| entry.get("name").and_then(Value::as_str) == Some("ZeroProxy"))
 }
 
 fn copilot_config_path() -> PathBuf {
@@ -3243,7 +3243,7 @@ mod tests {
     #[test]
     fn set_openclaw_agent_model_id_preserves_fallbacks_on_object_form() {
         // OpenClaw 2026.5.x: only the `primary` field should be rewritten —
-        // user-configured `fallbacks` must survive an CipherRoute save.
+        // user-configured `fallbacks` must survive an ZeroProxy save.
         let mut agent = serde_json::Map::new();
         agent.insert(
             "model".to_string(),

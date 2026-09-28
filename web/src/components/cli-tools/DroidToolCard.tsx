@@ -5,6 +5,12 @@ import type { ChangeEvent, KeyboardEvent } from "react";
 import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
 // import Image from "next/image";
 import EndpointPresetControl from "./EndpointPresetControl";
+import {
+  findMigratedByPrefix,
+  isZeroProxyModelId,
+  ZEROPROXY_MODEL_PREFIX,
+  LEGACY_MODEL_PREFIX,
+} from "@/lib/brandMigration";
 
 const CLOUD_URL: string | undefined = (import.meta.env as Record<string, string | undefined>)?.PUBLIC_CLOUD_URL;
 
@@ -21,7 +27,7 @@ interface ApiKey {
 interface DroidStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: {
     customModels?: Array<{
       id?: string;
@@ -77,8 +83,11 @@ export default function DroidToolCard({
 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!droidStatus?.installed) return null;
-    // Check for any CipherRoute model entry (support multi-model: custom:CipherRoute-0, custom:CipherRoute-1, ...)
-    const currentConfig = droidStatus.settings?.customModels?.find(m => m.id?.startsWith("custom:CipherRoute"));
+    const currentConfig = findMigratedByPrefix(
+      droidStatus.settings?.customModels,
+      ZEROPROXY_MODEL_PREFIX,
+      LEGACY_MODEL_PREFIX
+    );
     if (!currentConfig) return "not_configured";
     const localMatch = currentConfig.baseUrl?.includes("localhost") || currentConfig.baseUrl?.includes("127.0.0.1");
     const cloudMatch = cloudEnabled && CLOUD_URL && currentConfig.baseUrl?.startsWith(CLOUD_URL);
@@ -122,14 +131,15 @@ export default function DroidToolCard({
     if (droidStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
       const existingModels = (droidStatus.settings?.customModels || [])
-        .filter(m => m.id?.startsWith("custom:CipherRoute"))
+        .filter(m => isZeroProxyModelId(m.id))
         .sort((a, b) => (a.index || 0) - (b.index || 0))
         .map(m => m.model);
       if (existingModels.length > 0) {
         setModelList(existingModels);
       } else {
-        // Legacy: single model stored as custom:CipherRoute-0
-        const legacy = droidStatus.settings?.customModels?.find(m => m.id === "custom:CipherRoute-0");
+        const legacy = droidStatus.settings?.customModels?.find(
+          m => m.id === `${ZEROPROXY_MODEL_PREFIX}-0` || m.id === `${LEGACY_MODEL_PREFIX}-0`
+        );
         if (legacy?.model) {
           setModelList([legacy.model]);
         }
@@ -182,7 +192,7 @@ export default function DroidToolCard({
     try {
       const keyToUse = selectedApiKey?.trim()
         || (apiKeys?.length > 0 ? apiKeys[0].key : null)
-        || (!cloudEnabled ? "sk_cipherroute" : null);
+        || (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch("/api/cli-tools/droid-settings", {
         method: "POST",
@@ -231,12 +241,12 @@ export default function DroidToolCard({
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
     const settingsContent = {
       customModels: modelList.map((m, i) => ({
         model: m,
-        id: `custom:CipherRoute-${i}`,
+        id: `${ZEROPROXY_MODEL_PREFIX}-${i}`,
         index: i,
         baseUrl: getEffectiveBaseUrl(),
         apiKey: keyToUse,
@@ -297,7 +307,7 @@ export default function DroidToolCard({
                   <span className="material-symbols-outlined text-yellow-500">warning</span>
                   <div className="flex-1">
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">Factory Droid CLI not detected locally</p>
-                    <p className="text-sm text-text-muted">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted">Manual configuration is still available if ZeroProxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -330,12 +340,12 @@ export default function DroidToolCard({
             <>
               <div className="flex flex-col gap-2">
                 {/* Current Base URL */}
-                {droidStatus?.settings?.customModels?.find(m => m.id?.startsWith("custom:CipherRoute"))?.baseUrl && (
+                {findMigratedByPrefix(droidStatus?.settings?.customModels, ZEROPROXY_MODEL_PREFIX, LEGACY_MODEL_PREFIX)?.baseUrl && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
                     <span className="min-w-0 truncate rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {droidStatus.settings.customModels.find(m => m.id?.startsWith("custom:CipherRoute"))!.baseUrl}
+                      {findMigratedByPrefix(droidStatus.settings?.customModels, ZEROPROXY_MODEL_PREFIX, LEGACY_MODEL_PREFIX)!.baseUrl}
                     </span>
                   </div>
                 )}
@@ -376,7 +386,7 @@ export default function DroidToolCard({
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -437,7 +447,7 @@ export default function DroidToolCard({
                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={modelList.length === 0} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasCipherRoute} loading={restoring}>
+                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!droidStatus?.hasZeroProxy} loading={restoring}>
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>

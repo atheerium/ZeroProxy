@@ -12,7 +12,7 @@ import {
  * Browser-side app bootstrap for the Astro + Rust dashboard.
  *
  * 9router ran this as a Next.js server singleton (watchdog, network monitor,
- * quota auto-ping scheduler). CipherRoute owns process supervision in Rust, so
+ * quota auto-ping scheduler). ZeroProxy owns process supervision in Rust, so
  * this client path only:
  *   1. Resumes tunnel / tailscale / MITM when settings say they should be on
  *   2. Kicks a best-effort quota auto-ping tick while the dashboard is open
@@ -92,7 +92,7 @@ async function autoStartMitm(): Promise<void> {
   g.mitmStartInProgress = true;
   try {
     const mitmConfig = await getMitmConfig();
-    // CipherRoute: `enabled` means routes are configured (mitm_alias non-empty).
+    // ZeroProxy: `enabled` means routes are configured (mitm_alias non-empty).
     // There is no separate settings.mitmEnabled flag; if routes exist, try start
     // (start is idempotent when already running).
     if (!mitmConfig.enabled) return;

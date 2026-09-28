@@ -82,7 +82,7 @@ pub struct Cli {
     #[arg(long, env = "RUST_LOG", default_value = "info")]
     pub log_filter: String,
 
-    /// Path to the CipherRoute data directory (db.json, usage.json).
+    /// Path to the ZeroProxy data directory (db.json, usage.json).
     /// Falls back to $DATA_DIR or ~/.zeroproxy.
     #[arg(long, env = "DATA_DIR", global = true)]
     pub data_dir: Option<PathBuf>,

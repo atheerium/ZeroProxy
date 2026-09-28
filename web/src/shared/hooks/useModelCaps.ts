@@ -91,7 +91,7 @@ interface ModelsApiEntry {
 /**
  * Fetch model capabilities once and expose a lookup by fullModel
  * ("provider/model") or bare model id. Falls back to a client-side pattern
- * heuristic when `/api/models` does not include `caps` (CipherRoute today).
+ * heuristic when `/api/models` does not include `caps` (ZeroProxy today).
  */
 export function useModelCaps() {
   const [byFull, setByFull] = useState<Record<string, ModelCaps>>({});

@@ -1,6 +1,6 @@
 //! GET /api/cli-tools/openclaw-config
 //!
-//! Read-only aggregation of current CipherRoute config for OpenClaw.
+//! Read-only aggregation of current ZeroProxy config for OpenClaw.
 //! OpenClaw reads from this endpoint to auto-configure itself.
 //! No file write happens here.
 

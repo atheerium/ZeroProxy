@@ -1713,7 +1713,7 @@ async fn test_proxy_url(
     let client = match reqwest::Client::builder()
         .proxy(proxy)
         .timeout(std::time::Duration::from_millis(normalized_timeout_ms))
-        .user_agent("CipherRoute")
+        .user_agent("ZeroProxy")
         .build()
     {
         Ok(client) => client,

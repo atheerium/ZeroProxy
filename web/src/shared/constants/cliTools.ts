@@ -310,7 +310,7 @@ export const CLI_TOOLS: Record<string, CLITool> = {
     defaultCommand: "amp",
     modelAliases: ["g25p", "g25f", "cs45", "g54"],
     notes: [
-      { type: "info", text: "Use CipherRoute model aliases to keep Amp shorthand mappings stable across provider updates." },
+      { type: "info", text: "Use ZeroProxy model aliases to keep Amp shorthand mappings stable across provider updates." },
       { type: "warning", text: "Suggested shorthand examples: g25p → gemini/gemini-2.5-pro, g25f → gemini/gemini-2.5-flash, cs45 → cc/claude-sonnet-4-5-20250929." },
     ],
     guideSteps: [
@@ -318,7 +318,7 @@ export const CLI_TOOLS: Record<string, CLITool> = {
       { step: 2, title: "API Key", type: "apiKeySelector" },
       { step: 3, title: "Base URL", value: "{{baseUrl}}", copyable: true },
       { step: 4, title: "Select Model", type: "modelSelector" },
-      { step: 5, title: "Add Shorthands", desc: "Map Amp shorthand names such as g25p or cs45 to CipherRoute aliases in your local config." },
+      { step: 5, title: "Add Shorthands", desc: "Map Amp shorthand names such as g25p or cs45 to ZeroProxy aliases in your local config." },
     ],
     codeBlock: {
       language: "bash",
@@ -335,15 +335,15 @@ amp --model "{{model}}"
     name: "Qwen Code",
     image: "/providers/qwen.svg",
     color: "#10B981",
-    description: "Alibaba Qwen Code CLI — supports OpenAI, Anthropic & Gemini providers via CipherRoute",
+    description: "Alibaba Qwen Code CLI — supports OpenAI, Anthropic & Gemini providers via ZeroProxy",
     docsUrl: "https://qwenlm.github.io/qwen-code-docs/en/users/configuration/model-providers/",
     configType: "guide",
     defaultCommand: "qwen",
     notes: [
-      { type: "info", text: "Qwen Code supports multiple provider types (openai, anthropic, gemini) via modelProviders in settings.json. CipherRoute works as an OpenAI-compatible endpoint." },
-      { type: "info", text: "Any model available in CipherRoute can be used — not just Qwen models. Select from Qwen, Claude, Gemini, GPT, and more." },
+      { type: "info", text: "Qwen Code supports multiple provider types (openai, anthropic, gemini) via modelProviders in settings.json. ZeroProxy works as an OpenAI-compatible endpoint." },
+      { type: "info", text: "Any model available in ZeroProxy can be used — not just Qwen models. Select from Qwen, Claude, Gemini, GPT, and more." },
       { type: "warning", text: "Config path: Linux/macOS ~/.qwen/settings.json • Windows %USERPROFILE%\\.qwen\\settings.json" },
-      { type: "error", text: "Qwen OAuth free tier was discontinued on 2026-04-15. Use CipherRoute with alicode/openrouter/anthropic/gemini providers instead." },
+      { type: "error", text: "Qwen OAuth free tier was discontinued on 2026-04-15. Use ZeroProxy with alicode/openrouter/anthropic/gemini providers instead." },
     ],
     modelAliases: [
       "coder-model",
@@ -404,7 +404,7 @@ amp --model "{{model}}"
       { id: "deepseek-chat", name: "DeepSeek V3 Chat", alias: "deepseek-chat" },
     ],
     notes: [
-      { type: "info", text: "DeepSeek TUI uses ~/.deepseek/config.toml for configuration. CipherRoute will update the provider to 'openai' mode with your base_url, api_key, and model." },
+      { type: "info", text: "DeepSeek TUI uses ~/.deepseek/config.toml for configuration. ZeroProxy will update the provider to 'openai' mode with your base_url, api_key, and model." },
       { type: "warning", text: "Config path: Linux/macOS ~/.deepseek/config.toml • Windows %USERPROFILE%\\.deepseek\\config.toml" },
     ],
   },
@@ -423,7 +423,7 @@ amp --model "{{model}}"
       },
       {
         type: "info",
-        text: "Configure cipherroute as an OpenAI-compatible provider to route all jcode requests through the optimization layer.",
+        text: "Configure ZeroProxy as an OpenAI-compatible provider to route all jcode requests through the optimization layer.",
       },
       {
         type: "warning",
@@ -449,11 +449,11 @@ amp --model "{{model}}"
     notes: [
       {
         type: "info",
-        text: "Grok Build uses ~/.grok/config.toml. CipherRoute writes a [model.cipherroute] custom model and sets it as the default.",
+        text: "Grok Build uses ~/.grok/config.toml. ZeroProxy writes a [model.zeroproxy] custom model and sets it as the default.",
       },
       {
         type: "info",
-        text: "After Apply, run grok (or /model cipherroute) to use the routed model. Switch back anytime with /model grok-build. You can also pass --model provider/model-id.",
+        text: "After Apply, run grok (or /model zeroproxy) to use the routed model. Switch back anytime with /model grok-build. You can also pass --model provider/model-id.",
       },
       {
         type: "warning",

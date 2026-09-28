@@ -202,7 +202,7 @@ export default function Sidebar({ onClose }: SidebarProps) {
         <div className="px-6 py-4 flex flex-col gap-2">
           <a href="/dashboard" className="flex items-center gap-3 group">
             <div className="flex items-center justify-center size-9 rounded-mini-md bg-surface-card border border-hairline">
-              <AnthropicSpike size={20} className="text-brand-coral" ariaLabel="CipherRoute mark" />
+              <AnthropicSpike size={20} className="text-brand-coral" ariaLabel="ZeroProxy mark" />
             </div>
             <div className="flex flex-col leading-tight">
               <h1 className="font-serif text-[22px] font-normal tracking-[-0.02em] text-ink">
@@ -444,8 +444,8 @@ export default function Sidebar({ onClose }: SidebarProps) {
         isOpen={showUpdateModal}
         onClose={() => setShowUpdateModal(false)}
         onConfirm={handleUpdate}
-        title="Update CipherRoute"
-        message={`This will close CipherRoute and install v${updateInfo?.latestVersion || ""} in a separate window. Continue?`}
+        title="Update ZeroProxy"
+        message={`This will close ZeroProxy and install v${updateInfo?.latestVersion || ""} in a separate window. Continue?`}
         confirmText="Update"
         cancelText="Cancel"
         variant="primary"
@@ -491,7 +491,7 @@ function UpdateProgress({ status, latestVersion, installCmd, copied, onCopy }: U
   const errorMsg = status?.error;
 
   const steps = [
-    { key: "stopped", label: "Stopped CipherRoute server", state: "done" },
+    { key: "stopped", label: "Stopped ZeroProxy server", state: "done" },
     {
       key: "launched",
       label: "Launched background installer",
@@ -533,7 +533,7 @@ function UpdateProgress({ status, latestVersion, installCmd, copied, onCopy }: U
         </div>
         <div>
           <h2 className="text-lg font-semibold">
-            {done && success ? "Update Completed" : done && !success ? "Update Failed" : "Updating CipherRoute"}
+            {done && success ? "Update Completed" : done && !success ? "Update Failed" : "Updating ZeroProxy"}
           </h2>
           <p className="text-xs text-white/60">
             {done && success
@@ -580,7 +580,7 @@ function UpdateProgress({ status, latestVersion, installCmd, copied, onCopy }: U
       {done && success ? (
         <div className="space-y-2">
           <p className="text-sm text-white/80">
-            Run <code className="px-1.5 py-0.5 rounded bg-white/10 text-green-400">cipherroute</code> in your terminal to start the new version.
+            Run <code className="px-1.5 py-0.5 rounded bg-white/10 text-green-400">zeroproxy</code> in your terminal to start the new version.
           </p>
           <Button variant="secondary" fullWidth onClick={() => globalThis.location.reload()}>
             Reload Page

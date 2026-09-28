@@ -27,7 +27,7 @@ use crate::server::state::AppState;
 /// **IMPORTANT**: Cursor requires a Pro subscription and a tunnel / cloud-exposed
 /// endpoint. Localhost (127.0.0.1, ::1, 0.0.0.0) **will not work** because Cursor
 /// runs its AI requests in a subprocess that cannot reach the host's loopback on
-/// many platforms. See the CipherRoute docs for recommended tunnels (bore, ngrok,
+/// many platforms. See the ZeroProxy docs for recommended tunnels (bore, ngrok,
 /// Cloudflare Tunnel, etc.).
 
 pub fn routes() -> Router<AppState> {
@@ -70,7 +70,7 @@ async fn get_cursor_settings(State(state): State<AppState>, _headers: HeaderMap)
         "configType": "guide",
         "guideSteps": guide_steps,
         "settingsPath": Value::Null,
-        "hasCipherRoute": false,
+        "hasZeroProxy": false,
         "warning": "Cursor requires a Pro subscription. The endpoint must be a tunnel / cloud URL (e.g. https://your-tunnel.example.com) — localhost will NOT work because Cursor runs AI requests in a subprocess that cannot reach the host loopback. Users on Cursor Free plan cannot use custom endpoints.",
         "settings": Value::Null,
     }))

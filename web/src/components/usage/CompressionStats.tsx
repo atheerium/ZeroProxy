@@ -72,7 +72,7 @@ export default function CompressionStats({ period = "30d" }: { period?: string }
     };
   }, [localPeriod]);
 
-  // CipherRoute records prompt-cache reads but not RTK receipt-level savings yet.
+  // ZeroProxy records prompt-cache reads but not RTK receipt-level savings yet.
   // We surface cache-read tokens as the available "tokens saved" proxy and mark
   // the page clearly as partial until receipt-level compression tracking lands.
   const derived = useMemo(() => {

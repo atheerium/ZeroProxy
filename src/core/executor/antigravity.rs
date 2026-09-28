@@ -9,7 +9,7 @@
 //!   not OpenAI's. This executor expects the body to already be in that
 //!   shape (the request translator pipeline does the conversion).
 //! - A per-connection session id is derived via [`derive_session_id`] so
-//!   prompt caching survives within a single CipherRoute run.
+//!   prompt caching survives within a single ZeroProxy run.
 //! - Tool function names are sanitised to Gemini's regex
 //!   `[a-zA-Z_][a-zA-Z0-9_.:\-]{0,63}`.
 //! - The `cleanJSONSchemaForAntigravity` schema-cleaning step from 9router

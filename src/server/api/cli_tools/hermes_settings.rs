@@ -63,7 +63,7 @@ pub(super) async fn get_hermes_settings(
             Json(json!({
                 "installed": true,
                 "settings": { "model": model.clone() },
-                "hasCipherRoute": has_zeroproxy_config(model.as_ref()),
+                "hasZeroProxy": has_zeroproxy_config(model.as_ref()),
                 "configPath": hermes_config_path().to_string_lossy().to_string(),
             }))
             .into_response()

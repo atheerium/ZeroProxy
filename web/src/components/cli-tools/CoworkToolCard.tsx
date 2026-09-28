@@ -62,7 +62,7 @@ interface LocalStdioPluginDef {
 interface CoworkStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   defaultPlugins?: CoworkPluginState[];
   localStdioPlugins?: LocalStdioPluginDef[];
   cowork?: {
@@ -257,7 +257,7 @@ export default function CoworkToolCard({
     const url = status?.cowork?.baseUrl;
     if (!url) return "not_configured";
     if (isLocalhostUrl(url)) return "invalid";
-    return status.hasCipherRoute ? "configured" : "other";
+    return status.hasZeroProxy ? "configured" : "other";
   };
 
   const configStatus = getConfigStatus();
@@ -305,7 +305,7 @@ export default function CoworkToolCard({
       const keyToUse =
         selectedApiKey?.trim() ||
         (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-        (!cloudEnabled ? "sk_cipherroute" : null);
+        (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch(ENDPOINT, {
         method: "POST",
@@ -364,7 +364,7 @@ export default function CoworkToolCard({
       selectedApiKey && selectedApiKey.trim()
         ? selectedApiKey
         : !cloudEnabled
-          ? "sk_cipherroute"
+          ? "sk_zeroproxy"
           : "<API_KEY_FROM_DASHBOARD>";
 
     const modelsToShow = selectedModels.length > 0 ? selectedModels : ["provider/model-id"];
@@ -567,7 +567,7 @@ export default function CoworkToolCard({
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
                       {cloudEnabled
                         ? "No API keys - Create one in Keys page"
-                        : "sk_cipherroute (default)"}
+                        : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -908,7 +908,7 @@ export default function CoworkToolCard({
                   variant="outline"
                   size="sm"
                   onClick={handleReset}
-                  disabled={!status.hasCipherRoute}
+                  disabled={!status.hasZeroProxy}
                   loading={restoring}
                   className="w-full sm:w-auto"
                 >

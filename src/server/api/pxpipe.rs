@@ -65,7 +65,7 @@ async fn health(State(state): State<AppState>, headers: HeaderMap) -> Response {
     Json(json!({
         "healthy": false,
         "checks": [
-            { "id": "installed", "label": "PXPIPE installed", "ok": false, "detail": "PXPIPE is not managed by CipherRoute" },
+            { "id": "installed", "label": "PXPIPE installed", "ok": false, "detail": "PXPIPE is not managed by ZeroProxy" },
             { "id": "module", "label": "Transform module loads", "ok": false, "detail": null },
             { "id": "transform", "label": "Test request transforms", "ok": false, "detail": null }
         ],

@@ -70,7 +70,7 @@ export default function ApiKeySelect({
   if (noKeys && mode !== CUSTOM_VALUE) {
     return (
       <span className={`min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5 ${className}`}>
-        {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+        {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
       </span>
     );
   }

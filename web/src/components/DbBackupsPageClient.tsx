@@ -263,7 +263,7 @@ export default function DbBackupsPageClient() {
       const blob = await res.blob();
       const disposition = res.headers.get("content-disposition") || "";
       const match = disposition.match(/filename="?([^"]+)"?/i);
-      const filename = match?.[1] || `cipherroute-db-${Date.now()}.json`;
+      const filename = match?.[1] || `ZeroProxy-db-${Date.now()}.json`;
       const url = URL.createObjectURL(blob);
       const anchor = document.createElement("a");
       anchor.href = url;
@@ -399,7 +399,7 @@ export default function DbBackupsPageClient() {
       const blob = await res.blob();
       const disposition = res.headers.get("content-disposition") || "";
       const m = disposition.match(/filename="?([^"]+)"?/i);
-      const filename = m?.[1] || `cipherroute-data-${scopedScopes.join("-")}-${Date.now()}.json`;
+      const filename = m?.[1] || `ZeroProxy-data-${scopedScopes.join("-")}-${Date.now()}.json`;
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;

@@ -129,10 +129,10 @@ export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, api
     setApplying(true);
     setMessage(null);
     try {
-      // Use sk_cipherroute for localhost if no key, otherwise use selected key
+      // Use sk_zeroproxy for localhost if no key, otherwise use selected key
       const keyToUse = (selectedApiKey && selectedApiKey.trim())
         ? selectedApiKey
-        : (!cloudEnabled ? "sk_cipherroute" : selectedApiKey);
+        : (!cloudEnabled ? "sk_zeroproxy" : selectedApiKey);
 
       const res = await fetch("/api/cli-tools/codex-settings", {
         method: "POST",
@@ -191,16 +191,16 @@ export default function CodexToolCard({ tool, isExpanded, onToggle, baseUrl, api
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
     const effectiveSubagentModel = subagentModel || selectedModel;
 
-    const configContent = `# CipherRoute Configuration for Codex CLI
+    const configContent = `# ZeroProxy Configuration for Codex CLI
 model = "${selectedModel}"
-model_provider = "cipherroute"
+model_provider = "zeroproxy"
 
-[model_providers.cipherroute]
-name = "CipherRoute"
+[model_providers.zeroproxy]
+name = "ZeroProxy"
 base_url = "${getEffectiveBaseUrl()}"
 wire_api = "responses"
 
@@ -261,7 +261,7 @@ model = "${effectiveSubagentModel}"
                   <span className="material-symbols-outlined text-yellow-500">warning</span>
                   <div className="flex-1">
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">Codex CLI not detected locally</p>
-                    <p className="text-sm text-text-muted">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted">Manual configuration is still available if zeroproxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -350,7 +350,7 @@ model = "${effectiveSubagentModel}"
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>

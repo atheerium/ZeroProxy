@@ -69,7 +69,7 @@ use crate::server::state::AppState;
 use crate::types::{AppDb, HealthResponse, ProviderConnection};
 
 /// Header carrying the dashboard password for sensitive re-auth (export/import).
-/// Accepts the CipherRoute name and the legacy 9router name for compatibility.
+/// Accepts the ZeroProxy name and the legacy 9router name for compatibility.
 const DB_PASSWORD_HEADERS: &[&str] = &["x-op-password", "x-9r-password"];
 
 pub fn routes(state: AppState) -> Router<AppState> {

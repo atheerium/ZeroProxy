@@ -2,8 +2,13 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { UPDATER_CONFIG } from "@/shared/constants/config";
+import {
+  readMigratedJson,
+  writeMigratedJson,
+  ZEROPROXY_ENDPOINT_PRESETS_KEY,
+  LEGACY_ENDPOINT_PRESETS_KEY,
+} from "@/lib/brandMigration";
 
-const STORAGE_KEY = "cipherroute.cliToolEndpointPresets";
 const CUSTOM_VALUE = "__custom__";
 const SAVE_VALUE = "__save__";
 
@@ -33,20 +38,16 @@ function ensureV1(url: string): string {
 
 function readSavedPresets(): Preset[] {
   if (typeof window === "undefined") return [];
-  try {
-    const raw = JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]");
-    if (!Array.isArray(raw)) return [];
-    return raw.filter((p: unknown): p is Preset =>
-      !!p && typeof p === "object" && "name" in (p as Record<string, unknown>) && "baseUrl" in (p as Record<string, unknown>)
-    );
-  } catch {
-    return [];
-  }
+  const raw = readMigratedJson<unknown>(window.localStorage, ZEROPROXY_ENDPOINT_PRESETS_KEY, LEGACY_ENDPOINT_PRESETS_KEY);
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((p: unknown): p is Preset =>
+    !!p && typeof p === "object" && "name" in (p as Record<string, unknown>) && "baseUrl" in (p as Record<string, unknown>)
+  );
 }
 
 function writeSavedPresets(presets: Preset[]): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(presets));
+  writeMigratedJson(window.localStorage, ZEROPROXY_ENDPOINT_PRESETS_KEY, presets);
 }
 
 interface BuildOptionsArgs {

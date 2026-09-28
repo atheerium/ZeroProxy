@@ -1,5 +1,5 @@
 /**
- * Helper functions for calling the CipherRoute Rust backend API from the
+ * Helper functions for calling the ZeroProxy Rust backend API from the
  * Astro/React dashboard. Prefer relative `/api/*` URLs in the browser so
  * session cookies and the active host/port always match.
  */

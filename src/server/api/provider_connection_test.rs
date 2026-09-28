@@ -1676,7 +1676,7 @@ fn oauth_probe_request(provider: &str, access_token: &str) -> Option<PreparedReq
                     "Authorization".to_string(),
                     format!("Bearer {access_token}"),
                 ),
-                ("User-Agent".to_string(), "CipherRoute".to_string()),
+                ("User-Agent".to_string(), "ZeroProxy".to_string()),
                 (
                     "Accept".to_string(),
                     "application/vnd.github+json".to_string(),
@@ -1838,7 +1838,7 @@ async fn test_proxy_url(proxy_url: &str) -> Result<(), String> {
 
     let response = client
         .head("https://google.com/")
-        .header("User-Agent", "CipherRoute")
+        .header("User-Agent", "ZeroProxy")
         .send()
         .await
         .map_err(|error| {
@@ -2012,7 +2012,7 @@ fn cline_headers(token: &str, extra_headers: Vec<(String, String)>) -> Vec<(Stri
         ("X-Title".to_string(), "Cline".to_string()),
         (
             "User-Agent".to_string(),
-            format!("CipherRoute/{}", env!("CARGO_PKG_VERSION")),
+            format!("ZeroProxy/{}", env!("CARGO_PKG_VERSION")),
         ),
         ("X-PLATFORM".to_string(), std::env::consts::OS.to_string()),
         ("X-PLATFORM-VERSION".to_string(), "rust".to_string()),

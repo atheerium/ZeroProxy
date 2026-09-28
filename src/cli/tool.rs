@@ -30,7 +30,7 @@ pub enum ToolCmd {
         /// Model id to set (passed as `model` to the server).
         #[arg(long)]
         model: Option<String>,
-        /// API key to write (often the CipherRoute key, not a provider key).
+        /// API key to write (often the ZeroProxy key, not a provider key).
         #[arg(long, hide_env_values = true)]
         api_key: Option<String>,
         /// Base URL (defaults to the running server's URL).

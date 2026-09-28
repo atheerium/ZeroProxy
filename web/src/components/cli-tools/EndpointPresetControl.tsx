@@ -2,8 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
-
-const STORAGE_KEY = "cipherroute.cliToolEndpointPresets";
+import {
+  readMigratedJson,
+  writeMigratedJson,
+  ZEROPROXY_ENDPOINT_PRESETS_KEY,
+  LEGACY_ENDPOINT_PRESETS_KEY,
+} from "@/lib/brandMigration";
 
 interface Preset {
   name: string;
@@ -33,16 +37,12 @@ function normalizePresets(value: unknown): Preset[] {
 
 function readPresets(): Preset[] {
   if (typeof window === "undefined") return [];
-  try {
-    return normalizePresets(JSON.parse(window.localStorage.getItem(STORAGE_KEY) || "[]"));
-  } catch {
-    return [];
-  }
+  return normalizePresets(readMigratedJson<unknown>(window.localStorage, ZEROPROXY_ENDPOINT_PRESETS_KEY, LEGACY_ENDPOINT_PRESETS_KEY));
 }
 
 function writePresets(presets: Preset[]): void {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(normalizePresets(presets)));
+  writeMigratedJson(window.localStorage, ZEROPROXY_ENDPOINT_PRESETS_KEY, normalizePresets(presets));
 }
 
 export default function EndpointPresetControl({

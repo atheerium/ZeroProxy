@@ -18,7 +18,7 @@ interface ApiKey {
 interface KiloStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: {
     auth?: string[];
   };
@@ -85,9 +85,9 @@ export default function KiloToolCard({
 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!status?.installed) return null;
-    if (!status.hasCipherRoute) return "not_configured";
-    // Kilo backend already verifies localhost/127.0.0.1/cipherroute in the URL;
-    // if hasCipherRoute is true we treat it as connected.
+    if (!status.hasZeroProxy) return "not_configured";
+    // Kilo backend already verifies localhost/127.0.0.1 in the URL;
+    // if hasZeroProxy is true we treat it as connected.
     return "configured";
   };
 
@@ -128,7 +128,7 @@ export default function KiloToolCard({
       const keyToUse =
         selectedApiKey?.trim() ||
         (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-        (!cloudEnabled ? "sk_cipherroute" : null);
+        (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch("/api/cli-tools/kilo-settings", {
         method: "POST",
@@ -182,7 +182,7 @@ export default function KiloToolCard({
     const keyToUse =
       selectedApiKey?.trim() ||
       (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-      (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
     const effectiveUrl = getEffectiveBaseUrl();
     return [
       {
@@ -370,7 +370,7 @@ export default function KiloToolCard({
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -433,7 +433,7 @@ export default function KiloToolCard({
                 <Button onClick={() => void handleApply()} disabled={applying || !selectedModel} className="w-full sm:w-auto">
                   {applying ? "Applying..." : "Apply Settings"}
                 </Button>
-                {status?.hasCipherRoute && (
+                {status?.hasZeroProxy && (
                   <Button onClick={() => void handleReset()} disabled={restoring} variant="secondary" className="w-full sm:w-auto">
                     {restoring ? "Resetting..." : "Reset Settings"}
                   </Button>

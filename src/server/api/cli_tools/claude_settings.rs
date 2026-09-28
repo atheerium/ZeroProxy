@@ -61,7 +61,7 @@ pub(super) async fn get_claude_settings(
                 Json(json!({
                     "installed": true,
                     "settings": settings,
-                    "hasCipherRoute": has_zeroproxy,
+                    "hasZeroProxy": has_zeroproxy,
                     "settingsPath": claude_settings_path().to_string_lossy().to_string(),
                 }))
                 .into_response()

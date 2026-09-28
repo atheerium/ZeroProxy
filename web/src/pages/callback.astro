@@ -2,7 +2,7 @@
 // OAuth callback relay page.
 // The OAuth provider redirects the popup here after authentication.
 // This page reads the auth code from URL params and communicates it back to
-// the parent window (the CipherRoute dashboard) via BroadcastChannel,
+// the parent window (the ZeroProxy dashboard) via BroadcastChannel,
 // localStorage events, and postMessage.
 // This component is rendered server-side; the interactive logic runs on the
 // client in the <script> block below.
@@ -57,7 +57,7 @@
     <div class="card" id="card">
       <div class="spinner" id="spinner"></div>
       <h1 id="title">Processing authentication…</h1>
-      <p id="message">Communicating with the CipherRoute dashboard.</p>
+      <p id="message">Communicating with the ZeroProxy dashboard.</p>
     </div>
 
     <script>
@@ -149,7 +149,7 @@
           msg.innerHTML =
             'The URL did not contain OAuth parameters. ' +
             'Please copy the full URL from your browser\'s address bar and ' +
-            'paste it into the <strong>Callback URL</strong> field in the CipherRoute dashboard.';
+            'paste it into the <strong>Callback URL</strong> field in the ZeroProxy dashboard.';
         }
 
         // Fallback: if none of the communication methods worked, show copy-paste instructions

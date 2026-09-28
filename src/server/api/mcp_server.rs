@@ -1,7 +1,7 @@
 //! HTTP endpoints for the native MCP server.
 //!
 //! Provides an SSE-based MCP transport endpoint so any MCP client (Claude
-//! Desktop, Cursor, Cline, etc.) can discover and invoke CipherRoute's
+//! Desktop, Cursor, Cline, etc.) can discover and invoke ZeroProxy's
 //! administrative tools directly via the MCP protocol — no child process bridge
 //! required.
 //!
@@ -149,7 +149,7 @@ async fn message_handler(
 /// `resources/list`, `resources/read`) and returns the response directly
 /// in the HTTP response body. No SSE session required.
 ///
-/// This is the simplest way for MCP clients to interact with CipherRoute's
+/// This is the simplest way for MCP clients to interact with ZeroProxy's
 /// built-in tools — just POST a JSON-RPC 2.0 request and get a response back.
 async fn stateless_mcp_handler(
     State(state): State<AppState>,

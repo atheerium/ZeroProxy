@@ -2,7 +2,7 @@
 //!
 //! Runs a fixed set of checks and reports them in `--robot` JSON or a human
 //! summary. Designed to be the first command an agent runs to figure out
-//! whether the local CipherRoute install is healthy enough to use.
+//! whether the local ZeroProxy install is healthy enough to use.
 
 use std::path::Path;
 use std::time::Duration;
