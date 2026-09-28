@@ -1,4 +1,4 @@
-//! End-to-end tests for `cipherroute sync`. These exercise the binary against
+//! End-to-end tests for `zeroproxy sync`. These exercise the binary against
 //! a real `DATA_DIR` and parse the `--robot` envelope, mirroring the style
 //! of the M4/M5 CLI tests.
 
@@ -20,7 +20,7 @@ fn write_fixture(dir: &std::path::Path, name: &str, body: &str) -> std::path::Pa
 
 fn op(data_dir: &std::path::Path, args: &[&str]) -> Output {
     Command::cargo_bin("zeroproxy")
-        .expect("locate cipherroute binary")
+        .expect("locate zeroproxy binary")
         .env("DATA_DIR", data_dir)
         // Isolate from the developer shell — ambient CIPHERROUTE_URL/API_KEY
         // would flip `db export` into remote mode against a live server.
@@ -28,7 +28,7 @@ fn op(data_dir: &std::path::Path, args: &[&str]) -> Output {
         .env_remove("CIPHERROUTE_API_KEY")
         .args(args)
         .output()
-        .expect("spawn cipherroute")
+        .expect("spawn zeroproxy")
 }
 
 /// Minimal fixture mimicking the schema emitted by

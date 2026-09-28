@@ -1,6 +1,6 @@
 //! M4 CLI integration tests.
 //!
-//! These exercise the *real* `cipherroute` binary (via assert_cmd) against a
+//! These exercise the *real* `zeroproxy` binary (via assert_cmd) against a
 //! local wiremock server, then compare the `--robot` stdout against golden
 //! JSON envelopes. They cover the happy path for every M4 subcommand:
 //! usage / logs / quota / chat / provider oauth.
@@ -34,7 +34,7 @@ async fn boot_server() -> MockServer {
 
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("zeroproxy")
-        .expect("locate cipherroute binary")
+        .expect("locate zeroproxy binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
         // Force a clean data dir so the CLI does not fall back to a real
@@ -49,7 +49,7 @@ fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
         )
         .args(args)
         .output()
-        .expect("run cipherroute")
+        .expect("run zeroproxy")
 }
 
 fn parse_robot(stdout: &[u8]) -> Value {
@@ -256,13 +256,13 @@ async fn provider_oauth_status_envelopes() {
 #[tokio::test(flavor = "multi_thread")]
 async fn server_down_exits_with_code_6() {
     // Bind to an unused port and immediately drop the listener so connection
-    // is refused. `cipherroute` must exit 6 with a `server_unreachable` envelope.
+    // is refused. `zeroproxy` must exit 6 with a `server_unreachable` envelope.
     let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("listen");
     let port = listener.local_addr().expect("addr").port();
     drop(listener);
 
     let out = Command::cargo_bin("zeroproxy")
-        .expect("cipherroute binary")
+        .expect("zeroproxy binary")
         .env("CIPHERROUTE_URL", format!("http://127.0.0.1:{port}"))
         .env("CIPHERROUTE_API_KEY", API_KEY)
         .env(
@@ -275,7 +275,7 @@ async fn server_down_exits_with_code_6() {
         )
         .args(["--robot", "usage", "summary"])
         .output()
-        .expect("run cipherroute");
+        .expect("run zeroproxy");
 
     assert_eq!(
         out.status.code(),
@@ -291,7 +291,7 @@ async fn server_down_exits_with_code_6() {
 #[tokio::test(flavor = "multi_thread")]
 async fn schema_list_includes_m4_resources() {
     let out = Command::cargo_bin("zeroproxy")
-        .expect("cipherroute binary")
+        .expect("zeroproxy binary")
         .env(
             "DATA_DIR",
             tempfile::tempdir()
@@ -302,7 +302,7 @@ async fn schema_list_includes_m4_resources() {
         )
         .args(["--robot", "schema", "list"])
         .output()
-        .expect("run cipherroute");
+        .expect("run zeroproxy");
     assert!(
         out.status.success(),
         "stderr: {}",

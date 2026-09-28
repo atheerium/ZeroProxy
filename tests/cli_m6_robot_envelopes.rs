@@ -1,6 +1,6 @@
 //! M6 CLI integration tests — `settings`, `db`, `db cloud`, and `schema
 //! stability` envelopes. Pattern matches `cli_m5_robot_envelopes.rs`: spin
-//! up a wiremock server, drive the `cipherroute` binary against it with
+//! up a wiremock server, drive the `zeroproxy` binary against it with
 //! `CIPHERROUTE_URL` + `CIPHERROUTE_API_KEY`, and assert the resulting
 //! `zeroproxy.v1.*` envelopes on stdout.
 
@@ -26,7 +26,7 @@ async fn boot_server() -> MockServer {
 
 fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
     Command::cargo_bin("zeroproxy")
-        .expect("locate cipherroute binary")
+        .expect("locate zeroproxy binary")
         .env("CIPHERROUTE_URL", server.uri())
         .env("CIPHERROUTE_API_KEY", API_KEY)
         .env(
@@ -39,7 +39,7 @@ fn op(server: &MockServer, args: &[&str]) -> std::process::Output {
         )
         .args(args)
         .output()
-        .expect("run cipherroute")
+        .expect("run zeroproxy")
 }
 
 fn parse_robot(stdout: &[u8]) -> Value {

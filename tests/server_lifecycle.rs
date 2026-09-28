@@ -1,4 +1,4 @@
-//! End-to-end test for `cipherroute server start --detach` / `server stop`.
+//! End-to-end test for `zeroproxy server start --detach` / `server stop`.
 //!
 //! Spawns the real binary, asserts the PID and endpoint sidecar files are
 //! written, that the server answers on /api/health, and that stop tears
@@ -10,9 +10,9 @@ use std::time::{Duration, Instant};
 
 fn locate_binary() -> Option<PathBuf> {
     // Honor the convention `CARGO_BIN_EXE_<name>` set during integration test
-    // builds, with a fallback to `target/debug/cipherroute` for `cargo test`
+    // builds, with a fallback to `target/debug/zeroproxy` for `cargo test`
     // invocations that don't have the env var.
-    if let Some(p) = option_env!("CARGO_BIN_EXE_cipherroute") {
+    if let Some(p) = option_env!("CARGO_BIN_EXE_zeroproxy") {
         let path = PathBuf::from(p);
         if path.exists() {
             return Some(path);
@@ -20,7 +20,7 @@ fn locate_binary() -> Option<PathBuf> {
     }
     let cwd = std::env::current_dir().ok()?;
     for ancestor in cwd.ancestors() {
-        let candidate = ancestor.join("target/debug/cipherroute");
+        let candidate = ancestor.join("target/debug/zeroproxy");
         if candidate.exists() {
             return Some(candidate);
         }
@@ -52,7 +52,7 @@ fn wait_for_file(p: &Path, total: Duration) -> bool {
 #[test]
 fn server_start_detach_writes_pid_and_endpoint_then_stop_cleans_up() {
     let Some(bin) = locate_binary() else {
-        eprintln!("skipping: cipherroute binary not found");
+        eprintln!("skipping: zeroproxy binary not found");
         return;
     };
 
@@ -91,8 +91,8 @@ fn server_start_detach_writes_pid_and_endpoint_then_stop_cleans_up() {
         String::from_utf8_lossy(&start.stderr)
     );
 
-    let pid_file = dir.path().join("cipherroute.pid");
-    let endpoint_file = dir.path().join("cipherroute.endpoint");
+    let pid_file = dir.path().join("zeroproxy.pid");
+    let endpoint_file = dir.path().join("zeroproxy.endpoint");
     assert!(
         wait_for_file(&pid_file, Duration::from_secs(3)),
         "pid file not created"

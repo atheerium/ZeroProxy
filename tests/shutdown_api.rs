@@ -19,7 +19,7 @@ impl ServerHandle {
     async fn start(node_env: &str, shutdown_secret: Option<&str>) -> Self {
         let temp_dir = tempfile::tempdir().expect("tempdir");
         let port = free_port();
-        let bin = std::env::var("CARGO_BIN_EXE_cipherroute").expect("cipherroute binary path");
+        let bin = std::env::var("CARGO_BIN_EXE_zeroproxy").expect("zeroproxy binary path");
 
         let mut command = Command::new(bin);
         command
@@ -37,7 +37,7 @@ impl ServerHandle {
             command.env_remove("SHUTDOWN_SECRET");
         }
 
-        let child = command.spawn().expect("spawn cipherroute");
+        let child = command.spawn().expect("spawn zeroproxy");
         let client = reqwest::Client::new();
         let base_url = format!("http://127.0.0.1:{port}");
         wait_for_ready(&client, &base_url).await;
