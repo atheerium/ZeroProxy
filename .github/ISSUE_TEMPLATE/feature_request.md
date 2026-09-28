@@ -6,7 +6,7 @@ labels: ["enhancement"]
 ---
 
 ## Summary
-<!-- One sentence — what should cipherroute do that it doesn't today? -->
+<!-- One sentence — what should zeroproxy do that it doesn't today? -->
 
 ## Buyer / problem
 <!-- Who pays / who benefits, and what measurable problem it solves (follow AGENTS.md money-flow reasoning). -->
@@ -21,4 +21,4 @@ labels: ["enhancement"]
 <!-- How you'd verify it: `cargo test`, `curl /v1/chat/completions`, dashboard screenshot. -->
 
 ## Additional context
-<!-- Bead epic, docs/parity-9router.md divergence, or schema stability impact (cipherroute.v1.* additive only). -->
+<!-- Bead epic, docs/parity-9router.md divergence, or schema stability impact (zeroproxy.v1.* additive only). -->

@@ -1,11 +1,11 @@
 ---
 name: zeroproxy
-description: Install, initialize, and operate CipherRoute from the CLI — either guiding a human through setup or driving it fully autonomously as an agent. Use whenever the user asks to install the zeroproxy binary, start the local AI router on 127.0.0.1:4623, configure providers / combos / keys, or wire an AI coding CLI (Claude Code, Codex, Cursor, Cline, OpenClaw, Copilot, …) into CipherRoute.
+description: Install, initialize, and operate ZeroProxy from the CLI — either guiding a human through setup or driving it fully autonomously as an agent. Use whenever the user asks to install the zeroproxy binary, start the local AI router on 127.0.0.1:4623, configure providers / combos / keys, or wire an AI coding CLI (Claude Code, Codex, Cursor, Cline, OpenClaw, Copilot, …) into ZeroProxy.
 ---
 
 # zeroproxy — install & operate from the CLI
 
-[CipherRoute](https://github.com/atheerium/zeroproxy) is a single-binary AI router that exposes an OpenAI-compatible API on `127.0.0.1:4623` and fans out to 40+ providers with auto-fallback. This skill walks an agent through:
+[ZeroProxy](https://github.com/atheerium/ZeroProxy) is a single-binary AI router that exposes an OpenAI-compatible API on `127.0.0.1:4623` and fans out to 40+ providers with auto-fallback. This skill walks an agent through:
 
 1. Installing or upgrading the `zeroproxy` binary
 2. Initializing a data dir and capturing the admin API key
@@ -213,7 +213,7 @@ Most AI CLIs accept an OpenAI-compatible base URL and a bearer token:
 | Claude Code | `~/.claude/config.json` → `anthropic_api_base` | `http://127.0.0.1:4623/v1` |
 | OpenClaw | dashboard → CLI Tools → OpenClaw | one-click apply |
 
-The bearer is the admin key captured in step 2, or any key minted via `zeroproxy key add`. CipherRoute also has a `tool` subcommand (`zeroproxy tool …`) that can apply these settings programmatically — run `zeroproxy tool --help` to see the matrix of supported tools in the installed binary.
+The bearer is the admin key captured in step 2, or any key minted via `zeroproxy key add`. ZeroProxy also has a `tool` subcommand (`zeroproxy tool …`) that can apply these settings programmatically — run `zeroproxy tool --help` to see the matrix of supported tools in the installed binary.
 
 ## 6 · Verifications
 
@@ -240,7 +240,7 @@ zeroproxy server stop
 
 ## 7 · Sync provider catalog from upstream routers (optional)
 
-CipherRoute ships with an embedded snapshot of provider/model catalogs from
+ZeroProxy ships with an embedded snapshot of provider/model catalogs from
 two sister open-source routers — [9router](https://github.com/atheerium/9router)
 and [OmniRoute](https://github.com/diegosouzapw/OmniRoute). The `sync`
 subcommand applies those snapshots to the user's `db.json` so new models
@@ -298,7 +298,7 @@ Maintainers refresh the embedded snapshots by running
 ## When _not_ to use this skill
 
 - The user has zeroproxy running and wants help debugging combo dispatch — use `.agents/skills/testing-combo-fallback/SKILL.md` instead.
-- The user is asking about cloud-hosted multi-tenant CipherRoute — out of scope; this skill covers the local single-binary mode only.
+- The user is asking about cloud-hosted multi-tenant ZeroProxy — out of scope; this skill covers the local single-binary mode only.
 - The user explicitly wants to `--from-source` build zeroproxy from scratch — follow the README's "Build from source" section; this skill optimizes for the prebuilt-binary path.
 
 ## See also
