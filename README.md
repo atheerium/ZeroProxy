@@ -31,6 +31,7 @@
 - [Development](#development)
 - [How it works](#how-it-works)
 - [Project lineage](#project-lineage)
+- [Secondary: MCP and A2A (extras, not headline features)](#secondary-mcp-and-a2a-extras-not-headline-features)
 - [Troubleshooting](#troubleshooting)
 
 ---
@@ -803,6 +804,85 @@ The name changed on the way here — the binary was `cipherroute`, then `openpro
 `zeroproxy`; the schema namespace was `cipherroute.v1`. Those legacy names survive in
 environment variables and a few internal paths on purpose, because renaming them would
 break existing deployments.
+
+---
+
+## Secondary: MCP and A2A (extras, not headline features)
+
+ZeroProxy exposes two optional protocol adapters. They are registered and working, but
+they are **not** part of the product's core — the free-tier catalog, provider routing,
+combos and the CLI are. They are documented here so nothing is hidden, not because you
+need them. AGENTS.md's standing guidance is that these are bloat that should not be
+ported from upstream; they are here because they already exist, not because they are
+planned to grow. Neither has a dashboard page — both are API-only.
+
+### MCP — let an MCP client drive the router
+
+Two independent modes:
+
+**Native server mode** implements MCP JSON-RPC 2.0 directly, with a built-in registry of
+**17 administrative tools** so a client such as Claude Desktop, Cursor or Cline can
+inspect and change the router without a child process:
+
+| Tool | Purpose |
+|---|---|
+| `provider_list` / `provider_create` / `provider_delete` / `provider_test` | provider connections |
+| `key_list` / `key_create` / `key_delete` | API keys |
+| `combo_list` / `combo_create` | combos |
+| `pool_list` / `pool_create` / `pool_delete` | proxy pools |
+| `node_list` | provider nodes |
+| `models_list` | model catalog |
+| `health` | router health |
+| `settings_get` | settings read |
+| `usage_status` | quota and usage status |
+
+```
+POST /api/mcp                      # stateless JSON-RPC — no SSE needed
+GET  /api/mcp-server/sse           # long-lived SSE transport
+POST /api/mcp-server/message       # SSE message channel
+```
+
+Verbs handled: `initialize`, `tools/list`, `tools/call`, `resources/list`,
+`resources/read`.
+
+> **These routes carry no authentication at all, under any setting.** `mcp::routes()`
+> and `mcp_server::routes()` are merged with no `route_layer`
+> (`src/server/api/mod.rs:400-401`), and the only app-wide layer is a metrics and
+> request-id counter, applied explicitly "before any auth" (`mod.rs:411`). The
+> `provider_create`, `key_create` and `*_delete` tools are reachable by anyone who can
+> open a TCP connection. Verified against a running server: an unauthenticated
+> `tools/list` returns the full tool list. On the default loopback bind that is tolerable;
+> if you set `HOST=0.0.0.0` to reach the router from your LAN, this becomes a real hole
+> and you need a reverse proxy with auth in front of it.
+
+**Stdio-bridge mode** spawns external MCP child processes and bridges their stdio to SSE,
+for plugins configured locally:
+
+```
+GET  /api/mcp/{plugin}/sse
+POST /api/mcp/{plugin}/message
+```
+
+### A2A — expose the router as an agent
+
+Publishes a ZeroProxy Agent Card so another agent can discover and call it. These routes
+do carry an auth layer — `route_layer(guard::require_admin)` at `src/server/api/a2a.rs:41` —
+but read that as conditional, not absolute. `require_admin` accepts a valid management API
+key or dashboard password, and otherwise **fails open**: if the dashboard has no password
+set, or `require_login` is off, it returns `Ok` for anyone (`src/server/api/mod.rs:658`).
+The guard only bites once you have set a dashboard password and enabled login, which is the
+recommended configuration anyway. The MCP routes above have no such layer under any
+setting.
+
+| Route | Purpose |
+|---|---|
+| `GET /.well-known/agent.json` | standard Agent Card discovery |
+| `GET /api/a2a/agent-card` | the same card as JSON |
+| `POST /api/a2a/tasks/send` | submit a task |
+| `GET /api/a2a/tasks/{id}` | task status |
+| `POST /api/a2a/tasks/{id}/cancel` | cancel a task |
+
+Card capabilities: streaming on, push notifications off, state-transition history on.
 
 ---
 
