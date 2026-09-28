@@ -819,22 +819,29 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1917 passed, 0 failed** (measured on a
-  clean `main` @ `a142686f`, 2026-09-27). Keep it that way; a red merge is not worth landing,
-  because it destroys the only thing that makes the gate worth having.
-  **Count it, do not recall it.** I had 1905 written here for weeks, then 1913, and both were
-  wrong — they were the count *at the moment I last ran the suite*, and every test-adding commit
-  silently invalidated them. A branch whose diff touches no `.rs` file must produce the same
-  number; if it does not, the recorded baseline is stale and the branch is not what you think it
-  is. Re-measure and correct this line whenever the count moves.
-- Integration tests under `tests/` are intentionally excluded (their build was repaired separately
-  — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
-  is *not* the gate.
+- **The gate is green: `cargo test --lib --all-features` → 1928 passed, 0 failed.** Keep it that
+  way; a red merge is not worth landing, because it destroys the only thing that makes the gate
+  worth having.
+  **Count it, do not recall it.** I had 1905 written here for weeks, then 1913, then 1917, and all
+  three were wrong — each was the count *at the moment I last ran the suite*, and every
+  test-adding commit silently invalidated it. Re-measured **1928** on 2026-09-28; that is now
+  stale four times over (1905 → 1913 → 1936 → 1917 → 1928). A branch whose diff touches no `.rs`
+  file must produce the same number; if it does not, the recorded baseline is stale and the
+  branch is not what you think it is. The check that settles it: `git grep -oE 'fn [a-z0-9_]+\(\)'`
+  over `src/**` and diff the name set against `main` — if the names are identical, a different
+  count means the recorded number is wrong, not that the branch broke something.
+- Integration tests under `tests/` are intentionally excluded from the gate, so a green
+  `cargo test --lib` says nothing about them. But they are no longer merely "unmeasured": they
+  compile (`cargo build --tests` exit 0) and the four suites the brand sweep touched now run
+  green — `cli_tool_native_settings_api` 14, `db_backups_api` 5, `cowork_settings_api` 4,
+  `sync_cli` 4, 0 failed. They had been asserting strings the backend stopped emitting, so they
+  were **red before that sweep**, not merely unproven. Treat them as a second gate when you touch
+  `src/server/api/cli_tools/`.
 - Unit tests live in `src/**` as `#[cfg(test)]` modules (~224 files) — this is why `--lib` is
   the CI gate; parity locks need no network.
-- Web: `pnpm --dir web test` (vitest, **4** suites: `analyticsFormatting`, `availableModels`,
-  `providersPage`, `chatStream` — 71 tests. `brandMigration` is a 5th, added by the 2026-09-28
-  brand sweep).
+- Web: `pnpm --dir web test` (vitest, **6** suites / 81 tests: `analyticsFormatting`,
+  `availableModels`, `providersPage`, `chatStream`, `freeModels`, `brandMigration` —
+  re-measured 2026-09-28; a previously recorded "2 suites" was stale by four.)
 - `astro check` is **advisory** everywhere (`|| true` in CI, `|| echo advisory` in dev.sh) — fix
   new errors, don't chase the existing backlog.
 - `cargo clippy --all-targets --all-features` — no `-D warnings`; it fails only on real errors.
