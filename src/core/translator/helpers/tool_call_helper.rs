@@ -55,6 +55,169 @@ fn sanitize_tool_id(id: &str) -> Option<String> {
     }
 }
 
+fn is_usable_tool_call(tc: &Value) -> bool {
+    let Some(obj) = tc.as_object() else {
+        return false;
+    };
+    let Some(func) = obj.get("function").and_then(|v| v.as_object()) else {
+        return false;
+    };
+    let Some(name) = func.get("name").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    !name.trim().is_empty()
+}
+
+fn is_usable_tool_use(block: &Value) -> bool {
+    let Some(obj) = block.as_object() else {
+        return false;
+    };
+    let Some(name) = obj.get("name").and_then(|v| v.as_str()) else {
+        return false;
+    };
+    !name.trim().is_empty()
+}
+
+fn is_content_effectively_empty(content: &Value) -> bool {
+    match content {
+        Value::Null => true,
+        Value::String(s) => s.trim().is_empty(),
+        Value::Array(arr) => {
+            if arr.is_empty() {
+                return true;
+            }
+            arr.iter().all(|block| {
+                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                if block_type == "text" {
+                    block
+                        .get("text")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s.trim().is_empty())
+                        .unwrap_or(true)
+                } else {
+                    false
+                }
+            })
+        }
+        _ => false,
+    }
+}
+
+/// Remove degenerate tool_calls (missing/empty function.name) and
+/// degenerate Claude tool_use blocks (missing/empty name) from assistant messages.
+/// Runs BEFORE ensure_tool_call_ids so ids are never minted for dead entries.
+pub fn prune_degenerate_tool_calls(body: &mut Value) {
+    let Some(messages) = body.get_mut("messages").and_then(|v| v.as_array_mut()) else {
+        return;
+    };
+
+    for msg in messages.iter_mut() {
+        let Some(obj) = msg.as_object_mut() else {
+            continue;
+        };
+
+        let role = obj.get("role").and_then(|v| v.as_str());
+        if role != Some("assistant") {
+            continue;
+        }
+
+        if let Some(tcs) = obj.get_mut("tool_calls").and_then(|v| v.as_array_mut()) {
+            tcs.retain(is_usable_tool_call);
+            if tcs.is_empty() {
+                obj.remove("tool_calls");
+            }
+        }
+
+        if let Some(content) = obj.get_mut("content").and_then(|v| v.as_array_mut()) {
+            content.retain(|block| {
+                let block_type = block.get("type").and_then(|v| v.as_str()).unwrap_or("");
+                if block_type == "tool_use" {
+                    is_usable_tool_use(block)
+                } else {
+                    true
+                }
+            });
+            if content.is_empty() {
+                obj.remove("content");
+            }
+        }
+    }
+}
+
+/// Repair assistant turns that would serialize with no usable content.
+/// OpenAI-shaped bodies only; runs AFTER `prune_degenerate_tool_calls` so it
+/// sees the final `tool_calls` state.
+///
+/// Promotes `reasoning` / `reasoning_content` into `content` — free-tier
+/// reasoning models answer with `content: null` because the whole turn went
+/// into `reasoning`, and replaying that verbatim is a 400.
+///
+/// **Otherwise the message is dropped, not blanked.** With no content, no tool
+/// calls and no reasoning it holds zero information, and `content: ""` is not a
+/// repair: Cohere answers `missing required parameter: 'messages[1].content'` for
+/// it, so blanking just relocates the 400. On the translation path this drop is a
+/// no-op — `filter_to_openai_format` already retains blank-content messages away —
+/// which is what makes the pass safe to also run without a format conversion.
+pub fn repair_empty_assistant_content(body: &mut Value) {
+    let Some(messages) = body.get_mut("messages").and_then(|v| v.as_array_mut()) else {
+        return;
+    };
+
+    let mut promote: Vec<(usize, String)> = Vec::new();
+    let mut drop_at: Vec<usize> = Vec::new();
+    for (i, msg) in messages.iter().enumerate() {
+        let Some(obj) = msg.as_object() else {
+            continue;
+        };
+
+        if obj.get("role").and_then(|v| v.as_str()) != Some("assistant") {
+            continue;
+        }
+
+        let has_tool_calls = obj
+            .get("tool_calls")
+            .and_then(|v| v.as_array())
+            .map(|arr| !arr.is_empty())
+            .unwrap_or(false);
+
+        if has_tool_calls {
+            continue;
+        }
+
+        let is_empty = obj
+            .get("content")
+            .map(is_content_effectively_empty)
+            .unwrap_or(true);
+
+        if !is_empty {
+            continue;
+        }
+
+        let reasoning = obj
+            .get("reasoning")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty());
+        let reasoning_content = obj
+            .get("reasoning_content")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.trim().is_empty());
+
+        match reasoning.or(reasoning_content) {
+            Some(text) => promote.push((i, text.to_string())),
+            None => drop_at.push(i),
+        }
+    }
+
+    for (i, text) in promote {
+        if let Some(obj) = messages[i].as_object_mut() {
+            obj.insert("content".to_string(), Value::String(text));
+        }
+    }
+    for i in drop_at.into_iter().rev() {
+        messages.remove(i);
+    }
+}
+
 /// Validate / repair every tool_call id in `body.messages`. Mutates in
 /// place. Mirrors `ensureToolCallIds` in 9router.
 pub fn ensure_tool_call_ids(body: &mut Value) {
@@ -378,5 +541,161 @@ mod tests {
         ]});
         let ids = get_tool_call_ids(&assistant);
         assert!(has_tool_results(&user_with_result, &ids));
+    }
+
+    #[test]
+    fn prune_removes_degenerate_tool_call_with_empty_function() {
+        let mut body = json!({"messages": [
+            {"role": "user", "content": "list files"},
+            {"role": "assistant", "content": "", "tool_calls": [{}]}
+        ]});
+        prune_degenerate_tool_calls(&mut body);
+        let msg = &body["messages"][1];
+        assert!(msg.get("tool_calls").is_none());
+    }
+
+    #[test]
+    fn prune_keeps_valid_tool_call_and_removes_degenerate() {
+        let mut body = json!({"messages": [
+            {"role": "user", "content": "list files"},
+            {"role": "assistant", "content": "", "tool_calls": [
+                {},
+                {"id": "c1", "type": "function", "function": {"name": "WebSearch", "arguments": "{}"}}
+            ]}
+        ]});
+        prune_degenerate_tool_calls(&mut body);
+        let msg = &body["messages"][1];
+        let tcs = msg.get("tool_calls").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(tcs.len(), 1);
+        assert_eq!(tcs[0]["function"]["name"], "WebSearch");
+    }
+
+    #[test]
+    fn prune_removes_tool_calls_key_when_array_empty() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": "hello", "tool_calls": []}
+        ]});
+        prune_degenerate_tool_calls(&mut body);
+        let msg = &body["messages"][0];
+        assert!(msg.get("tool_calls").is_none());
+    }
+
+    #[test]
+    fn prune_handles_claude_tool_use_with_blank_name() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "tu1", "name": "", "input": {}},
+                {"type": "tool_use", "id": "tu2", "name": "WebSearch", "input": {}}
+            ]}
+        ]});
+        prune_degenerate_tool_calls(&mut body);
+        let msg = &body["messages"][0];
+        let content = msg.get("content").and_then(|v| v.as_array()).unwrap();
+        assert_eq!(content.len(), 1);
+        assert_eq!(content[0]["name"], "WebSearch");
+    }
+
+    #[test]
+    fn prune_removes_content_key_when_all_tool_use_pruned() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "tu1", "name": "", "input": {}}
+            ]}
+        ]});
+        prune_degenerate_tool_calls(&mut body);
+        let msg = &body["messages"][0];
+        assert!(msg.get("content").is_none());
+    }
+
+    #[test]
+    fn repair_promotes_reasoning_to_content() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": null, "reasoning": "thinking hard"}
+        ]});
+        repair_empty_assistant_content(&mut body);
+        let msg = &body["messages"][0];
+        assert_eq!(msg["content"], "thinking hard");
+    }
+
+    #[test]
+    fn repair_promotes_reasoning_content_to_content() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": "", "reasoning_content": "thinking hard"}
+        ]});
+        repair_empty_assistant_content(&mut body);
+        let msg = &body["messages"][0];
+        assert_eq!(msg["content"], "thinking hard");
+    }
+
+    #[test]
+    fn repair_drops_assistant_when_no_reasoning() {
+        let mut body = json!({"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": null}
+        ]});
+        repair_empty_assistant_content(&mut body);
+        let arr = body["messages"].as_array().unwrap();
+        assert_eq!(arr.len(), 1);
+        assert_eq!(arr[0]["role"], "user");
+    }
+
+    #[test]
+    fn repair_drops_assistant_for_whitespace_content() {
+        let mut body = json!({"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": "   "}
+        ]});
+        repair_empty_assistant_content(&mut body);
+        assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn repair_drops_assistant_for_array_content_with_blank_text_blocks() {
+        let mut body = json!({"messages": [
+            {"role": "user", "content": "hi"},
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "  "},
+                {"type": "text", "text": ""}
+            ]}
+        ]});
+        repair_empty_assistant_content(&mut body);
+        assert_eq!(body["messages"].as_array().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn repair_does_not_touch_tool_user_system_messages() {
+        let mut body = json!({"messages": [
+            {"role": "tool", "content": null, "tool_call_id": "1"},
+            {"role": "user", "content": null},
+            {"role": "system", "content": null}
+        ]});
+        let before = body.clone();
+        repair_empty_assistant_content(&mut body);
+        assert_eq!(body, before);
+    }
+
+    #[test]
+    fn repair_leaves_well_formed_assistant_unchanged() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": "hello world", "tool_calls": [
+                {"id": "c1", "type": "function", "function": {"name": "WebSearch", "arguments": "{}"}}
+            ]}
+        ]});
+        let before = body.clone();
+        repair_empty_assistant_content(&mut body);
+        assert_eq!(body, before);
+    }
+
+    #[test]
+    fn repair_does_not_corrupt_claude_shaped_assistant() {
+        let mut body = json!({"messages": [
+            {"role": "assistant", "content": [
+                {"type": "text", "text": "hello"},
+                {"type": "tool_use", "id": "tu1", "name": "WebSearch", "input": {}}
+            ]}
+        ]});
+        let before = body.clone();
+        repair_empty_assistant_content(&mut body);
+        assert_eq!(body, before);
     }
 }

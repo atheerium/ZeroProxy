@@ -567,6 +567,34 @@ commit can land on the wrong branch or sweep in unrelated files, which is its ow
 error. Report the state, ask once, act on the answer. This applies to this file too: a `docs(agents)`
 rule written but left uncommitted protects nobody.
 
+### 15. `apply_normalization_hooks` was DEAD CODE for every OpenAI→OpenAI request
+The request dispatch in `src/server/api/chat.rs` was `if passthrough {…} else if
+plan.needs_translation() { translate_request_with_strip(…) }` — **with no third arm**. And
+`needs_translation()` is `source_format != target_format`, so an OpenAI client talking to an
+OpenAI-compatible provider (OpenRouter, Kilo — both of which `get_target_format_for_provider`
+maps to `_ => Format::OpenAi`) matched *neither* branch. `translate_request` is the only other
+caller of the normalization pass, so **`ensure_tool_call_ids`, `normalize_developer_role` and
+`fix_missing_tool_responses` never ran for those requests either** — not just the new
+degenerate-tool-call repair. The hooks' own doc comment already claimed they were "always run
+regardless of translation"; the call site never honoured it, so the comment was the lie.
+
+Fixed by exporting `registry::normalize_openai_messages(body, target)` and calling it from a new
+`else` arm. The two arms are mutually exclusive, so nothing is applied twice. **The lesson is
+general: adding a repair inside `translate_request` does not mean it runs.** A defensive
+normalization belongs on the path that serves the *untranslated* request, and "the request
+format equals the provider format" is by far the most common case in production — check the
+dispatch `if`/`else if` chain, not just the helper.
+
+Cost of the gap: a Cohere 400 reached the client verbatim
+(`invalid request: invalid message provided at index 1: must have non-empty content or tool
+calls.`, surfaced inside OpenRouter's `metadata.raw`). Two independent upstream realities
+compounded — free-tier reasoning models answer with `content: null` because the whole turn went
+into `reasoning`, and free-tier small models emit truncated tool calls — and nothing on our side
+repaired either. Note `content: ""` is **not** a repair: Cohere answers `missing required
+parameter: 'messages[1].content'` for it, so a zero-information assistant turn must be **dropped**,
+not blanked. Dropping is safe because `filter_to_openai_format` already retains blank-content
+messages away, so the behaviour only changes on the path that had no such filter.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`

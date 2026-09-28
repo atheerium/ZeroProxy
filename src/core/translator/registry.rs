@@ -476,7 +476,7 @@ impl TranslationRegistry {
             strip_content_types(body, list);
         }
 
-        apply_normalization_hooks(body);
+        apply_normalization_hooks(body, target);
 
         // Target-format post-hooks (9router translator/index.js:124-128).
         // preserveCacheControl follows the provider quirk (alicode / alicode-intl
@@ -632,18 +632,33 @@ impl TranslationRegistry {
 /// Apply normalization hooks that are always run regardless of translation.
 /// Mirrors the hooks in open-sse/translator/index.js:
 ///   stripContentTypes, normalizeThinkingConfig, ensureToolCallIds, fixMissingToolResponses
-fn apply_normalization_hooks(body: &mut Value) -> bool {
+fn apply_normalization_hooks(body: &mut Value, target: Format) -> bool {
     // normalizeThinkingConfig (9router): drop thinking on non-user turns
     normalize_thinking_config(body);
     // normalizeDeveloperRole: rewrite role "developer" -> "system" so
     // OAI-compat providers (DeepSeek, Groq, Ollama, …) that pre-date the
     // Codex CLI role split don't 400 on the request.
     crate::core::translator::helpers::openai_helper::normalize_developer_role(body);
-    // ensureToolCallIds: ensure tool_calls have ids (full impl from tool_call_helper)
+    crate::core::translator::helpers::tool_call_helper::prune_degenerate_tool_calls(body);
     crate::core::translator::helpers::tool_call_helper::ensure_tool_call_ids(body);
-    // fixMissingToolResponses: insert empty tool_result if needed (full impl from tool_call_helper)
     crate::core::translator::helpers::tool_call_helper::fix_missing_tool_responses(body);
+    if target == Format::OpenAi || target == Format::OpenAiResponses || target == Format::Codex {
+        crate::core::translator::helpers::tool_call_helper::repair_empty_assistant_content(body);
+    }
     true
+}
+
+/// Run [`apply_normalization_hooks`] on a body that is already in `target` shape.
+///
+/// `translate_request` applies the hooks itself, but it is only reachable when
+/// the source and target formats differ — so an OpenAI→OpenAI request (an
+/// OpenAI client talking to an OpenAI-compatible provider such as OpenRouter or
+/// Kilo) used to skip the entire pass, including the pre-existing
+/// `ensure_tool_call_ids` and `fix_missing_tool_responses`. Callers must invoke
+/// this in the non-translating branch, and must not also call
+/// `translate_request` for the same body.
+pub fn normalize_openai_messages(body: &mut Value, target: Format) -> bool {
+    apply_normalization_hooks(body, target)
 }
 
 /// Strip specific content types from messages (opt-in via stripList).
@@ -710,9 +725,12 @@ pub fn filter_to_openai_format(body: &mut Value, preserve_cache_control: bool) {
         }
 
         // Keep assistant messages with tool_calls as-is
-        if msg.get("role").and_then(Value::as_str) == Some("assistant")
-            && msg.get("tool_calls").is_some()
-        {
+        let has_tool_calls = msg
+            .get("tool_calls")
+            .and_then(Value::as_array)
+            .map(|arr| !arr.is_empty())
+            .unwrap_or(false);
+        if msg.get("role").and_then(Value::as_str) == Some("assistant") && has_tool_calls {
             continue;
         }
 
@@ -779,8 +797,13 @@ pub fn filter_to_openai_format(body: &mut Value, preserve_cache_control: bool) {
         if role == "tool" {
             return true;
         }
-        // Always keep assistant messages with tool_calls
-        if role == "assistant" && msg.get("tool_calls").is_some() {
+        // Always keep assistant messages with non-empty tool_calls
+        let has_tool_calls = msg
+            .get("tool_calls")
+            .and_then(Value::as_array)
+            .map(|arr| !arr.is_empty())
+            .unwrap_or(false);
+        if role == "assistant" && has_tool_calls {
             return true;
         }
         // Check content
@@ -1278,5 +1301,146 @@ mod parity_tests {
         assert!(content
             .iter()
             .any(|b| b.get("type").and_then(Value::as_str) == Some("text")));
+    }
+
+    #[test]
+    fn translate_request_prunes_degenerate_tool_calls_for_openai_target() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "list files"},
+                {"role": "assistant", "content": "", "tool_calls": [{}]}
+            ]
+        });
+        let reg = global_registry();
+        reg.translate_request(
+            Format::OpenAi,
+            Format::OpenAi,
+            "test-model",
+            &mut body,
+            false,
+            None,
+        );
+        let messages = body["messages"].as_array().unwrap();
+        for msg in messages {
+            if let Some(tcs) = msg.get("tool_calls").and_then(|v| v.as_array()) {
+                for tc in tcs {
+                    let name = tc
+                        .get("function")
+                        .and_then(|f| f.get("name"))
+                        .and_then(|v| v.as_str());
+                    assert!(
+                        name.is_some_and(|n| !n.trim().is_empty()),
+                        "no degenerate tool_call should reach output"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn translate_request_keeps_valid_tool_calls_for_openai_target() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "search web"},
+                {"role": "assistant", "content": "", "tool_calls": [
+                    {"id": "call_1", "type": "function", "function": {"name": "WebSearch", "arguments": "{}"}}
+                ]}
+            ]
+        });
+        let reg = global_registry();
+        reg.translate_request(
+            Format::OpenAi,
+            Format::OpenAi,
+            "test-model",
+            &mut body,
+            false,
+            None,
+        );
+        let messages = body["messages"].as_array().unwrap();
+        let assistant_msg = &messages[1];
+        let tcs = assistant_msg
+            .get("tool_calls")
+            .and_then(|v| v.as_array())
+            .unwrap();
+        assert_eq!(tcs.len(), 1);
+        assert_eq!(tcs[0]["function"]["name"], "WebSearch");
+    }
+
+    #[test]
+    fn translate_request_does_not_run_repair_for_claude_target() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": [
+                    {"type": "text", "text": "hello"},
+                    {"type": "tool_use", "id": "tu1", "name": "WebSearch", "input": {}}
+                ]}
+            ]
+        });
+        let reg = global_registry();
+        reg.translate_request(
+            Format::OpenAi,
+            Format::Claude,
+            "test-model",
+            &mut body,
+            false,
+            None,
+        );
+        let messages = body["messages"].as_array().unwrap();
+        let assistant_msg = &messages[1];
+        assert!(assistant_msg
+            .get("content")
+            .and_then(|v| v.as_array())
+            .is_some());
+    }
+
+    // The reported production 400. An OpenAI client talking to an
+    // OpenAI-compatible provider (OpenRouter, Kilo) never reaches
+    // translate_request — source_format == target_format — so this is the entry
+    // point that actually serves those requests.
+    #[test]
+    fn normalize_openai_messages_reproduces_cohere_400_input() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "list files"},
+                {"role": "assistant", "content": "", "tool_calls": [{}]}
+            ]
+        });
+        normalize_openai_messages(&mut body, Format::OpenAi);
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 1, "the zero-information turn must be gone");
+        assert_eq!(messages[0]["role"], "user");
+    }
+
+    #[test]
+    fn normalize_openai_messages_promotes_reasoning_only_turn() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "say hi"},
+                {"role": "assistant", "content": null, "reasoning": "thinking hard"}
+            ]
+        });
+        normalize_openai_messages(&mut body, Format::OpenAi);
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 2);
+        assert_eq!(messages[1]["content"], "thinking hard");
+    }
+
+    #[test]
+    fn normalize_openai_messages_keeps_valid_tool_call_and_its_result() {
+        let mut body = json!({
+            "messages": [
+                {"role": "user", "content": "search web"},
+                {"role": "assistant", "content": "", "tool_calls": [
+                    {"id": "call_1", "type": "function", "function": {"name": "WebSearch", "arguments": "{}"}}
+                ]},
+                {"role": "tool", "tool_call_id": "call_1", "content": "results"}
+            ]
+        });
+        normalize_openai_messages(&mut body, Format::OpenAi);
+        let messages = body["messages"].as_array().unwrap();
+        assert_eq!(messages.len(), 3, "a real tool turn must survive intact");
+        let tcs = messages[1]["tool_calls"].as_array().unwrap();
+        assert_eq!(tcs[0]["function"]["name"], "WebSearch");
     }
 }

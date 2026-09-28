@@ -1331,6 +1331,14 @@ async fn execute_single_model(
                 Some(&strip_refs)
             },
         );
+    } else {
+        // Same source and target format: no transform runs, but the body still
+        // has to be a valid OpenAI-shaped request. translate_request is the only
+        // other caller of the normalization pass, so without this an
+        // OpenAI→OpenAI provider (OpenRouter, Kilo, …) receives the client's
+        // history verbatim — degenerate tool calls and reasoning-only assistant
+        // turns included, which is a 400 from Cohere/Novita-class backends.
+        registry::normalize_openai_messages(&mut body, plan.target_format);
     }
 
     // 3b. Re-apply model(level) thinking onto provider-native fields
