@@ -24,9 +24,15 @@ fi
 #    API takes literally ("grantTypes": ["refresh_token", ...]), so a bare-word
 #    match here blocks every correct OIDC implementation. Require an assignment
 #    followed by a plausible-length value.
+#
+#    The refresh_token name is spelled as an explicit case alternation, NOT with
+#    `(?i)` or `[Rr]efresh`: this is GNU grep -E, where `(?i:...)` is unsupported
+#    (the alternative silently goes inert, disabling the whole check) and
+#    `[Rr]efresh_[Tt]oken` still misses the all-caps `REFRESH_TOKEN=` form that a
+#    .env file actually uses. Both were tried and both failed the matrix below.
 BASE=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD HEAD~1 2>/dev/null || echo "HEAD~1")
 DIFF=$(git diff "$BASE"..HEAD -U0 2>/dev/null || true)
-SECRET_RE='sk-[a-zA-Z0-9]{20,}|refresh_token["'"'"']?[[:space:]]*[:=]>?[[:space:]]*["'"'"']?[A-Za-z0-9_.-]{16,}|Bearer[[:space:]]+[A-Za-z0-9_.-]{20,}|BEGIN (RSA|EC) PRIVATE KEY'
+SECRET_RE='sk-[a-zA-Z0-9]{20,}|(refresh_token|Refresh_Token|REFRESH_TOKEN)["'"'"']?[[:space:]]*[:=]>?[[:space:]]*["'"'"']?[A-Za-z0-9_.-]{16,}|Bearer[[:space:]]+[A-Za-z0-9_.-]{20,}|BEGIN (RSA|EC) PRIVATE KEY'
 if echo "$DIFF" | grep -qE "$SECRET_RE"; then
   echo "!! pre-push: outgoing diff contains potential secret"
   exit 1
