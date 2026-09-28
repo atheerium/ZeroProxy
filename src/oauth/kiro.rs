@@ -160,13 +160,13 @@ fn auth_service_base_url() -> String {
 }
 
 /// Resolve the configurable AWS OIDC base URL for a given region.
+///
+/// Delegates to [`super::kiro_oidc_base_url`], the single source of truth that the
+/// live device-code routes in `mod.rs` also use. It used to re-read
+/// `CIPHERROUTE_KIRO_OIDC_BASE_URL` independently, which meant the env override
+/// was implemented twice and the two copies could drift.
 fn oidc_base_url(region: &str) -> String {
-    std::env::var("CIPHERROUTE_KIRO_OIDC_BASE_URL")
-        .ok()
-        .filter(|v| !v.trim().is_empty())
-        .unwrap_or_else(|| format!("https://oidc.{region}.amazonaws.com"))
-        .trim_end_matches('/')
-        .to_string()
+    super::kiro_oidc_base_url(region)
 }
 
 // ---------------------------------------------------------------------------
