@@ -88,20 +88,8 @@ const CLINE_AUTHORIZE_URL: &str = "https://api.cline.bot/api/v1/auth/authorize";
 const CLINE_TOKEN_URL: &str = "https://api.cline.bot/api/v1/auth/token";
 const KIRO_SOCIAL_REDIRECT_URI: &str = "kiro://kiro.kiroAgent/authenticate-success";
 const KIRO_SOCIAL_REDIRECT_URI_ENCODED: &str = "kiro%3A%2F%2Fkiro.kiroAgent%2Fauthenticate-success";
-const KIRO_DEFAULT_START_URL: &str = "https://view.awsapps.com/start";
-const KIRO_ISSUER_URL: &str = "https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6";
-const KIRO_CLIENT_NAME: &str = "kiro-oauth-client";
-const KIRO_CLIENT_TYPE: &str = "public";
-const KIRO_DEFAULT_REGION: &str = "us-east-1";
-const KIRO_SCOPES: &[&str] = &[
-    "codewhisperer:completions",
-    "codewhisperer:analysis",
-    "codewhisperer:conversations",
-];
-const KIRO_GRANT_TYPES: &[&str] = &[
-    "urn:ietf:params:oauth:grant-type:device_code",
-    "refresh_token",
-];
+const KIRO_DEFAULT_START_URL: &str = crate::oauth::KIRO_DEFAULT_START_URL;
+const KIRO_DEFAULT_REGION: &str = crate::oauth::KIRO_DEFAULT_REGION;
 const CODEX_PROXY_TIMEOUT_MS: u64 = 300_000;
 
 /// Per-provider refresh locks to prevent Auth0 `refresh_token_reused` errors.
@@ -505,13 +493,6 @@ struct KiroCompatExtraData {
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
-struct KiroClientRegistrationResponse {
-    client_id: String,
-    client_secret: String,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
 struct KiroDeviceAuthorizationResponse {
     device_code: String,
     user_code: String,
@@ -803,12 +784,7 @@ fn kiro_auth_service_base_url() -> String {
 }
 
 fn kiro_oidc_base_url(region: &str) -> String {
-    std::env::var("CIPHERROUTE_KIRO_OIDC_BASE_URL")
-        .ok()
-        .filter(|value| !value.trim().is_empty())
-        .unwrap_or_else(|| format!("https://oidc.{region}.amazonaws.com"))
-        .trim_end_matches('/')
-        .to_string()
+    crate::oauth::kiro_oidc_base_url(region)
 }
 
 fn normalize_kiro_region(region: Option<&str>) -> String {
@@ -2668,8 +2644,13 @@ async fn start_device_code_compat(
     state: State<AppState>,
     Query(query): Query<DeviceCodeCompatQuery>,
 ) -> Response {
-    // Kiro with IDC config uses the special AWS SSO flow
-    let is_kiro = provider == "kiro" && query.start_url.is_some();
+    // Kiro always uses the AWS SSO OIDC flow, which registers its own client
+    // with AWS. Do NOT re-gate this on `query.start_url.is_some()`: that only
+    // matched the IDC tab, so AWS Builder ID (which implies its start URL from
+    // the registration issuer and therefore sends none) fell through to the
+    // generic branch, substituted the literal "zeroproxy" as the client id, and
+    // got a 401 `InvalidClientException` — "Invalid client provided".
+    let is_kiro = provider == "kiro";
 
     if !is_kiro {
         // For all other device code providers (github, qwen, kilocode, etc.),
@@ -2764,13 +2745,7 @@ async fn start_device_code_compat(
         .post(format!("{oidc_base_url}/client/register"))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
-        .json(&json!({
-            "clientName": KIRO_CLIENT_NAME,
-            "clientType": KIRO_CLIENT_TYPE,
-            "scopes": KIRO_SCOPES,
-            "grantTypes": KIRO_GRANT_TYPES,
-            "issuerUrl": KIRO_ISSUER_URL,
-        }))
+        .json(&crate::oauth::device_code::kiro_registration_body())
         .send()
         .await
     {
@@ -2785,20 +2760,31 @@ async fn start_device_code_compat(
         return internal_error_response(format!("Client registration failed: {error}"));
     }
 
-    let client_info: KiroClientRegistrationResponse = match register_response.json().await {
+    let register_body: serde_json::Value = match register_response.json().await {
         Ok(value) => value,
         Err(error) => {
             return internal_error_response(format!("Client registration failed: {error}"))
         }
     };
 
+    let (client_id, client_secret) =
+        match crate::oauth::device_code::parse_kiro_registration_response(&register_body) {
+            Ok(credentials) => credentials,
+            Err(error) => {
+                let detail = error
+                    .error_description
+                    .unwrap_or_else(|| error.error.clone());
+                return internal_error_response(format!("Client registration failed: {detail}"));
+            }
+        };
+
     let device_response = match client
         .post(format!("{oidc_base_url}/device_authorization"))
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .json(&json!({
-            "clientId": client_info.client_id,
-            "clientSecret": client_info.client_secret,
+            "clientId": client_id,
+            "clientSecret": client_secret,
             "startUrl": start_url,
         }))
         .send()
@@ -2829,8 +2815,8 @@ async fn start_device_code_compat(
         verification_uri_complete: device_data.verification_uri_complete,
         expires_in: device_data.expires_in.unwrap_or(DEVICE_FLOW_TTL_SECS) as u64,
         interval: device_data.interval.unwrap_or(5),
-        client_id: client_info.client_id,
-        client_secret: client_info.client_secret,
+        client_id,
+        client_secret,
         region,
         auth_method,
         start_url,

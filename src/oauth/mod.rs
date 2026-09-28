@@ -29,6 +29,35 @@ pub enum OAuthFlowKind {
 
 pub use providers::OAuthProviderConfig;
 
+/// Single source of truth for the AWS IAM Identity Center `sso-oidc` parameters
+/// Kiro's Builder ID and Identity Center flows register against. Both
+/// `kiro_register_client` (the `POST /api/oauth/kiro/device_code` route) and the
+/// dashboard's `GET /api/oauth/kiro/device-code` route must post this same body,
+/// so the two call sites share it rather than each restating the member names.
+pub const KIRO_ISSUER_URL: &str = "https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6";
+pub const KIRO_CLIENT_NAME: &str = "kiro-oauth-client";
+pub const KIRO_CLIENT_TYPE: &str = "public";
+pub const KIRO_DEFAULT_REGION: &str = "us-east-1";
+pub const KIRO_DEFAULT_START_URL: &str = "https://view.awsapps.com/start";
+pub const KIRO_SCOPES: &[&str] = &[
+    "codewhisperer:completions",
+    "codewhisperer:analysis",
+    "codewhisperer:conversations",
+];
+pub const KIRO_GRANT_TYPES: &[&str] = &[
+    "urn:ietf:params:oauth:grant-type:device_code",
+    "refresh_token",
+];
+
+pub fn kiro_oidc_base_url(region: &str) -> String {
+    std::env::var("CIPHERROUTE_KIRO_OIDC_BASE_URL")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .unwrap_or_else(|| format!("https://oidc.{region}.amazonaws.com"))
+        .trim_end_matches('/')
+        .to_string()
+}
+
 pub mod pkce {
     use super::*;
 
@@ -360,45 +389,65 @@ pub mod device_code {
         })
     }
 
+    /// Body for AWS IAM Identity Center `RegisterClient` (`POST /client/register`).
+    ///
+    /// The members are camelCase because that is the AWS wire format — there is
+    /// no `client_id`, `client_name`, `client_type`, `grant_types`,
+    /// `redirect_uris`, `token_endpoint_auth_method` or `expires_at` member, and
+    /// omitting the required `clientName` / `clientType` fails validation.
+    pub(crate) fn kiro_registration_body() -> serde_json::Value {
+        serde_json::json!({
+            "clientName": super::KIRO_CLIENT_NAME,
+            "clientType": super::KIRO_CLIENT_TYPE,
+            "scopes": super::KIRO_SCOPES,
+            "grantTypes": super::KIRO_GRANT_TYPES,
+            "issuerUrl": super::KIRO_ISSUER_URL,
+        })
+    }
+
+    /// Extract the credentials AWS issues from a `RegisterClient` response.
+    ///
+    /// AWS returns `clientId` / `clientSecret` in camelCase. Both are required by
+    /// the following `StartDeviceAuthorization` call, so a response missing
+    /// either is an error — never a locally-invented substitute, which would be
+    /// rejected downstream as "Invalid client provided".
+    pub(crate) fn parse_kiro_registration_response(
+        body: &serde_json::Value,
+    ) -> Result<(String, String), OAuthError> {
+        let missing = |field: &str| OAuthError {
+            error: "client_registration_failed".to_string(),
+            error_description: Some(format!("AWS RegisterClient response is missing `{field}`")),
+        };
+
+        let client_id = body
+            .get("clientId")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| missing("clientId"))?;
+        let client_secret = body
+            .get("clientSecret")
+            .and_then(|v| v.as_str())
+            .filter(|s| !s.is_empty())
+            .ok_or_else(|| missing("clientSecret"))?;
+
+        Ok((client_id.to_string(), client_secret.to_string()))
+    }
+
     /// Kiro AWS SSO OIDC flow - register client first, then standard device code flow.
     ///
-    /// The registration includes an `expires_at` set to
-    /// `KIRO_CLIENT_REGISTRATION_TTL_SECS` (3600s / 1 hour) from now.
-    /// After this TTL elapses the client credentials are invalid and a new
-    /// registration is required.
-    ///
-    /// Each call creates a **fresh** client registration.  Callers MUST
-    /// re-register (i.e. call this function again) when a token‑endpoint
-    /// response indicates `invalid_client` or `expired_client`.
-    ///
-    /// The device‑code polling path (`poll_for_token`) does **not**
-    /// automatically re‑register — the caller is responsible for catching
-    /// client‑expired errors and re‑invoking this function before retrying
-    /// the poll.
-    const KIRO_CLIENT_REGISTRATION_TTL_SECS: u64 = 3600;
-
+    /// Each call creates a **fresh** client registration. Callers MUST re-register
+    /// when a token-endpoint response indicates `invalid_client` or
+    /// `expired_client`; the device-code polling path does not do this itself.
     pub async fn kiro_register_client() -> Result<(String, String), OAuthError> {
         let client = reqwest::Client::new();
-        let client_id = format!("zeroproxy-{}", uuid::Uuid::new_v4());
-        let now_secs = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default()
-            .as_secs();
-        let expires_at = now_secs + KIRO_CLIENT_REGISTRATION_TTL_SECS;
-
-        let registration = serde_json::json!({
-            "client_id": client_id,
-            "client_name": "kiro-oauth-client",
-            "client_type": "public",
-            "grant_types": ["urn:ietf:params:oauth:grant-type:device_code"],
-            "redirect_uris": ["http://localhost:4623/oauth/callback"],
-            "token_endpoint_auth_method": "client_secret_post",
-            "expires_at": expires_at
-        });
 
         let response = client
-            .post("https://oidc.us-east-1.amazonaws.com/client/register")
-            .json(&registration)
+            .post(format!(
+                "{}/client/register",
+                super::kiro_oidc_base_url(super::KIRO_DEFAULT_REGION)
+            ))
+            .header(reqwest::header::ACCEPT, "application/json")
+            .json(&kiro_registration_body())
             .send()
             .await
             .map_err(|e| OAuthError {
@@ -419,18 +468,7 @@ pub mod device_code {
             error_description: Some(e.to_string()),
         })?;
 
-        let registered_client_id = resp_body
-            .get("client_id")
-            .and_then(|v| v.as_str())
-            .unwrap_or(&client_id)
-            .to_string();
-        let client_secret = resp_body
-            .get("client_secret")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
-            .unwrap_or_default();
-
-        Ok((registered_client_id, client_secret))
+        parse_kiro_registration_response(&resp_body)
     }
 
     pub async fn kilocode_start_device_flow(

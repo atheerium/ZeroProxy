@@ -607,6 +607,78 @@ parameter: 'messages[1].content'` for it, so a zero-information assistant turn m
 not blanked. Dropping is safe because `filter_to_openai_format` already retains blank-content
 messages away, so the behaviour only changes on the path that had no such filter.
 
+### 16. "Invalid client provided" on Kiro/AWS Builder ID — a bad client id, self-inflicted
+`Invalid client provided` is the literal text AWS `sso-oidc` returns for
+`StartDeviceAuthorization`'s **`InvalidClientException` (HTTP 401)**: "the `clientId` or
+`clientSecret` in the request is invalid … an incorrect `clientId` or an expired `clientSecret`".
+It means the request carried a client AWS never issued. It is **never** a credential problem, so
+do not go looking at tokens, refresh, or region.
+
+Kiro's Builder ID and Identity Center flows both speak AWS IAM Identity Center OIDC
+(`sso-oidc`, host `oidc.{region}.amazonaws.com`), and they run **three steps**:
+
+1. `POST {oidc}/client/register` — AWS *issues* a `clientId` + `clientSecret`. Required members
+   are **`clientName` and `clientType`** (only `public` is supported); optional `scopes`,
+   `grantTypes`, `issuerUrl`, `redirectUris`. **Every member is camelCase.** There is no
+   `client_id`, `client_name`, `client_type`, `grant_types`, `token_endpoint_auth_method` or
+   `expires_at` member — those were all invented here at one point. The response is camelCase
+   too: `clientId`, `clientIdIssuedAt`, `clientSecret`, `clientSecretExpiresAt`, plus
+   `authorizationEndpoint` / `tokenEndpoint`.
+2. `POST {oidc}/device_authorization` — `{clientId, clientSecret, startUrl}`, where `startUrl`
+   is the **AWS access portal** (`https://view.awsapps.com/start` for Builder ID). Returns
+   `deviceCode`, `userCode`, `verificationUri`, `verificationUriComplete`, `interval`, `expiresIn`.
+3. `POST {oidc}/token` — `{clientId, clientSecret, deviceCode, grantType:
+   "urn:ietf:params:oauth:grant-type:device_code"}`. `authorization_pending` / `slow_down` /
+   `expired_token` / `access_denied` come back **inside a 200 body**, so this call must not
+   status-check. The credentials from step 1 must be persisted and replayed here, or step 2 will
+   fail again.
+
+**The bug, and the reason it kept coming back.** `start_device_code_compat`
+(`src/server/api/oauth.rs`) gated its Kiro branch on
+`let is_kiro = provider == "kiro" && query.start_url.is_some();`. `web/…/OAuthModal.tsx` only
+sends `start_url` for the **IDC** tab; AWS **Builder ID** sends none, because its start URL is
+implied by the registration. So Builder ID fell through to the *generic* provider branch, which
+has no client id for kiro (`providers::kiro().client_id` is `""`) and substituted the literal
+string **`"zeroproxy"`**. AWS has no such client → 401 → the modal's red "Invalid client
+provided". The working registration code was in the same function, one `&&` away, unreachable.
+Fixed 2026-09-28 to `provider == "kiro"`. **If you ever see that `start_url` condition come
+back, you have reintroduced this bug.**
+
+The same class of bug existed a second time in `kiro_register_client()`
+(`src/oauth/mod.rs`, the `POST /api/oauth/{provider}/device_code` route): it sent the snake_case
+body above, then grepped the response for `client_id`/`client_secret`, and rescued both misses
+with `.unwrap_or(&client_id)` — **a locally invented `zeroproxy-<uuid>`** — and
+`.unwrap_or_default()` (an empty secret). That silent fallback is what turned a bad request
+into an opaque upstream error instead of a local one. **A missing `clientId`/`clientSecret` is
+now a hard error; never substitute a placeholder for a credential the server must issue.**
+
+Rules that follow, because both bugs were the same mistake:
+- **Never invent a client id.** It must come from `RegisterClient`, or the call is meaningless.
+- **The three call sites share one body.** `device_code::kiro_registration_body()` and
+  `device_code::parse_kiro_registration_response()` in `src/oauth/mod.rs` are the single source
+  of truth for the AWS parameters and the response, used by both routes. Copying the JSON into a
+  second handler is how the two copies drifted apart in the first place.
+- **`scope` on `/token` is a no-op** — the access token always carries every scope from
+  registration. Do not try to narrow it there.
+- **Registered credentials expire** (`clientSecretExpiresAt`, 3600s here). Re-register rather
+  than caching them; the dashboard registers per connect attempt, which is why that is fine.
+- **`src/oauth/kiro.rs`'s `register_client` / `start_device_authorization` / `poll_device_token`
+  are dead code** — no callers in `src/` or `tests/`. That file is otherwise live for
+  `normalize_kiro_external_idp_auth` and the `KiroAuthMethod` enum. Do not assume its presence
+  means a flow is wired.
+- **Open question, deliberately not "fixed":** we send `issuerUrl =
+  https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6` while the Kiro IDE appears to
+  send `https://view.awsapps.com/start`. AWS documents `issuerUrl` as optional and does not
+  constrain `startUrl` against it, and the flow works, so changing it on a hunch is how this
+  gets "fixed" into a new bug. Leave it unless a real 4xx points at it.
+
+**Verify a Kiro connect end-to-end, not by inspection** — the failure is invisible to every
+local gate, because both bugs are runtime-only and the gate never calls AWS:
+`./scripts/dev.sh --fast detach` then
+`curl -s 'localhost:4623/api/oauth/kiro/device-code' | jq '{user_code, verification_uri}'`
+must return a real user code. A `clientId` of `zeroproxy` or an empty secret in that path is the
+bug, even if the tests are green.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
@@ -726,10 +798,10 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1947 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1950 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. **Count it, do not recall it.** This line has now been wrong three times (1905 →
-  1913 → 1936 → 1947), because the recorded number is the count *at the moment the suite was last
+  worth having. **Count it, do not recall it.** This line has now been wrong four times (1905 →
+  1913 → 1936 → 1947 → 1950), because the recorded number is the count *at the moment the suite was last
   run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
   file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
   it whenever the count moves.

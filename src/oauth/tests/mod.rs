@@ -270,7 +270,7 @@ mod gitlab_extended_tests {
 }
 
 mod kiro_device_flow_tests {
-    use crate::oauth::{DeviceCodeResponse, KiroDeviceFlow};
+    use crate::oauth::{device_code, DeviceCodeResponse, KiroDeviceFlow};
 
     #[test]
     fn test_kiro_device_flow_struct() {
@@ -308,6 +308,82 @@ mod kiro_device_flow_tests {
             client_secret: "".to_string(),
         };
         assert!(kiro_flow.device_code.verification_uri_complete.is_some());
+    }
+
+    /// Regression: the AWS `RegisterClient` request used to be built with
+    /// snake_case keys (`client_name`, `client_type`, `grant_types`) and
+    /// non-members (`client_id`, `redirect_uris`, `token_endpoint_auth_method`,
+    /// `expires_at`). AWS rejected it, and the response parser then looked for
+    /// `client_id`/`client_secret` instead of `clientId`/`clientSecret`, so it
+    /// silently invented a client id. The result was a 401 from
+    /// `/device_authorization` surfacing as "Invalid client provided".
+    #[test]
+    fn test_kiro_registration_body_uses_aws_camel_case_members() {
+        let body = device_code::kiro_registration_body();
+
+        for required in ["clientName", "clientType", "scopes", "grantTypes"] {
+            assert!(
+                body.get(required).is_some(),
+                "RegisterClient body is missing required member `{required}`"
+            );
+        }
+
+        for non_member in [
+            "client_id",
+            "client_name",
+            "client_type",
+            "grant_types",
+            "redirect_uris",
+            "token_endpoint_auth_method",
+            "expires_at",
+        ] {
+            assert!(
+                body.get(non_member).is_none(),
+                "RegisterClient body carries `{non_member}`, which AWS does not accept"
+            );
+        }
+
+        assert_eq!(body["clientType"], "public");
+        assert!(body["grantTypes"]
+            .as_array()
+            .expect("grantTypes is an array")
+            .iter()
+            .any(|value| value == "refresh_token"));
+    }
+
+    #[test]
+    fn test_parse_kiro_registration_response_reads_camel_case_credentials() {
+        let body = serde_json::json!({
+            "clientId": "issued-client-id",
+            "clientSecret": "issued-client-secret",
+            "clientIdIssuedAt": 1700000000,
+            "clientSecretExpiresAt": 1700003600,
+        });
+
+        let (client_id, client_secret) =
+            device_code::parse_kiro_registration_response(&body).expect("response is well formed");
+
+        assert_eq!(client_id, "issued-client-id");
+        assert_eq!(client_secret, "issued-client-secret");
+    }
+
+    /// The anti-regression hinge: a response missing credentials must be an
+    /// error. Inventing a placeholder here is what turned a bad request into the
+    /// opaque "Invalid client provided" the user sees in the dashboard.
+    #[test]
+    fn test_parse_kiro_registration_response_rejects_missing_credentials() {
+        for body in [
+            serde_json::json!({}),
+            serde_json::json!({ "clientId": "only-the-id" }),
+            serde_json::json!({ "clientSecret": "only-the-secret" }),
+            serde_json::json!({ "client_id": "wrong-case", "client_secret": "wrong-case" }),
+            serde_json::json!({ "clientId": "", "clientSecret": "" }),
+        ] {
+            assert!(
+                device_code::parse_kiro_registration_response(&body).is_err(),
+                "registration response {body} should have been rejected, not defaulted"
+            );
+        }
     }
 }
 
