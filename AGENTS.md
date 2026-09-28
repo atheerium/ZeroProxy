@@ -742,10 +742,14 @@ name is still honoured**, deliberately, so an existing shell profile keeps worki
   environment** (`std::env::var_os(key).is_some()`), *not* when the parsed field merely
   looks empty. Checking the field instead would let `ZEROPROXY_NO_OPEN=false` be
   overridden by `CIPHERROUTE_NO_OPEN=true`, inverting precedence.
-- **Any test that mutates the environment must clear BOTH spellings.** `core::env::var`
-  falls back, so removing only the new name leaves the legacy one live and the test
-  silently starts depending on the developer's shell. `src/cli/config.rs`'s `clear_env()`
-  and `tests/sync_cli.rs` both do this deliberately, with a comment saying so.
+- **A test that needs a variable to be ABSENT must clear BOTH spellings.**
+  `core::env::var` falls back, so removing only the new name leaves the legacy one live and
+  the test silently starts depending on the developer's shell. `src/cli/config.rs`'s
+  `clear_env()` and `tests/sync_cli.rs` both do this deliberately, with a comment saying so.
+  **A test that SETS the new name needs only the new name** — setting it shadows any
+  inherited legacy value, so there is nothing to isolate (`tests/proxy_pools_api.rs`'s
+  `VercelApiEnvGuard` is the correct counterexample). Match the rule to whether the
+  variable must be absent, not to a blanket "clear both".
 - **One test is intentionally left on the legacy name**:
   `tests/oauth_kiro_device_code_api.rs` `kiro_device_code_defaults_match_cipherroute_builder_id_flow`
   sets `CIPHERROUTE_KIRO_OIDC_BASE_URL`. Every sibling was renamed. That one is the only
