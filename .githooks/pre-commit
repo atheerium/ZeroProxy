@@ -23,9 +23,15 @@ if echo "$STAGED_DIFF" | grep -qE "$SECRET_PAT"; then
 fi
 
 # 3. block committing machine-local files
-if git diff --cached --name-only | grep -qE '(^opencode\.json$|\.env|admin\.key|db\.json)'; then
+# `.env.example` is a tracked template of placeholders, not a machine-local
+# secret file, so it is allowed through. Without the exclusion the guard also
+# matched it, which made the template impossible to edit.
+BLOCKED_RE='(^opencode\.json$|(^|/)\.env|admin\.key|db\.json)'
+ALLOWED_RE='(^|/)\.env\.example$'
+STAGED_BLOCKED="$(git diff --cached --name-only | grep -E "$BLOCKED_RE" | grep -vE "$ALLOWED_RE" || true)"
+if [[ -n "$STAGED_BLOCKED" ]]; then
   echo "!! pre-commit: staged file looks machine-local (opencode.json / .env / admin.key / db.json)"
-  git diff --cached --name-only | grep -E '(^opencode\.json$|\.env|admin\.key|db\.json)'
+  echo "$STAGED_BLOCKED"
   echo "Unstage with: git restore --staged <file>"
   exit 1
 fi
