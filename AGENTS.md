@@ -267,7 +267,7 @@ that asymmetry in mind before consuming it.
   and silently classified all 171 commits as `src/`-free.
 - **`cargo clippy` aborts at the first failing integration target.** Truncated output undercounts
   badly. Iterate until clean; never trust a single run's error list.
-- **`pnpm build` does not type-check** (Astro skips `tsc`) and the repo has ~507 pre-existing tsc
+- **`pnpm build` does not type-check** (Astro skips `tsc`) and the repo has ~492 pre-existing tsc
   errors. Capture the error list, `git stash`, re-run, and `comm` the two sets — comparing totals
   hides offsetting changes.
 - **SQLite JSON booleans:** use `json_type(value,'$.k')='true'`. `json_extract(...)='true'` never
@@ -284,7 +284,7 @@ that asymmetry in mind before consuming it.
   runtime. Prove substitution by grepping the *built* bundle for a bare `__UI_*` identifier:
   `grep -rIlE '(^|[^A-Za-z0-9_$])__UI_(BUILT_AT|GIT_SHA|COMMIT_TIME)__' web/dist/_astro/` must
   print nothing. The navbar badge reads these (see Trap 9).
-- **`tsc` total is not proof; a per-file filter is.** A total equal to the 507 baseline can hide
+- **`tsc` total is not proof; a per-file filter is.** A total equal to the 492 baseline can hide
   offsetting errors. `pnpm exec tsc --noEmit -p tsconfig.json 2>&1 | grep <file>` proving *zero*
   errors in the files you touched is the real check.
 
@@ -809,7 +809,8 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
 
 - Port `4623`; data dir from `$DATA_DIR`, default `~/.zeroproxy`; SQLite at
   `$DATA_DIR/zeroproxy.sqlite` (mandatory store, no fallback).
-- Logs: `~/.zeroproxy/log.txt`, or `journalctl --user -u zeroproxy -f`.
+- Logs: `$DATA_DIR/zeroproxy.log` (`src/cli/server.rs:197`) — **not** `log.txt` — or
+  `journalctl --user -u zeroproxy -f`.
 - Release build: `cargo build --release --locked --no-default-features && ./target/release/zeroproxy --web-dir ./web/dist`.
 
 ## Testing
@@ -831,7 +832,9 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   is *not* the gate.
 - Unit tests live in `src/**` as `#[cfg(test)]` modules (~224 files) — this is why `--lib` is
   the CI gate; parity locks need no network.
-- Web: `pnpm --dir web test` (vitest, 2 suites: `availableModels`, `providersPage`).
+- Web: `pnpm --dir web test` (vitest, **4** suites: `analyticsFormatting`, `availableModels`,
+  `providersPage`, `chatStream` — 71 tests. `brandMigration` is a 5th, added by the 2026-09-28
+  brand sweep).
 - `astro check` is **advisory** everywhere (`|| true` in CI, `|| echo advisory` in dev.sh) — fix
   new errors, don't chase the existing backlog.
 - `cargo clippy --all-targets --all-features` — no `-D warnings`; it fails only on real errors.
