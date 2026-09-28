@@ -1,5 +1,5 @@
 <!--
-Thank you for contributing to CipherRoute.
+Thank you for contributing to ZeroProxy.
 Fill in the sections below — delete the comments. Keep PRs ≤ ~400 lines where possible.
 See CONTRIBUTING.md and docs/git-conventions.md for the full workflow.
 -->
@@ -11,9 +11,9 @@ See CONTRIBUTING.md and docs/git-conventions.md for the full workflow.
 <!-- Exact commands + evidence. CI runs the same — show it was green locally. -->
 - [ ] `cargo fmt --all -- --check`
 - [ ] `cargo clippy --all-targets --all-features`
-- [ ] `cargo test -p cipherroute --lib provider_models` / `./scripts/dev.sh --full`
+- [ ] `cargo test -p zeroproxy --lib provider_models` / `./scripts/dev.sh --full`
 - [ ] `pnpm --dir web run build` (if dashboard touched)
-- [ ] Manual: `curl -sf http://127.0.0.1:4623/health` → `{"ok":true}` / `cipherroute --robot doctor`
+- [ ] Manual: `curl -sf http://127.0.0.1:4623/health` → `{"ok":true}` / `zeroproxy --robot doctor`
 
 Evidence:
 ```
