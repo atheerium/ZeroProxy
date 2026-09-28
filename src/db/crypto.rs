@@ -305,6 +305,68 @@ fn decrypt_value_v2(raw_key: &str, payload_b64: &str) -> anyhow::Result<String> 
 ///
 /// Already-prefixed ciphertext is never re-encrypted (stops monotonic growth
 /// when a previous load failed to decrypt).
+/// Reserved map key holding the ciphertext of a whole `provider_specific_data`
+/// map. The map is serialised to a single JSON string, encrypted through the
+/// same `encrypt_opt`/`decrypt_opt` path as every other credential (so it gets
+/// identical `opxenc2:` versioning, lazy v1 migration, idempotence and
+/// fail-closed behaviour), then stored under this one key.
+///
+/// A plaintext map always serialises to a string starting with `{`, so it can
+/// never be confused with the `opxenc1:`/`opxenc2:` prefixes.
+const PSD_ENC_KEY: &str = "__zeroproxy_psd_encrypted__";
+
+/// Encrypt `provider_specific_data` in place. Idempotent: a map that already
+/// holds only ciphertext under [`PSD_ENC_KEY`] is left untouched, so calling
+/// this on an already-written connection does not double-encrypt.
+fn encrypt_psd(data: &mut std::collections::BTreeMap<String, serde_json::Value>, key: &str) {
+    if key.is_empty() || data.is_empty() {
+        return;
+    }
+    if data.len() == 1 {
+        if let Some(serde_json::Value::String(existing)) = data.get(PSD_ENC_KEY) {
+            if existing.starts_with(ENC_PREFIX_V2) || existing.starts_with(ENC_PREFIX) {
+                return;
+            }
+        }
+    }
+    let Ok(plain) = serde_json::to_string(data) else {
+        return;
+    };
+    let mut slot = Some(plain);
+    encrypt_opt(&mut slot, key);
+    if let Some(cipher) = slot {
+        data.clear();
+        data.insert(PSD_ENC_KEY.to_string(), serde_json::Value::String(cipher));
+    }
+}
+
+/// Decrypt `provider_specific_data` in place, expanding it back into the real
+/// map. A map that is not in ciphertext form is left as-is, so plaintext rows
+/// written before this field was covered keep working.
+///
+/// If the key is missing or wrong, `decrypt_opt` clears the slot rather than
+/// handing ciphertext to a consumer — the map is emptied for the same reason a
+/// token is cleared: a credential that cannot be decrypted must never be used.
+fn decrypt_psd(data: &mut std::collections::BTreeMap<String, serde_json::Value>, key: &str) {
+    if data.len() != 1 {
+        return;
+    }
+    let Some(serde_json::Value::String(cipher)) = data.get(PSD_ENC_KEY).cloned() else {
+        return;
+    };
+    if !(cipher.starts_with(ENC_PREFIX_V2) || cipher.starts_with(ENC_PREFIX)) {
+        return;
+    }
+    let mut slot = Some(cipher);
+    decrypt_opt(&mut slot, key);
+    match slot {
+        Some(plain) => {
+            *data = serde_json::from_str(&plain).unwrap_or_default();
+        }
+        None => data.clear(),
+    }
+}
+
 pub fn encrypt_connection(conn: &mut ProviderConnection, key: &str) {
     if key.is_empty() {
         return;
@@ -313,6 +375,7 @@ pub fn encrypt_connection(conn: &mut ProviderConnection, key: &str) {
     encrypt_opt(&mut conn.refresh_token, key);
     encrypt_opt(&mut conn.id_token, key);
     encrypt_opt(&mut conn.api_key, key);
+    encrypt_psd(&mut conn.provider_specific_data, key);
 }
 
 /// Decrypt sensitive fields of a [`ProviderConnection`] **in place** after
@@ -329,6 +392,7 @@ pub fn decrypt_connection(conn: &mut ProviderConnection, key: &str) {
     decrypt_opt(&mut conn.refresh_token, key);
     decrypt_opt(&mut conn.id_token, key);
     decrypt_opt(&mut conn.api_key, key);
+    decrypt_psd(&mut conn.provider_specific_data, key);
 }
 
 // ---------------------------------------------------------------------------
@@ -893,4 +957,93 @@ mod tests {
     }
 
     static ENV_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+}
+
+// ── provider_specific_data coverage ────────────────────────────────────────
+// `provider_specific_data` carries provider secrets that are not covered by the
+// four string fields (Kiro's AWS `clientSecret` is written there on every
+// successful device-code poll). These tests pin that it is encrypted at rest
+// and that the round trip is lossless.
+
+fn conn_with_psd() -> ProviderConnection {
+    let mut psd = std::collections::BTreeMap::new();
+    psd.insert(
+        "clientSecret".to_string(),
+        serde_json::Value::String("aws-secret-should-never-hit-disk".into()),
+    );
+    psd.insert(
+        "profileArn".to_string(),
+        serde_json::Value::String("arn:aws:iam::1:role/Kiro".into()),
+    );
+    ProviderConnection {
+        id: "c1".into(),
+        provider: "kiro".into(),
+        provider_specific_data: psd,
+        ..Default::default()
+    }
+}
+
+#[test]
+fn psd_is_encrypted_at_rest_and_round_trips() {
+    let key = "test-key";
+    let original = conn_with_psd();
+    let expected = original.provider_specific_data.clone();
+
+    let mut conn = original;
+    encrypt_connection(&mut conn, key);
+
+    let stored = serde_json::to_string(&conn.provider_specific_data).unwrap();
+    assert!(
+        !stored.contains("aws-secret-should-never-hit-disk"),
+        "provider_specific_data secret stored in plaintext: {stored}"
+    );
+    assert!(
+        stored.contains(ENC_PREFIX_V2),
+        "expected the opxenc2 prefix, got: {stored}"
+    );
+
+    decrypt_connection(&mut conn, key);
+    assert_eq!(conn.provider_specific_data, expected);
+}
+
+#[test]
+fn psd_encrypt_is_idempotent() {
+    let key = "test-key";
+    let mut conn = conn_with_psd();
+    encrypt_connection(&mut conn, key);
+    let once = conn.provider_specific_data.clone();
+    encrypt_connection(&mut conn, key);
+    assert_eq!(
+        once, conn.provider_specific_data,
+        "second encrypt changed the value"
+    );
+    decrypt_connection(&mut conn, key);
+    assert_eq!(
+        conn.provider_specific_data
+            .get("clientSecret")
+            .and_then(|v| v.as_str()),
+        Some("aws-secret-should-never-hit-disk")
+    );
+}
+
+#[test]
+fn psd_plaintext_map_survives_decrypt_unchanged() {
+    // Rows written before this field was encrypted are plain maps, not blobs.
+    let mut conn = conn_with_psd();
+    let expected = conn.provider_specific_data.clone();
+    decrypt_connection(&mut conn, "test-key");
+    assert_eq!(conn.provider_specific_data, expected);
+}
+
+#[test]
+fn psd_empty_map_is_left_empty() {
+    let mut conn = ProviderConnection {
+        id: "c1".into(),
+        provider: "kiro".into(),
+        ..Default::default()
+    };
+    encrypt_connection(&mut conn, "test-key");
+    assert!(conn.provider_specific_data.is_empty());
+    decrypt_connection(&mut conn, "test-key");
+    assert!(conn.provider_specific_data.is_empty());
 }
