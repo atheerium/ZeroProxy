@@ -75,6 +75,15 @@ provider and still has no per-provider latency/TTFT. Verify with
   first-class models (270 providers in the snapshot, 137 free), each carrying a `providerFreeTier`
   marker that the dashboard renders as a **FREE** badge. Live db currently shows ~880 free models
   across ~105 providers. Run it with `zeroproxy sync omniroute --free-only`.
+- **The catalog is NOT falling behind — measured 2026-09-27, so do not open a staleness
+  investigation.** `sources/omniroute.json` is pinned to `443d669`, and OmniRoute's `main` HEAD is
+  `443d66996d69` — the *same* commit. `normalize-sources.mjs:27` is the OmniRoute entry with
+  `defaultRef: "main"` (line 21 is 9router's `master`), so the snapshot already tracks the intended
+  branch. Contents at that ref: **270 providers / 137 free / 2592 models / 96 `modelsUrl`**.
+  To re-check after upstream moves: compare the snapshot's `ref` against
+  `https://api.github.com/repos/diegosouzapw/OmniRoute/commits/main` (`git ls-remote` is the
+  flakier of the two on this network). Because `main` is frequently *behind* the default branch
+  `release/v3.8.51`, "our default branch looks newer" is not evidence our snapshot is stale.
 - The navbar badge now tells you **which version you are actually running**. It previously showed
   the backend's sha and process uptime (`0m`), which made a stale dashboard look freshly restarted.
   It now reports the dashboard's own build identity against repo HEAD as fresh / stale / unknown,
@@ -143,8 +152,96 @@ Consequence to respect: a custom model can never be hidden by the Available Mode
 "disable everything" will still leave custom models selectable. That is correct, not a bug — if you
 need it gone, delete the model.
 
+## Live end-to-end verification (2026-09-27) — the proxy WORKS, and three traps came out of it
+
+Real requests against the running instance on `:4623`, using the maintainer's own 4 real combos.
+This is the empirical answer to "does it plug into an agentic harness and do combos work".
+
+| probe | result |
+|---|---|
+| `POST /v1/chat/completions` model `build` (4 members, 2 providers) | **200 in 1.7 s**, served by **kilocode** (first member; no fallback needed) |
+| same, `max_tokens: 512` | 200 in 0.75 s, `finish_reason: stop`, `content: "OK"` |
+| independent model `openrouter/nvidia/nemotron-3.5-lightning:free` | **200**, real completion |
+| `GET /v1/models` | **1572** model ids |
+| `opencode-zen/nemotron-3-ultra-free` | **502** — and this is CORRECT, see trap 3 |
+
+### Trap 1 — the 56-token empty completion REPRODUCES ON DEMAND, and it is a token-budget problem
+Same combo, same prompt, only the budget differs:
+
+| `max_tokens` | `finish_reason` | `content` |
+|---|---|---|
+| 16 | `length` | **`null`** |
+| 512 | `stop` | `"OK"` |
+
+Free reasoning models spend the *entire* budget on `reasoning` and emit nothing into `content`.
+At 16 tokens the client receives a billed response with a `null` content — this is exactly the
+maintainer's 56-token report, and it is **not** a client bug. Any fix must promote `reasoning`
+into `content` when `content` is empty (or return an error so `classify_error` makes it
+fallback-eligible). Note `finish_reason` stays honest (`length`), so the emptiness is only
+visible in `content` — grep for `"content":null`, not for a non-`stop` finish reason.
+
+### Trap 2 — `provider` in the response body is the MODEL's catalog provider, NOT the connection that served it
+A request to `openrouter/nvidia/nemotron-3.5-lightning:free` came back `"provider":"Nvidia"`, which
+reads as "the OpenRouter connection served this" but is simply the first segment of the model id.
+Meanwhile `/health` simultaneously showed `openrouter` in `server_error` with a future
+`degradedUntil` — so the two facts looked contradictory and were not.
+**`usageHistory.provider` is the only authoritative record of which connection served a request.**
+Read it with `sqlite3 "$DB" ".backup '$SNAP'"` first: the live server holds un-checkpointed WAL, so
+querying the db file directly returns **empty tables** and looks like "no keys, no combos, nothing
+configured". That is a false negative, not an empty install.
+
+### Trap 3 — a 502 from a provider can be the provider's own policy, correctly relayed
+`opencode-zen/*` returns `502 {"message":"OpenCode's free tier can only be used from within OpenCode"}`.
+That is upstream refusing a non-OpenCode client, surfaced faithfully. Do not "fix" it as a routing
+bug. Contrast with a real routing failure, which is `400 {"code":"bad_request","message":"No
+credentials for provider: <id>"}` — that one *is* ours.
+
+## Free-model detection has FOUR implementations and they disagree — do not add a fifth
+
+`is_free_model_id` in `src/core/model/catalog.rs` is now the canonical predicate, and
+`web/src/shared/utils/freeModels.ts` deliberately mirrors it. Three pre-existing Rust sites
+answer a *related* question with their own, different, rules:
+
+| site | question it actually answers | rules |
+|---|---|---|
+| `core/model/catalog.rs` `is_free_model_id` (new) | "is this free by name?" | `:free` `-free` `_free` `/free`, **case-insensitive** |
+| `core/auto/scoring.rs:80-86` | "should auto-prefer this?" | the above **plus** `== "free"`, `starts_with("free-")`, `ends_with("-free-1")`, any `:`-segment `== "free"` |
+| `server/api/providers.rs:66` | "is this an opencode-free id?" | `-free` only |
+| `server/api/chat.rs:3098` | "is this a *premium* opencode model?" | `-free` only, **inverted** |
+
+**These were left alone deliberately, not overlooked.** `scoring.rs` decides which model the
+`auto` presets select, so consolidating it changes routing; no test pins the desired
+selection, so a silent change there would be a behaviour change disguised as a refactor. The
+other two are provider-specific special cases, not general classification.
+
+**If you add a fifth copy, you have made it worse.** Either call `is_free_model_id`, or — if
+your question really is different (scoring, premium-vs-free) — say so in a comment naming the
+question, because "free" reads like one concept and is currently three.
+
+`is_free` on `/v1/models` is a **non-optional** bool, so `false` means "not free *by name*",
+NOT "confirmed paid" — the opposite of `providerFreeTier`, where absence means unknown. Keep
+that asymmetry in mind before consuming it.
+
 ## Verification traps — each of these produced a wrong conclusion at least once
 
+- **Never measure memory off a debug build.** The maintainer's ceiling is 200 MB
+  RAM, 300 MB absolute. **Measured 2026-09-27: the release build sits at 45.6 MB
+  RSS / 45.6 MB peak — roughly 4x under the tight ceiling, so the constraint is
+  met and there is nothing to fix.** The *debug* build measures 314 MB RSS / 348 MB
+  peak, i.e. it looks like a 15% breach of the hard limit. That is an artifact:
+  `target/debug/zeroproxy` is **522 MB** against a **27.8 MB** release binary
+  (release already sets `lto = "fat"`, `codegen-units = 1`, `opt-level = "s"`,
+  `strip = "symbols"`). I read the debug number first and nearly opened a
+  performance investigation against a problem that does not exist. Measure with
+  `cargo build --release` and read `/proc/<pid>/status`, and say which build you
+  measured.
+- **`/v1/v1/*` routes are a deliberate compatibility layer, not a duplication bug.**
+  Inference is registered twice: a `/v1` nest serving `/v1/models`,
+  `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, *and* literal
+  `/v1/v1/*` routes. Some agentic harnesses emit a `base_url` that already ends
+  in `/v1` and then append the standard path, so both spellings must answer.
+  Verified live: `GET /v1/models` and `GET /v1/v1/models` both return 200.
+  Do not "deduplicate" these into one.
 - **`gh` resolves to the WRONG REPOSITORY unless you pass `--repo`.** This checkout has **two**
   remotes: `origin` = `atheerium/ZeroProxy` (ours) and `upstream` = `quangdang46/openproxy` (our
   parent). **Measured: bare `gh repo view` returns `quangdang46/openproxy`, not ZeroProxy** — so
@@ -654,6 +751,42 @@ to the release profile. Full flags: `./scripts/dev.sh --help`.
 > **Never run the release binary for dev work** — stale embedded assets. dev.sh always passes
 > `--web-dir`.
 
+### The after-each-change contract (read this before your first build)
+
+**`./scripts/dev.sh` with no flags is the correct default and it does not block.** Run it from the
+repo root after every change. It rebuilds only the stale layer, restarts detached, verifies the
+serving binary, and returns. Do **not** pass a mode. `dev.sh run` is the only way to get a
+foreground server, and an agent should essentially never want that.
+
+```bash
+./scripts/dev.sh                 # build-if-stale + restart + verify + return
+./scripts/dev.sh --doctor        # is what actually running? exits 1 if anything is wrong
+./scripts/dev.sh --full detach   # the pre-push gate: fmt + clippy + astro + tests
+./scripts/dev.sh --check         # lint only, no build
+PORT=4631 ./scripts/dev.sh       # a second instance, for testing a change safely
+```
+
+Three things that make this reliable, each of which used to be a trap:
+
+- **The two build layers are independent.** `web/dist` is served from disk, so a `web/src` edit is
+  live with **no** cargo build; a `src/**` edit is not. `--doctor` prints which layer is stale.
+- **`--doctor` is the only check that catches Trap 4c.** A green `/health` cannot tell you the
+  dashboard is being served from disk rather than from build-time embedded assets; `--doctor`
+  inspects the serving process's argv and exits 1 if `--web-dir` is missing.
+- **`--doctor` resolves the pid from the `$PORT` listener, not `pgrep -x zeroproxy`.** With two
+  instances running, `pgrep` inspects the wrong one and will happily green-light a broken server.
+  Same wrong-process class as Trap 4b.
+
+**Free-model naming convention.** Free tiers are detected by name suffix, case-insensitively:
+`:free`, `-free`, `_free`, `/free`. Measured over the 1787 distinct model ids in
+`sources/omniroute.json` + `provider_catalog.json`: **46** match. Case-insensitivity is
+load-bearing — three ids use a capital `Free` (`...-Distill-Llama-70B-Free`,
+`Llama-3.3-70B-Instruct-Turbo-Free`, `Llama-Vision-Free`) that a naive `endsWith("-free")` misses.
+Two ids contain "free" as an *infix* and are deliberately **not** classified, because intent is
+unknowable from the name: `goldeneye-free-auto`, `gpt-5.6-luna-free-thinking`.
+The predicate is `isFreeModelId` in `web/src/shared/utils/freeModels.ts`, with unit tests in
+`web/src/__tests__/freeModels.test.ts` — extend the suffix list there, never inline it.
+
 ### Reload contract (run this yourself — never ask the user)
 
 | Change | Command | Why |
@@ -685,9 +818,14 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1905 passed, 0 failed.** Keep it that
-  way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having.
+- **The gate is green: `cargo test --lib --all-features` → 1917 passed, 0 failed** (measured on a
+  clean `main` @ `a142686f`, 2026-09-27). Keep it that way; a red merge is not worth landing,
+  because it destroys the only thing that makes the gate worth having.
+  **Count it, do not recall it.** I had 1905 written here for weeks, then 1913, and both were
+  wrong — they were the count *at the moment I last ran the suite*, and every test-adding commit
+  silently invalidated them. A branch whose diff touches no `.rs` file must produce the same
+  number; if it does not, the recorded baseline is stale and the branch is not what you think it
+  is. Re-measure and correct this line whenever the count moves.
 - Integration tests under `tests/` are intentionally excluded (their build was repaired separately
   — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
   is *not* the gate.

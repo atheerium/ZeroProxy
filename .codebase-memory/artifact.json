@@ -1,0 +1,11 @@
+{
+    "schema_version": 2,
+    "commit": "a142686f07b9df6b2cdd81a7ba409ba40db1e247",
+    "indexed_at": "2026-09-27T17:11:26Z",
+    "project": "zeroproxy",
+    "nodes": 16190,
+    "edges": 85489,
+    "original_size": 45613056,
+    "compressed_size": 7774619,
+    "compression_level": 9
+}

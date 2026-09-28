@@ -152,6 +152,80 @@ pub fn provider_catalog() -> &'static ProviderCatalog {
     &PROVIDER_CATALOG
 }
 
+/// Whether a model id is free *by name alone*.
+///
+/// Mirrors `web/src/shared/utils/freeModels.ts` on purpose — if the two drift,
+/// a model reads as free in the dashboard and paid in the API. Matching is
+/// case-insensitive because three shipped ids end in a capital `Free`, which a
+/// naive `ends_with("-free")` misses. "free" as an *infix* is deliberately not
+/// a signal: `goldeneye-free-auto` and `gpt-5.6-luna-free-thinking` contain it
+/// and intent is not derivable from a name.
+///
+/// A name heuristic only. Prefer a real marker where one exists — synced models
+/// carry `providerFreeTier` — and use this when those are absent.
+pub fn is_free_model_id(id: &str) -> bool {
+    let name = id.trim().to_ascii_lowercase();
+    name.ends_with(":free")
+        || name.ends_with("-free")
+        || name.ends_with("_free")
+        || name.ends_with("/free")
+}
+
+#[cfg(test)]
+mod free_model_id_tests {
+    use super::is_free_model_id;
+
+    #[test]
+    fn matches_every_measured_suffix() {
+        for id in [
+            "openrouter/openrouter/free",
+            "nvidia/nemotron-3.5-lightning:free",
+            "some-model-free",
+            "some_model_free",
+            "vendor/free",
+        ] {
+            assert!(is_free_model_id(id), "{id} should be free by name");
+        }
+    }
+
+    #[test]
+    fn capital_free_is_matched() {
+        for id in [
+            "deepseek-ai/DeepSeek-R1-Distill-Llama-70B-Free",
+            "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+            "meta-llama/Llama-Vision-Free",
+        ] {
+            assert!(is_free_model_id(id), "{id} should be free by name");
+        }
+    }
+
+    #[test]
+    fn infix_free_is_not_a_signal() {
+        for id in ["goldeneye-free-auto", "gpt-5.6-luna-free-thinking"] {
+            assert!(!is_free_model_id(id), "{id} must not be guessed free");
+        }
+    }
+
+    #[test]
+    fn paid_and_lookalike_models_are_not_free() {
+        for id in [
+            "gpt-4.1",
+            "claude-opus-5",
+            "free-solo/turbo-1",
+            "freestyle/ultra",
+        ] {
+            assert!(!is_free_model_id(id), "{id} should not be free");
+        }
+    }
+
+    #[test]
+    fn blank_and_padded_ids() {
+        assert!(is_free_model_id("  a-model-free  "));
+        assert!(!is_free_model_id(""));
+        assert!(!is_free_model_id("   "));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
