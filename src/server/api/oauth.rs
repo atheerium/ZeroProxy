@@ -2858,6 +2858,33 @@ async fn poll_kiro_device_code_compat(state: &AppState, body: Value) -> Response
         auth_method: None,
         start_url: None,
     });
+
+    // The AWS-issued client credentials come from the device-code start call, so a
+    // poll that arrives without them cannot succeed. Rejecting here keeps us from
+    // forwarding `null`/empty clientId+clientSecret to `CreateToken`, which AWS
+    // answers with an opaque `InvalidClientException` ("Invalid client provided").
+    let required = |value: Option<&String>, field: &'static str| -> Result<String, Response> {
+        value
+            .map(|v| v.trim())
+            .filter(|v| !v.is_empty())
+            .map(|v| v.to_string())
+            .ok_or_else(|| {
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(json!({ "error": format!("Missing Kiro client {field}") })),
+                )
+                    .into_response()
+            })
+    };
+    let client_id = match required(extra_data.client_id.as_ref(), "id") {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+    let client_secret = match required(extra_data.client_secret.as_ref(), "secret") {
+        Ok(value) => value,
+        Err(response) => return response,
+    };
+
     let region = normalize_kiro_region(extra_data.region.as_deref());
     let auth_method = normalize_kiro_auth_method(extra_data.auth_method.as_deref());
     let start_url = normalize_kiro_start_url(extra_data.start_url.as_deref());
@@ -2867,8 +2894,8 @@ async fn poll_kiro_device_code_compat(state: &AppState, body: Value) -> Response
         .header("Content-Type", "application/json")
         .header("Accept", "application/json")
         .json(&json!({
-            "clientId": extra_data.client_id,
-            "clientSecret": extra_data.client_secret,
+            "clientId": client_id,
+            "clientSecret": client_secret,
             "deviceCode": device_code,
             "grantType": "urn:ietf:params:oauth:grant-type:device_code",
         }))
@@ -2884,7 +2911,13 @@ async fn poll_kiro_device_code_compat(state: &AppState, body: Value) -> Response
         Err(error) => return internal_error_response(error.to_string()),
     };
 
-    if let Some(access_token) = poll_response.access_token.clone() {
+    if let Some(access_token) = poll_response
+        .access_token
+        .as_deref()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+    {
         let claims = decode_jwt_claims(&access_token);
         let email = claims
             .as_ref()
