@@ -714,10 +714,13 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1936 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1947 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. (Re-measured 2026-09-27; the previous "1905" figure recorded here was stale by 31
-  tests, so never trust a count copied from this file — run the gate and read the number.)
+  worth having. **Count it, do not recall it.** This line has now been wrong three times (1905 →
+  1913 → 1936 → 1947), because the recorded number is the count *at the moment the suite was last
+  run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
+  file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
+  it whenever the count moves.
 - Integration tests under `tests/` are intentionally excluded (their build was repaired separately
   — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
   is *not* the gate.
