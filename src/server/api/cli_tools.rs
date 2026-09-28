@@ -6,6 +6,7 @@ mod grok_build_settings;
 mod hermes_settings;
 mod jcode_settings;
 mod kilo_settings;
+mod omo_settings;
 mod openclaw_settings;
 
 use std::collections::BTreeMap;
@@ -2431,6 +2432,7 @@ pub fn routes() -> Router<AppState> {
         .merge(hermes_settings::routes())
         .merge(jcode_settings::routes())
         .merge(kilo_settings::routes())
+        .merge(omo_settings::routes())
         .merge(openclaw_settings::routes())
         .route("/api/cli-tools", get(list_tools))
         .route("/api/cli-tools/execute", post(execute_command))

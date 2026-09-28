@@ -437,6 +437,13 @@ amp --model "{{model}}"
       { id: "gemini-3.1-pro", name: "Gemini 3.1 Pro", alias: "gemini", defaultValue: "gemini/gemini-3.1-pro" },
     ],
   },
+  omo: {
+    id: "omo",
+    name: "OMO",
+    color: "#EC4899",
+    description: "OpenCode plugin managing a fleet of sub-agents with models and fallbacks",
+    configType: "custom",
+  },
   "grok-build": {
     id: "grok-build",
     name: "Grok Build (Grok CLI)",

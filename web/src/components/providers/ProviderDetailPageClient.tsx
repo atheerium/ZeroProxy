@@ -12,6 +12,7 @@ import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
 import { fetchSuggestedModels } from "@/shared/utils/providerModelsFetcher";
 import { type CustomModelEntry } from "@/shared/utils/providerCustomModels";
+import { isFreeModelId } from "@/shared/utils/freeModels";
 import {
   getThinkingLevels,
   unionThinkingLevels,
@@ -106,6 +107,8 @@ export default function ProviderDetailPageClient() {
   // Filter / toolbar state for Available Models
   const [searchQuery, setSearchQuery] = useState("");
   const [visibilityFilter, setVisibilityFilter] = useState<"all" | "visible" | "hidden">("all");
+  // Mirrors the model picker's FREE ONLY toggle; the two lists must agree.
+  const [freeNamesOnly, setFreeNamesOnly] = useState(false);
   const [testAllAutoHideFailed, setTestAllAutoHideFailed] = useState(false);
   const [testAllProgress, setTestAllProgress] = useState<{ done: number; total: number } | null>(null);
   const [lastRefreshedAt, setLastRefreshedAt] = useState<number | null>(null);
@@ -1172,7 +1175,10 @@ export default function ProviderDetailPageClient() {
       const nameStr = (r.id || r.name || "").toLowerCase();
       const matchesSearch = !lowerQuery || nameStr.includes(lowerQuery) || (r.alias && r.alias.toLowerCase().includes(lowerQuery));
       const matchesVisibility = visibilityFilter === "all" || (visibilityFilter === "visible" ? !r.disabled : visibilityFilter === "hidden" ? r.disabled : true);
-      return matchesSearch && matchesVisibility;
+      // Both arms needed: `isFree` is the persisted marker, `isFreeModelId` the
+      // name heuristic, which is the only signal for rows carrying no marker.
+      const matchesFree = !freeNamesOnly || r.isFree === true || isFreeModelId(r.id);
+      return matchesSearch && matchesVisibility && matchesFree;
     };
     const customModelRows = am.customRows.filter(filterRow);
     const displayModels = am.enabledCoreRows.filter(filterRow);
@@ -1837,6 +1843,16 @@ export default function ProviderDetailPageClient() {
                         {v === "all" ? "All" : v === "visible" ? "Visible" : "Hidden"}
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => setFreeNamesOnly((v) => !v)}
+                      aria-pressed={freeNamesOnly}
+                      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold transition-colors ${
+                        freeNamesOnly ? "border-green-500/40 bg-green-500/10 text-green-500" : "border-border bg-surface text-text-muted hover:border-green-500/40 hover:text-green-500"
+                      }`}
+                    >
+                      FREE ONLY
+                    </button>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2 text-[11px] text-text-muted">

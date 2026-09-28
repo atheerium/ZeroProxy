@@ -38,10 +38,11 @@ while [[ $# -gt 0 ]]; do
     --port) PORT="$2"; shift 2 ;;
     --port=*) PORT="${1#*=}"; shift ;;
     --check) MODE="check"; shift ;;
+    --doctor) MODE="doctor"; shift ;;
     --help|-h) SHOW_HELP=true; shift ;;
     --) shift; break ;;
     -*) echo "Unknown option: $1" >&2; exit 1 ;;
-    *) # positional mode: run | build | detach | check | check-stale
+    *) # positional mode: run | build | detach | check | check-stale | doctor
       if [[ -z "$MODE" ]]; then
         MODE="$1"
       else
@@ -102,11 +103,15 @@ OPTIONS (run from repo root — no cd scripts needed):
   --backend-only  Only rebuild Rust binary (cargo build).
   --release       Use release profile (implies slower optimized build).
   --port PORT     Server port (default 4623, also $PORT).
+  --doctor        Report whether what is SERVED is current, then exit. Exits 1 if not.
   --no-restart    Build only, don't start server (alias for MODE=build).
   -h, --help      Show this help.
 
+  No arguments = build whatever is stale, restart detached, verify, and RETURN.
+  (Use MODE=run for a foreground server.)
+
 MODE (legacy positional, still supported):
-  run        Build + start foreground (default, Ctrl+C to stop)
+  run        Build + start foreground (Ctrl+C to stop)
   detach     Build + start detached on 127.0.0.1:$PORT
   build      Only build, don't run
   check      Run fmt, clippy, astro check, tests
@@ -212,6 +217,59 @@ check_stale_dashboard() {
 
 is_web_stale() {
   check_stale_dashboard >/dev/null 2>&1
+}
+
+newest_mtime() {
+  find "$1" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1
+}
+
+# The layers are independent: web/dist is served from disk, so a web/src edit is
+# live without a cargo build, while a src/** edit is not live until the binary is.
+changed_layers() {
+  local layers=""
+  local bin_mtime src_mtime dist_mtime
+  bin_mtime=$(newest_mtime "$BIN" 2>/dev/null || stat -c %Y "$BIN" 2>/dev/null)
+  src_mtime=$(newest_mtime src)
+  if [[ -n "$bin_mtime" && -n "$src_mtime" ]] && awk "BEGIN{exit !($src_mtime > $bin_mtime)}"; then
+    layers="rust"
+  fi
+  dist_mtime=$(newest_mtime web/dist)
+  if [[ -n "$src_mtime" && -n "$dist_mtime" ]] && awk "BEGIN{exit !($src_mtime > $dist_mtime)}"; then
+    layers="${layers:+$layers }web"
+  fi
+  echo "$layers"
+}
+
+# The serving process's own argv is the only check that cannot lie: /health
+# answers identically either way, so a missing --web-dir means embedded assets.
+doctor() {
+  local layers pid running bad=0
+  layers=$(changed_layers)
+  echo "== doctor: is what is served current? =="
+  echo "   build layers behind : ${layers:-none}"
+  pid=$(loopback_socket_lines | sed -n 's/.*pid=\([0-9]*\).*/\1/p' | head -1)
+  if [[ -z "$pid" ]]; then
+    echo "   server              : NOT RUNNING (nothing is being served on :$PORT)"
+    bad=1
+  else
+    running=$(tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null || true)
+    echo "   server pid          : $pid"
+    if [[ "$running" == *"--web-dir"* ]]; then
+      echo "   dashboard source    : web/dist on disk  (--web-dir present, correct)"
+    else
+      echo "   dashboard source    : !! BUILD-TIME EMBEDDED ASSETS (no --web-dir in argv)"
+      echo "      Trap 4c: /health still returns ok, so this is invisible from the API."
+      echo "      Any web/dist rebuild is ignored until the binary is rebuilt too."
+      bad=1
+    fi
+  fi
+  if [[ -n "$layers" ]]; then
+    echo "   ACTION              : ./scripts/dev.sh --fast detach   (rebuilds: $layers)"
+    bad=1
+  elif [[ "$bad" == 0 ]]; then
+    echo "   ACTION              : nothing to rebuild"
+  fi
+  [[ "$bad" == 0 ]]
 }
 
 check_dirty_tree() {
@@ -335,6 +393,12 @@ if [[ "$SHOW_HELP" == true ]]; then
   exit 0
 fi
 
+# Bare `./scripts/dev.sh` used to fall through to a foreground `exec`, which blocks
+# forever. Default to the restart-and-return path instead; `run` still gives foreground.
+if [[ -z "$MODE" ]]; then
+  MODE="detach"
+fi
+
 case "$MODE" in
   build)
     build
@@ -349,6 +413,9 @@ case "$MODE" in
     ;;
   check-stale)
     check_stale_dashboard || echo "web/dist up-to-date."
+    ;;
+  doctor)
+    doctor || exit 1
     ;;
   detach)
     check_dirty_tree || true
@@ -372,10 +439,10 @@ case "$MODE" in
     echo "== server restarted. Binary freshness confirmed. =="
     echo "== status =="
     "$BIN" --robot server status 2>&1 | head -n 20 || curl -sf "http://127.0.0.1:${PORT}/health" && echo "health ok"
-    echo "Logs: tail -f ~/.zeroproxy/log.txt  (or journalctl --user -u zeroproxy -f if using service)"
-    echo "Stop: $BIN server stop  or  pkill -f zeroproxy  or  fuser -k ${PORT}/tcp"
+    echo "Logs: tail -f ~/.zeroproxy/zeroproxy.log   (journalctl --user -u zeroproxy -f for the service)"
+    echo "Stop: ./scripts/dev.sh detach   (restarts);  zeroproxy server stop   (stops)"
     ;;
-  run|restart|"")
+  run|restart)
     check_dirty_tree || true
     kill_port
     wait_for_port_free || exit 1
