@@ -166,7 +166,11 @@ pub fn kiro() -> OAuthProviderConfig {
             "codewhisperer:conversations",
         ],
         uses_pkce: false,
-        extra_params: &[("client_name", "kiro-oauth-client")],
+        // Kiro is device-code only. The old `("client_name", "kiro-oauth-client")`
+        // here was snake_case bait from the pre-Trap-16 bug: nothing reads it
+        // (the device flow uses kiro_registration_body(), which sends the
+        // camelCase AWS member `clientName` to /client/register).
+        extra_params: &[],
         refresh_lead_ms: 0,
     }
 }
