@@ -4,7 +4,7 @@
 //!
 //! Accepts either OpenAI-compatible **multipart/form-data** (with `file`, `model`,
 //! and optional `language`/`prompt`/`response_format`/`temperature`) or a JSON body
-//! with `file_b64` + `file_name` (legacy CipherRoute CLI shape — kept for backwards
+//! with `file_b64` + `file_name` (legacy ZeroProxy CLI shape — kept for backwards
 //! compatibility). Resolves the model to a provider, then dispatches by the
 //! provider's STT `format`:
 //!

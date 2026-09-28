@@ -85,7 +85,7 @@ pub(super) async fn get_grok_build_settings(
                     "default": default_model,
                     "subagents": subagents,
                 },
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "configPath": config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -295,7 +295,7 @@ fn parse_models_default(toml: &str) -> Option<String> {
 }
 
 fn build_model_section(model: &str, base_url: &str, api_key: &str) -> String {
-    build_model_section_for_slot(MODEL_SLOT, model, base_url, api_key, "CipherRoute", None)
+    build_model_section_for_slot(MODEL_SLOT, model, base_url, api_key, "ZeroProxy", None)
 }
 
 /// Build a `[model.{slot}]` section, optionally with a `context_window` field
@@ -313,7 +313,7 @@ fn build_model_section_for_slot(
          model = \"{model}\"\n\
          base_url = \"{base_url}\"\n\
          name = \"{name}\"\n\
-         description = \"Routed via CipherRoute gateway\"\n\
+         description = \"Routed via ZeroProxy gateway\"\n\
          api_backend = \"chat_completions\"\n"
     );
     if !api_key.is_empty() {
@@ -597,7 +597,7 @@ async fn write_grok_config(body: &SaveGrokBuildSettingsRequest) -> AnyhowResult<
             &body.model,
             &normalized_base_url,
             &api_key,
-            "CipherRoute",
+            "ZeroProxy",
             body.context_window,
         ),
     );
@@ -626,7 +626,7 @@ async fn write_grok_config(body: &SaveGrokBuildSettingsRequest) -> AnyhowResult<
                         model,
                         &normalized_base_url,
                         &api_key,
-                        &format!("CipherRoute {ty}"),
+                        &format!("ZeroProxy {ty}"),
                         cw,
                     ),
                 );
@@ -784,7 +784,7 @@ model = "x"
                 "gcli/grok-4",
                 "http://127.0.0.1:4623/v1",
                 "sk",
-                "CipherRoute general-purpose",
+                "ZeroProxy general-purpose",
                 Some(200000),
             ),
         );

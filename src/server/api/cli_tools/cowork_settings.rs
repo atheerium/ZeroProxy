@@ -252,7 +252,7 @@ fn app_port() -> u16 {
 
 fn cli_token() -> String {
     // Match 9router's getConsistentMachineId("9r-cli-auth") as closely as practical.
-    // CipherRoute's consistent_machine_id uses MACHINE_ID_SALT (default endpoint-proxy-salt).
+    // ZeroProxy's consistent_machine_id uses MACHINE_ID_SALT (default endpoint-proxy-salt).
     // For CLI bridge headers we hash with the dedicated CLI_TOKEN_SALT.
     use sha2::Digest;
     let salt = CLI_TOKEN_SALT;
@@ -595,7 +595,7 @@ async fn load_cowork_status() -> AnyhowResult<Value> {
     Ok(json!({
         "installed": true,
         "config": config,
-        "hasCipherRoute": has_zeroproxy,
+        "hasZeroProxy": has_zeroproxy,
         "configPath": config_path.map(|path| path.to_string_lossy().to_string()),
         "cowork": {
             "appliedId": applied_id,

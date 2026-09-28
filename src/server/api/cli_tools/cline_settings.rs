@@ -62,7 +62,7 @@ pub(super) async fn get_cline_settings(
             Json(json!({
                 "installed": true,
                 "settings": settings,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "globalStatePath": global_state_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -262,7 +262,7 @@ async fn reset_cline_settings() -> AnyhowResult<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed from Cline",
+        "message": "ZeroProxy settings removed from Cline",
     }))
 }
 

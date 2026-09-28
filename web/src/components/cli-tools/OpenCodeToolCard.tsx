@@ -5,6 +5,7 @@ import type { ChangeEvent } from "react";
 import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
 // import Image from "next/image";
 import EndpointPresetControl from "./EndpointPresetControl";
+import { pickMigratedKey, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY } from "@/lib/brandMigration";
 
 interface Tool {
   name: string;
@@ -19,10 +20,15 @@ interface ApiKey {
 interface OpenCodeStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   config?: {
     provider?: {
-      "cipherroute"?: {
+      zeroproxy?: {
+        options?: {
+          baseURL?: string;
+        };
+      };
+      cipherroute?: {
         options?: {
           baseURL?: string;
         };
@@ -102,8 +108,12 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
     }
 
     // Parse subagent settings from agent.explorer if exists
-    if (status?.config?.agent?.explorer?.model?.startsWith("cipherroute/")) {
-      setSubagentModel(status.config.agent.explorer.model.replace("cipherroute/", ""));
+    const explorerModel = status?.config?.agent?.explorer?.model;
+    for (const prefix of [`${ZEROPROXY_CLI_PROVIDER_KEY}/`, `${LEGACY_CLI_PROVIDER_KEY}/`]) {
+      if (explorerModel?.startsWith(prefix)) {
+        setSubagentModel(explorerModel.slice(prefix.length));
+        break;
+      }
     }
   }, [status]);
 
@@ -120,9 +130,9 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!status?.installed) return null;
     if (!status.config) return "not_configured";
-    const url = status.config?.provider?.["cipherroute"]?.options?.baseURL || "";
+    const url = pickMigratedKey(status.config?.provider, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)?.options?.baseURL || "";
     const isLocal = url.includes("localhost") || url.includes("127.0.0.1");
-    return status.hasCipherRoute && (isLocal || url.includes(baseUrl)) ? "configured" : status.hasCipherRoute ? "other" : "not_configured";
+    return status.hasZeroProxy && (isLocal || url.includes(baseUrl)) ? "configured" : status.hasZeroProxy ? "other" : "not_configured";
   };
 
   const configStatus = getConfigStatus();
@@ -154,7 +164,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
     try {
       const keyToUse = (selectedApiKey && selectedApiKey.trim())
         ? selectedApiKey
-        : (!cloudEnabled ? "sk_cipherroute" : selectedApiKey);
+        : (!cloudEnabled ? "sk_zeroproxy" : selectedApiKey);
 
       const res = await fetch("/api/cli-tools/opencode-settings", {
         method: "POST",
@@ -207,7 +217,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
     const modelsToShow = selectedModels.length > 0 ? selectedModels : ["provider/model-id"];
     const activeModelToShow = activeModel || selectedModels[0] || modelsToShow[0];
@@ -222,18 +232,18 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
       filename: "~/.config/opencode/opencode.json",
       content: JSON.stringify({
         provider: {
-          "cipherroute": {
+          [ZEROPROXY_CLI_PROVIDER_KEY]: {
             npm: "@ai-sdk/openai-compatible",
             options: { baseURL: getEffectiveBaseUrl(), apiKey: keyToUse },
             models: modelsObj,
           },
         },
-        model: `cipherroute/${activeModelToShow}`,
+        model: `${ZEROPROXY_CLI_PROVIDER_KEY}/${activeModelToShow}`,
         agent: {
           explorer: {
             description: "Fast explorer subagent for codebase exploration",
             mode: "subagent",
-            model: `cipherroute/${effectiveSubagentModel}`
+            model: `${ZEROPROXY_CLI_PROVIDER_KEY}/${effectiveSubagentModel}`
           }
         }
       }, null, 2),
@@ -276,7 +286,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
                   <span className="material-symbols-outlined text-yellow-500">warning</span>
                   <div className="flex-1">
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">OpenCode CLI not detected locally</p>
-                    <p className="text-sm text-text-muted">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted">Manual configuration is still available if ZeroProxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -309,12 +319,12 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
             <>
               <div className="flex flex-col gap-2">
                 {/* Current base URL */}
-                {status?.config?.provider?.["cipherroute"]?.options?.baseURL && (
+                {pickMigratedKey(status?.config?.provider, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)?.options?.baseURL && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
                     <span className="min-w-0 truncate rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {status.config.provider["cipherroute"]!.options.baseURL}
+                      {pickMigratedKey(status.config?.provider, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)?.options?.baseURL}
                     </span>
                   </div>
                 )}
@@ -355,7 +365,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -481,7 +491,7 @@ export default function OpenCodeToolCard({ tool, isExpanded, onToggle, baseUrl, 
                 <Button variant="primary" size="sm" onClick={handleApply} disabled={selectedModels.length === 0} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.hasCipherRoute} loading={restoring}>
+                <Button variant="outline" size="sm" onClick={handleReset} disabled={!status.hasZeroProxy} loading={restoring}>
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>

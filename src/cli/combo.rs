@@ -1,6 +1,6 @@
 //! `zeroproxy combo *` — fallback chains and round-robin combos.
 //!
-//! Combos are one of CipherRoute's two core concepts: a named list of models
+//! Combos are one of ZeroProxy's two core concepts: a named list of models
 //! the router walks through on failure (or rotates across, depending on
 //! strategy). They are stored in `db.json` as the `combos` Vec.
 

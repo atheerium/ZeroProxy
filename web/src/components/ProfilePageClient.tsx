@@ -54,7 +54,7 @@ function StatusAlert({ status }: { status: StatusMessage | null }) {
 }
 
 /** Default on-disk path shown in Profile (matches `default_data_dir` + sqlite name). */
-const DEFAULT_DB_PATH_DISPLAY = "~/.cipherroute/cipherroute.sqlite";
+const DEFAULT_DB_PATH_DISPLAY = "~/.zeroproxy/zeroproxy.sqlite";
 
 function getLocaleFromCookie(): string {
   if (typeof document === "undefined") return "en";
@@ -197,7 +197,7 @@ export default function ProfilePageClient() {
     setPassStatus(null);
 
     try {
-      // Prefer dedicated auth endpoint (9router parity + CipherRoute design)
+      // Prefer dedicated auth endpoint (9router parity + ZeroProxy design)
       const res = await fetch("/api/auth/password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -226,7 +226,7 @@ export default function ProfilePageClient() {
       ) {
         setPassStatus({
           type: "error",
-          message: `${msg} — if the dashboard password API is unavailable, use \`cipherroute auth set-password\`.`,
+          message: `${msg} — if the dashboard password API is unavailable, use \`zeroproxy auth reset-password\`.`,
         });
       } else {
         setPassStatus({ type: "error", message: msg });
@@ -501,7 +501,7 @@ export default function ProfilePageClient() {
       const anchor = document.createElement("a");
       const stamp = new Date().toISOString().replace(/[.:]/g, "-");
       anchor.href = url;
-      anchor.download = `cipherroute-backup-${stamp}.json`;
+      anchor.download = `zeroproxy-backup-${stamp}.json`;
       document.body.appendChild(anchor);
       anchor.click();
       document.body.removeChild(anchor);
@@ -837,7 +837,7 @@ export default function ProfilePageClient() {
               <div className="flex flex-col gap-2">
                 <label className="font-medium text-sm">Issuer URL</label>
                 <Input
-                  placeholder="https://auth.example.com/application/o/cipherroute/"
+                  placeholder="https://auth.example.com/application/o/ZeroProxy/"
                   value={oidcForm.oidcIssuerUrl}
                   onChange={(e) => updateOidcForm("oidcIssuerUrl", e.target.value)}
                   disabled={loading || oidcLoading}
@@ -847,7 +847,7 @@ export default function ProfilePageClient() {
               <div className="flex flex-col gap-2">
                 <label className="font-medium text-sm">Client ID</label>
                 <Input
-                  placeholder="cipherroute-dashboard"
+                  placeholder="ZeroProxy-dashboard"
                   value={oidcForm.oidcClientId}
                   onChange={(e) => updateOidcForm("oidcClientId", e.target.value)}
                   disabled={loading || oidcLoading}

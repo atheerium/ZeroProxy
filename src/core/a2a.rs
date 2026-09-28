@@ -1,4 +1,4 @@
-//! A2A (Agent-to-Agent) protocol implementation for CipherRoute.
+//! A2A (Agent-to-Agent) protocol implementation for ZeroProxy.
 //!
 //! Implements the [A2A protocol](https://github.com/google/A2A) for agent
 //! discovery and task-based communication.  A2A lets agents discover one
@@ -57,12 +57,12 @@ pub struct AgentSkill {
 }
 
 impl AgentCard {
-    /// Build the default CipherRoute Agent Card.
+    /// Build the default ZeroProxy Agent Card.
     pub fn new(base_url: &str) -> Self {
         let api_base = base_url.trim_end_matches('/');
         Self {
-            name: "CipherRoute".to_string(),
-            description: "CipherRoute — AI proxy/router for multi-provider model access, routing, and configuration management".to_string(),
+            name: "ZeroProxy".to_string(),
+            description: "ZeroProxy — AI proxy/router for multi-provider model access, routing, and configuration management".to_string(),
             url: format!("{api_base}/api/a2a"),
             version: env!("CARGO_PKG_VERSION").to_string(),
             capabilities: AgentCapabilities {
@@ -279,7 +279,7 @@ impl Default for TaskStore {
 // ─── Task dispatch ─────────────────────────────────────────────────────────
 
 /// Dispatch an incoming A2A task by matching its message parts to
-/// internal CipherRoute operations.
+/// internal ZeroProxy operations.
 pub async fn dispatch_task(
     store: &TaskStore,
     request: TaskSendRequest,
@@ -384,7 +384,7 @@ fn handle_provider_skill(text: &str, state: &crate::server::state::AppState) -> 
     vec![
         TaskPart {
             r#type: "text".to_string(),
-            text: Some(format!("CipherRoute Provider Management\n\nAvailable connections:\n{providers_json}\n\nQuery: {text}")),
+            text: Some(format!("ZeroProxy Provider Management\n\nAvailable connections:\n{providers_json}\n\nQuery: {text}")),
             metadata: None,
         },
     ]
@@ -424,7 +424,7 @@ fn handle_health_skill() -> Vec<TaskPart> {
     vec![TaskPart {
         r#type: "text".to_string(),
         text: Some(format!(
-            "CipherRoute v{} is running.",
+            "ZeroProxy v{} is running.",
             env!("CARGO_PKG_VERSION")
         )),
         metadata: None,

@@ -1,4 +1,4 @@
-//! Fusion strategy orchestrator for CipherRoute's combo dispatch pipeline.
+//! Fusion strategy orchestrator for ZeroProxy's combo dispatch pipeline.
 //!
 //! Ports 9router's `executeFusionStrategy` / `handleFusionChat` logic:
 //! fan out the same prompt to every panel model in parallel, collect

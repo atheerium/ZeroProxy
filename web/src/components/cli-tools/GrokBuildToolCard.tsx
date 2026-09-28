@@ -9,7 +9,7 @@ import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
 
 const ENDPOINT = "/api/cli-tools/grok-build-settings";
-const MODEL_SLOT = "cipherroute";
+const MODEL_SLOT = "zeroproxy";
 
 interface Tool {
   name: string;
@@ -34,7 +34,7 @@ interface GrokModelCfg {
 interface GrokStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: {
     model?: GrokModelCfg | null;
     default?: string | null;
@@ -183,7 +183,7 @@ export default function GrokBuildToolCard({
       const keyToUse =
         selectedApiKey?.trim() ||
         (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-        (!cloudEnabled ? "sk_cipherroute" : null);
+        (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch(ENDPOINT, {
         method: "POST",
@@ -238,7 +238,7 @@ export default function GrokBuildToolCard({
       selectedApiKey && selectedApiKey.trim()
         ? selectedApiKey
         : !cloudEnabled
-          ? "sk_cipherroute"
+          ? "sk_zeroproxy"
           : "<API_KEY_FROM_DASHBOARD>";
 
     const modelId = selectedModel || "provider/model-id";
@@ -248,8 +248,8 @@ default = "${MODEL_SLOT}"
 [model.${MODEL_SLOT}]
 model = "${modelId}"
 base_url = "${getEffectiveBaseUrl()}"
-name = "CipherRoute"
-description = "Routed via CipherRoute gateway"
+name = "ZeroProxy"
+description = "Routed via ZeroProxy gateway"
 api_backend = "chat_completions"
 api_key = "${keyToUse}"
 `;
@@ -329,7 +329,7 @@ api_key = "${keyToUse}"
                       curl -fsSL https://x.ai/cli/install.sh | bash
                     </code>
                     <p className="text-sm text-text-muted mt-2">
-                      Manual configuration is still available if cipherroute is deployed on a remote
+                      Manual configuration is still available if ZeroProxy is deployed on a remote
                       server.
                     </p>
                   </div>
@@ -517,7 +517,7 @@ api_key = "${keyToUse}"
                   variant="outline"
                   size="sm"
                   onClick={() => void handleReset()}
-                  disabled={!grokStatus?.hasCipherRoute}
+                  disabled={!grokStatus?.hasZeroProxy}
                   loading={restoring}
                 >
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset

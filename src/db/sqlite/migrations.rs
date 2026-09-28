@@ -1,4 +1,4 @@
-//! Versioned migration runner for the CipherRoute SQLite schema.
+//! Versioned migration runner for the ZeroProxy SQLite schema.
 //!
 //! Migration files live under `src/db/sqlite/migrations/` and follow the
 //! naming convention `NNNN_description.sql`. Each file is wrapped in a

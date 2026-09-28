@@ -141,7 +141,7 @@ pub fn encryption_key() -> Option<String> {
 // ProviderConnection field-level encryption / decryption
 // ---------------------------------------------------------------------------
 
-/// Marker prefix for values encrypted by CipherRoute (prevents double-encrypt and
+/// Marker prefix for values encrypted by ZeroProxy (prevents double-encrypt and
 /// detects ciphertext when `CIPHERROUTE_ENCRYPTION_KEY` is missing).
 pub const ENC_PREFIX: &str = "opxenc1:";
 

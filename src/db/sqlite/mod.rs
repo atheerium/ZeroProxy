@@ -1,4 +1,4 @@
-//! SQLite backend for CipherRoute persistence.
+//! SQLite backend for ZeroProxy persistence.
 //!
 //! Provides a thin wrapper around `rusqlite::Connection` with:
 //! - Synchronous connections wrapped in a `parking_lot::Mutex` (the rest of
@@ -27,7 +27,7 @@ use rusqlite::Connection;
 
 pub use schema::SCHEMA_VERSION;
 
-/// Cheap handle to the CipherRoute SQLite DB. Cloning shares the same
+/// Cheap handle to the ZeroProxy SQLite DB. Cloning shares the same
 /// connection (serialised through the mutex). Callers should perform
 /// long transactions on a dedicated `Connection` (see [`connect`]).
 #[derive(Clone)]

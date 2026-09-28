@@ -1,10 +1,10 @@
-//! Response cache for CipherRoute.
+//! Response cache for ZeroProxy.
 //!
 //! Provides an exact-match response cache keyed by SHA-256 of the serialized
 //! request body. Non-streaming chat completions are cached with a configurable
 //! TTL (default 60 seconds). Upstream `Cache-Control` headers are respected.
 //!
-//! This is the equivalent of OmniRoute's response cache, ported to CipherRoute.
+//! This is the equivalent of OmniRoute's response cache, ported to ZeroProxy.
 
 use std::collections::BTreeMap;
 use std::hash::Hash;

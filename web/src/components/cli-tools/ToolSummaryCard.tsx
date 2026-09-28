@@ -12,7 +12,7 @@ interface Tool {
 
 interface Status {
   installed?: boolean;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
 }
 
 interface ToolSummaryCardProps {
@@ -25,7 +25,7 @@ interface ToolSummaryCardProps {
 function getStatus(status?: Status | null): { label: string; cls: string } {
   if (!status) return { label: "Unknown", cls: "bg-gray-500/10 text-gray-500" };
   if (!status.installed) return { label: "Not installed", cls: "bg-gray-500/10 text-gray-500" };
-  if (status.hasCipherRoute) return { label: "Connected", cls: "bg-green-500/10 text-green-600 dark:text-green-400" };
+  if (status.hasZeroProxy) return { label: "Connected", cls: "bg-green-500/10 text-green-600 dark:text-green-400" };
   return { label: "Not configured", cls: "bg-yellow-500/10 text-yellow-600 dark:text-yellow-400" };
 }
 

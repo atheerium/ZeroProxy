@@ -196,7 +196,7 @@ async fn test_cline_settings_writes_global_state_keys() {
 // ─── continue_settings: merges JSON models[] ─────────────────────────────
 //
 // Continue.dev has a config.json at ~/.continue/config.json with a "models"
-// array. CipherRoute merges a new entry into that array.
+// array. ZeroProxy merges a new entry into that array.
 
 #[tokio::test]
 async fn test_continue_settings_merges_models() {
@@ -220,7 +220,7 @@ async fn test_continue_settings_merges_models() {
 
     // Merge a new model entry
     let new_model = serde_json::json!({
-        "title": "CipherRoute",
+        "title": "ZeroProxy",
         "provider": "openai",
         "model": "gpt-4o",
         "apiKey": "op_key",
@@ -242,7 +242,7 @@ async fn test_continue_settings_merges_models() {
 
     let op_model = result_models
         .iter()
-        .find(|m| m.get("title").and_then(Value::as_str) == Some("CipherRoute"))
+        .find(|m| m.get("title").and_then(Value::as_str) == Some("ZeroProxy"))
         .unwrap();
     assert_eq!(
         op_model.get("baseUrl").and_then(Value::as_str),

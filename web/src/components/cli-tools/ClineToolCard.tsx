@@ -18,7 +18,7 @@ interface ApiKey {
 interface ClineStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: {
     actModeApiProvider?: string;
     planModeApiProvider?: string;
@@ -88,7 +88,7 @@ export default function ClineToolCard({
 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!status?.installed) return null;
-    if (!status.hasCipherRoute) return "not_configured";
+    if (!status.hasZeroProxy) return "not_configured";
     const url = status.settings?.openAiBaseUrl || "";
     const localMatch = url.includes("localhost") || url.includes("127.0.0.1") || url.includes("0.0.0.0");
     return localMatch ? "configured" : "other";
@@ -134,7 +134,7 @@ export default function ClineToolCard({
       const keyToUse =
         selectedApiKey?.trim() ||
         (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-        (!cloudEnabled ? "sk_cipherroute" : null);
+        (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch("/api/cli-tools/cline-settings", {
         method: "POST",
@@ -188,7 +188,7 @@ export default function ClineToolCard({
     const keyToUse =
       selectedApiKey?.trim() ||
       (apiKeys?.length > 0 ? apiKeys[0].key : null) ||
-      (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
     const effectiveUrl = getEffectiveBaseUrl();
     const baseWithoutV1 = effectiveUrl.endsWith("/v1") ? effectiveUrl.slice(0, -3) : effectiveUrl;
     return [
@@ -380,7 +380,7 @@ export default function ClineToolCard({
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -443,7 +443,7 @@ export default function ClineToolCard({
                 <Button onClick={() => void handleApply()} disabled={applying || !selectedModel} className="w-full sm:w-auto">
                   {applying ? "Applying..." : "Apply Settings"}
                 </Button>
-                {status?.hasCipherRoute && (
+                {status?.hasZeroProxy && (
                   <Button onClick={() => void handleReset()} disabled={restoring} variant="secondary" className="w-full sm:w-auto">
                     {restoring ? "Resetting..." : "Reset Settings"}
                   </Button>

@@ -1,4 +1,4 @@
-//! MCP (Model Context Protocol) support for CipherRoute.
+//! MCP (Model Context Protocol) support for ZeroProxy.
 //!
 //! Two MCP modes:
 //!   * **Stdio-bridge mode** — spawns external MCP child processes (e.g.
@@ -6,7 +6,7 @@
 //!     Layout: [`bridge`], [`plugins`], [`smart_filter`].
 //!     The HTTP handlers live in `crate::server::api::mcp`.
 //!   * **Native server mode** — implements the MCP JSON-RPC 2.0 protocol
-//!     directly inside CipherRoute with a built-in tool registry of ~15
+//!     directly inside ZeroProxy with a built-in tool registry of ~15
 //!     administrative tools. Served at `/api/mcp-server/*` and `/api/mcp`.
 //!     Layout: [`server`].
 

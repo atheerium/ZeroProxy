@@ -8,6 +8,11 @@ import EndpointPresetControl from "./EndpointPresetControl";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
+import {
+  pickMigratedKey,
+  ZEROPROXY_CLI_PROVIDER_KEY,
+  LEGACY_CLI_PROVIDER_KEY,
+} from "@/lib/brandMigration";
 
 interface Tool {
   name: string;
@@ -29,11 +34,16 @@ interface Agent {
 interface OpenclawStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: {
     models?: {
       providers?: {
-        "cipherroute"?: {
+        zeroproxy?: {
+          baseUrl?: string;
+          apiKey?: string;
+        };
+        /** Pre-rename spelling, still present in on-disk OpenClaw settings. */
+        cipherroute?: {
           baseUrl?: string;
           apiKey?: string;
         };
@@ -105,7 +115,11 @@ export default function OpenClawToolCard({
 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!openclawStatus?.installed) return null;
-    const currentProvider = openclawStatus.settings?.models?.providers?.["cipherroute"];
+    const currentProvider = pickMigratedKey(
+        openclawStatus.settings?.models?.providers,
+        ZEROPROXY_CLI_PROVIDER_KEY,
+        LEGACY_CLI_PROVIDER_KEY,
+      );
     if (!currentProvider) return "not_configured";
     const matched = matchKnownEndpoint(currentProvider.baseUrl, {
       tunnelPublicUrl,
@@ -148,10 +162,19 @@ export default function OpenClawToolCard({
   useEffect(() => {
     if (openclawStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
-      const provider = openclawStatus.settings?.models?.providers?.["cipherroute"];
+      const provider = pickMigratedKey(
+        openclawStatus.settings?.models?.providers,
+        ZEROPROXY_CLI_PROVIDER_KEY,
+        LEGACY_CLI_PROVIDER_KEY,
+      );
       if (provider) {
         const primaryModel = openclawStatus.settings?.agents?.defaults?.model?.primary;
-        if (primaryModel) setSelectedModel(primaryModel.replace("cipherroute/", ""));
+        if (primaryModel) {
+          const prefix = [ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY]
+            .map((p) => `${p}/`)
+            .find((p) => primaryModel.startsWith(p));
+          setSelectedModel(prefix ? primaryModel.slice(prefix.length) : primaryModel);
+        }
         if (provider.apiKey && apiKeys?.some(k => k.key === provider.apiKey)) {
           setSelectedApiKey(provider.apiKey);
         }
@@ -198,7 +221,7 @@ export default function OpenClawToolCard({
     try {
       const keyToUse = selectedApiKey?.trim()
         || (apiKeys?.length > 0 ? apiKeys[0].key : null)
-        || (!cloudEnabled ? "sk_cipherroute" : null);
+        || (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch("/api/cli-tools/openclaw-settings", {
         method: "POST",
@@ -258,19 +281,19 @@ export default function OpenClawToolCard({
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
     const settingsContent = {
       agents: {
         defaults: {
           model: {
-            primary: `cipherroute/${selectedModel || "provider/model-id"}`,
+            primary: `${ZEROPROXY_CLI_PROVIDER_KEY}/${selectedModel || "provider/model-id"}`,
           },
         },
       },
       models: {
         providers: {
-          "cipherroute": {
+          [ZEROPROXY_CLI_PROVIDER_KEY]: {
             baseUrl: getEffectiveBaseUrl(),
             apiKey: keyToUse,
             api: "openai-completions",
@@ -329,7 +352,7 @@ export default function OpenClawToolCard({
                   <span className="material-symbols-outlined text-yellow-500">warning</span>
                   <div className="flex-1">
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">Open Claw CLI not detected locally</p>
-                    <p className="text-sm text-text-muted">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted">Manual configuration is still available if ZeroProxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -346,12 +369,12 @@ export default function OpenClawToolCard({
             <>
               <div className="flex flex-col gap-2">
                 {/* Current Base URL */}
-                {openclawStatus?.settings?.models?.providers?.["cipherroute"]?.baseUrl && (
+                {pickMigratedKey(openclawStatus.settings?.models?.providers, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)?.baseUrl && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
                     <span className="min-w-0 truncate rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {openclawStatus.settings.models.providers["cipherroute"]!.baseUrl}
+                      {pickMigratedKey(openclawStatus.settings?.models?.providers, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)!.baseUrl}
                     </span>
                   </div>
                 )}
@@ -434,7 +457,7 @@ export default function OpenClawToolCard({
                 <Button variant="primary" size="sm" onClick={handleApplySettings} disabled={!selectedModel} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasCipherRoute} loading={restoring}>
+                <Button variant="outline" size="sm" onClick={handleResetSettings} disabled={!openclawStatus?.hasZeroProxy} loading={restoring}>
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>

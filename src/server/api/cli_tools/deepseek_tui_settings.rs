@@ -59,7 +59,7 @@ pub(super) async fn get_deepseek_tui_settings(
             Json(json!({
                 "installed": true,
                 "settings": config,
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "configPath": config_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -269,7 +269,7 @@ async fn reset_deepseek_config() -> AnyhowResult<Value> {
     fs::write(&config_path, DEFAULT_CONFIG).await?;
     Ok(json!({
         "success": true,
-        "message": "CipherRoute config reset to DeepSeek defaults",
+        "message": "ZeroProxy config reset to DeepSeek defaults",
     }))
 }
 

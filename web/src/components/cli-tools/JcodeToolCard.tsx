@@ -4,6 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import type { ChangeEvent } from "react";
 import { Card, Button, ModelSelectModal, ManualConfigModal } from "@/shared/components";
 import EndpointPresetControl from "./EndpointPresetControl";
+import {
+  pickMigratedKey,
+  ZEROPROXY_CLI_PROVIDER_KEY,
+  LEGACY_CLI_PROVIDER_KEY,
+} from "@/lib/brandMigration";
 import BaseUrlSelect from "./BaseUrlSelect";
 import ApiKeySelect from "./ApiKeySelect";
 import { matchKnownEndpoint } from "./cliEndpointMatch";
@@ -22,7 +27,7 @@ interface ApiKey {
 interface JcodeStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   config?: {
     providers?: Record<string, { base_url?: string; default_model?: string }>;
   };
@@ -82,8 +87,12 @@ export default function JcodeToolCard({
 
   const getConfigStatus = (): "configured" | "not_configured" | "other" | null => {
     if (!jcodeStatus?.installed) return null;
-    if (!jcodeStatus?.hasCipherRoute) return "not_configured";
-    const currentProvider = jcodeStatus.config?.providers?.["cipherroute"];
+    if (!jcodeStatus?.hasZeroProxy) return "not_configured";
+    const currentProvider = pickMigratedKey(
+      jcodeStatus.config?.providers,
+      ZEROPROXY_CLI_PROVIDER_KEY,
+      LEGACY_CLI_PROVIDER_KEY
+    );
     if (!currentProvider) return "not_configured";
     const matched = matchKnownEndpoint(currentProvider.base_url, {
       tunnelPublicUrl,
@@ -126,7 +135,11 @@ export default function JcodeToolCard({
   useEffect(() => {
     if (jcodeStatus?.installed && !hasInitializedModel.current) {
       hasInitializedModel.current = true;
-      const provider = jcodeStatus.config?.providers?.["cipherroute"];
+      const provider = pickMigratedKey(
+        jcodeStatus.config?.providers,
+        ZEROPROXY_CLI_PROVIDER_KEY,
+        LEGACY_CLI_PROVIDER_KEY
+      );
       if (provider) {
         if (provider.default_model) {
           setSelectedModel(provider.default_model);
@@ -172,7 +185,7 @@ export default function JcodeToolCard({
     try {
       const keyToUse = selectedApiKey?.trim()
         || (apiKeys?.length > 0 ? apiKeys[0].key : null)
-        || (!cloudEnabled ? "sk_cipherroute" : null);
+        || (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch("/api/cli-tools/jcode-settings", {
         method: "POST",
@@ -226,18 +239,18 @@ export default function JcodeToolCard({
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
-    const configToml = `[providers.cipherroute]
+    const configToml = `[providers.zeroproxy]
 	type = "openai-compatible"
 	base_url = "${getEffectiveBaseUrl()}"
 	auth = "bearer"
 	api_key_env = "JCODE_CIPHERROUTE_API_KEY"
-	env_file = "provider-cipherroute.env"
+	env_file = "provider-zeroproxy.env"
 	default_model = "${selectedModel || "provider/model-id"}"
 	requires_api_key = true
 
-	[[providers.cipherroute.models]]
+	[[providers.zeroproxy.models]]
 	id = "${selectedModel || "provider/model-id"}"`;
 
     const envContent = `JCODE_CIPHERROUTE_API_KEY="${keyToUse}"`;
@@ -248,7 +261,7 @@ export default function JcodeToolCard({
         content: configToml,
       },
       {
-        filename: "~/.config/jcode/provider-cipherroute.env",
+        filename: "~/.config/jcode/provider-zeroproxy.env",
         content: envContent,
       },
     ];
@@ -294,7 +307,7 @@ export default function JcodeToolCard({
                     <code className="block mt-2 p-2 bg-black/20 rounded text-xs font-mono">
                       curl -fsSL https://raw.githubusercontent.com/1jehuang/jcode/master/scripts/install.sh | bash
                     </code>
-                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if ZeroProxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -329,12 +342,16 @@ export default function JcodeToolCard({
                 )}
 
                 {/* Current base URL */}
-                {jcodeStatus?.config?.providers?.["cipherroute"]?.base_url && (
+                {pickMigratedKey(jcodeStatus?.config?.providers, ZEROPROXY_CLI_PROVIDER_KEY, LEGACY_CLI_PROVIDER_KEY)?.base_url && (
                   <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-[8rem_auto_1fr_auto] sm:items-center sm:gap-2">
                     <span className="text-xs font-semibold text-text-main sm:text-right sm:text-sm">Current</span>
                     <span className="material-symbols-outlined hidden text-text-muted text-[14px] sm:inline">arrow_forward</span>
                     <span className="min-w-0 truncate rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {jcodeStatus.config.providers["cipherroute"].base_url}
+                      {pickMigratedKey(
+                        jcodeStatus.config?.providers,
+                        ZEROPROXY_CLI_PROVIDER_KEY,
+                        LEGACY_CLI_PROVIDER_KEY
+                      )?.base_url}
                     </span>
                   </div>
                 )}
@@ -389,8 +406,8 @@ export default function JcodeToolCard({
                 {/* Usage hint */}
                 <div className="flex flex-col gap-1 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg">
                   <p className="text-xs font-medium text-blue-600 dark:text-blue-400">Usage:</p>
-                  <code className="text-xs font-mono text-text-muted">jcode --provider-profile cipherroute</code>
-                  <code className="text-xs font-mono text-text-muted">jcode --provider-profile cipherroute --model {selectedModel || "provider/model-id"}</code>
+                  <code className="text-xs font-mono text-text-muted">jcode --provider-profile zeroproxy</code>
+                  <code className="text-xs font-mono text-text-muted">jcode --provider-profile zeroproxy --model {selectedModel || "provider/model-id"}</code>
                 </div>
               </div>
 
@@ -405,7 +422,7 @@ export default function JcodeToolCard({
                 <Button variant="primary" size="sm" onClick={() => void handleApplySettings()} disabled={!selectedModel} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => void handleResetSettings()} disabled={!jcodeStatus?.hasCipherRoute} loading={restoring}>
+                <Button variant="outline" size="sm" onClick={() => void handleResetSettings()} disabled={!jcodeStatus?.hasZeroProxy} loading={restoring}>
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>

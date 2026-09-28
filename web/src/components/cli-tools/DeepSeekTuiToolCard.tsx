@@ -21,7 +21,7 @@ interface ApiKey {
 interface DeepSeekStatus {
   installed: boolean;
   error?: string;
-  hasCipherRoute?: boolean;
+  hasZeroProxy?: boolean;
   settings?: Record<string, Record<string, string>>;
 }
 
@@ -154,7 +154,7 @@ export default function DeepSeekTuiToolCard({
     try {
       const keyToUse = selectedApiKey?.trim()
         || (apiKeys?.length > 0 ? apiKeys[0].key : null)
-        || (!cloudEnabled ? "sk_cipherroute" : null);
+        || (!cloudEnabled ? "sk_zeroproxy" : null);
 
       const res = await fetch(ENDPOINT, {
         method: "POST",
@@ -207,7 +207,7 @@ export default function DeepSeekTuiToolCard({
   const getManualConfigs = (): Array<{ filename: string; content: string }> => {
     const keyToUse = (selectedApiKey && selectedApiKey.trim())
       ? selectedApiKey
-      : (!cloudEnabled ? "sk_cipherroute" : "<API_KEY_FROM_DASHBOARD>");
+      : (!cloudEnabled ? "sk_zeroproxy" : "<API_KEY_FROM_DASHBOARD>");
 
     const tomlContent = `[providers.openai]
 base_url = "${getEffectiveBaseUrl()}"
@@ -258,7 +258,7 @@ model = "${selectedModel || "provider/model-id"}"
                     <p className="font-medium text-yellow-600 dark:text-yellow-400">DeepSeek TUI not detected locally</p>
                     <p className="text-sm text-text-muted mt-1">Install via npm:</p>
                     <code className="block mt-2 p-2 bg-black/20 rounded text-xs font-mono">npm install -g deepseek-tui</code>
-                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if cipherroute is deployed on a remote server.</p>
+                    <p className="text-sm text-text-muted mt-2">Manual configuration is still available if ZeroProxy is deployed on a remote server.</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 pl-9">
@@ -339,7 +339,7 @@ model = "${selectedModel || "provider/model-id"}"
                     </select>
                   ) : (
                     <span className="min-w-0 rounded bg-surface/40 px-2 py-2 text-xs text-text-muted sm:py-1.5">
-                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_cipherroute (default)"}
+                      {cloudEnabled ? "No API keys - Create one in Keys page" : "sk_zeroproxy (default)"}
                     </span>
                   )}
                 </div>
@@ -367,7 +367,7 @@ model = "${selectedModel || "provider/model-id"}"
                 <Button variant="primary" size="sm" onClick={() => void handleApply()} disabled={!selectedModel} loading={applying}>
                   <span className="material-symbols-outlined text-[14px] mr-1">save</span>Apply
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => void handleReset()} disabled={!deepseekStatus?.hasCipherRoute} loading={restoring}>
+                <Button variant="outline" size="sm" onClick={() => void handleReset()} disabled={!deepseekStatus?.hasZeroProxy} loading={restoring}>
                   <span className="material-symbols-outlined text-[14px] mr-1">restore</span>Reset
                 </Button>
                 <Button variant="ghost" size="sm" onClick={() => setShowManualConfigModal(true)}>

@@ -61,7 +61,7 @@ pub(super) async fn get_kilo_settings(
             Json(json!({
                 "installed": true,
                 "settings": { "auth": auth_keys },
-                "hasCipherRoute": has_zeroproxy,
+                "hasZeroProxy": has_zeroproxy,
                 "authPath": auth_path().to_string_lossy().to_string(),
             }))
             .into_response()
@@ -194,7 +194,7 @@ async fn write_kilo_settings(body: &SaveKiloSettingsRequest) -> AnyhowResult<()>
             vscode.insert(
                 "kilocode.customProvider".to_string(),
                 json!({
-                    "name": "CipherRoute",
+                    "name": "ZeroProxy",
                     "baseURL": normalized_base_url,
                     "apiKey": body.api_key,
                 }),
@@ -235,7 +235,7 @@ async fn reset_kilo_settings() -> AnyhowResult<Value> {
 
     Ok(json!({
         "success": true,
-        "message": "CipherRoute settings removed from Kilo Code",
+        "message": "ZeroProxy settings removed from Kilo Code",
     }))
 }
 

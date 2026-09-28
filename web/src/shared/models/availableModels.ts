@@ -10,6 +10,7 @@
 // id normalization.
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import { readMigratedRaw, writeMigratedRaw } from "@/lib/brandMigration";
 // Catalog loads async into the store; subscribe so rows recompute on arrival.
 import { getModelsByProviderId, useEnsureCatalog } from "@/shared/constants/models";
 import { useCatalogStore } from "@/store/catalogStore";
@@ -243,7 +244,8 @@ export async function fetchLiveModels(
 //   PUT  /api/providers/filters  → { alias, freeOnly }
 // Falls back to localStorage when the endpoint is unavailable.
 
-const FREE_ONLY_LS_PREFIX = "cipherroute:freeOnly:";
+const FREE_ONLY_LS_PREFIX = "zeroproxy:freeOnly:";
+const LEGACY_FREE_ONLY_LS_PREFIX = "cipherroute:freeOnly:";
 
 async function loadFreeOnly(alias: string): Promise<boolean> {
   try {
@@ -260,7 +262,7 @@ async function loadFreeOnly(alias: string): Promise<boolean> {
     // ignore — fall through to localStorage
   }
   try {
-    const v = localStorage.getItem(FREE_ONLY_LS_PREFIX + alias);
+    const v = readMigratedRaw(localStorage, FREE_ONLY_LS_PREFIX + alias, LEGACY_FREE_ONLY_LS_PREFIX + alias);
     if (v !== null) return v === "1";
   } catch {
     // ignore
@@ -270,7 +272,7 @@ async function loadFreeOnly(alias: string): Promise<boolean> {
 
 async function saveFreeOnly(alias: string, value: boolean): Promise<void> {
   try {
-    localStorage.setItem(FREE_ONLY_LS_PREFIX + alias, value ? "1" : "0");
+    writeMigratedRaw(localStorage, FREE_ONLY_LS_PREFIX + alias, value ? "1" : "0");
   } catch {
     // ignore
   }

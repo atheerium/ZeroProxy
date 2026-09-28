@@ -1,4 +1,4 @@
-//! SQLite schema for CipherRoute persistence.
+//! SQLite schema for ZeroProxy persistence.
 //!
 //! Mirrors the upstream 9router schema (see `9router/src/lib/db/schema.js`)
 //! with zeroproxy-specific columns added for encrypted secrets and snapshots.
@@ -12,7 +12,7 @@
 /// `migrations/`.
 pub const SCHEMA_VERSION: i32 = 2;
 
-/// All DDL statements that define the CipherRoute schema. Run inside a single
+/// All DDL statements that define the ZeroProxy schema. Run inside a single
 /// transaction during `init_db`.
 pub const TABLES_SQL: &[&str] = &[
     // Metadata: holds the active schema version + integrity stamp.
