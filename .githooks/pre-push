@@ -19,9 +19,15 @@ if [[ -n "$BRANCH" ]] && ! echo "$BRANCH" | grep -qE "$BRANCH_RE" && ! echo "$BR
 fi
 
 # 2. secret scan on outgoing diff vs origin/main or origin/HEAD
+#    Each pattern must match a *value*, not a bare identifier. `refresh_token`
+#    in particular is also an OAuth 2.0 grant type name that AWS's RegisterClient
+#    API takes literally ("grantTypes": ["refresh_token", ...]), so a bare-word
+#    match here blocks every correct OIDC implementation. Require an assignment
+#    followed by a plausible-length value.
 BASE=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD HEAD~1 2>/dev/null || echo "HEAD~1")
 DIFF=$(git diff "$BASE"..HEAD -U0 2>/dev/null || true)
-if echo "$DIFF" | grep -qE 'sk-[a-zA-Z0-9]{20,}|refresh_token|BEGIN (RSA|EC) PRIVATE KEY'; then
+SECRET_RE='sk-[a-zA-Z0-9]{20,}|refresh_token["'"'"']?[[:space:]]*[:=]>?[[:space:]]*["'"'"']?[A-Za-z0-9_.-]{16,}|Bearer[[:space:]]+[A-Za-z0-9_.-]{20,}|BEGIN (RSA|EC) PRIVATE KEY'
+if echo "$DIFF" | grep -qE "$SECRET_RE"; then
   echo "!! pre-push: outgoing diff contains potential secret"
   exit 1
 fi
