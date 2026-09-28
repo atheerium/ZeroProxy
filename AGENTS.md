@@ -39,13 +39,25 @@ Treat this file as the sole source of truth for anything you were not told in th
 - The Mission section above is permanent. Everything else may be superseded — check `git log` on
   this file when state looks stale.
 
+**If you were asked to implement a feature, read
+[Agent Orchestration](#agent-orchestration--the-maintainers-loop-and-how-to-stay-out-of-each-others-way)
+NOW, before your first edit.** It defines the maintainer's 4-step loop, the branch-per-agent rule,
+and why port 4623 is the single most common way two concurrent agents destroy each other's work.
+The short version, which overrides any instinct to be helpful:
+
+1. **Never merge to `main` without being asked in that same conversation.**
+2. **Never commit at the end of an implementation** — the maintainer tests before committing.
+3. **Never edit in the main worktree** — make a branch and a worktree first.
+4. **Never touch port 4623** unless you are the maintainer's own test instance. Use `PORT=4631`.
+
 ## Current state (2026-09-26) — read before planning more work
 
-**Not on `main`: the analytics rewrite lives on `agent/feat/analytics-pages` (2 commits, unmerged,
-no PR).** Fixes the success-rate lie (failures were never persisted) and adds `/dashboard/analytics`
-+ `/dashboard/provider-stats`. Until it merges, `main` still reports a fake 100% success rate for every
-provider and still has no per-provider latency/TTFT. Verify with
-`git log --oneline main..agent/feat/analytics-pages` before assuming either version.
+**The analytics rewrite IS on `main`** (it was merged, then the remote branch was deleted on
+2026-09-27). Fixes the success-rate lie (failures were never persisted) and adds
+`/dashboard/analytics` + `/dashboard/provider-stats`. **This line was stale for a week** — it
+claimed the work was unmerged, and an agent nearly preserved a branch that had nothing left in it.
+If you ever doubt a "current state" claim here, check the artifact, not the sentence:
+`git merge-base --is-ancestor <branch> main` and `git ls-tree -r --name-only main | grep <the file>`.
 
 **The free-tier goal is met and PR #14 is MERGED into `main` (merge commit `c9d72419`, 2026-09-26).**
 
@@ -770,24 +782,94 @@ traps. The `github_*` MCP tools take an explicit owner/repo and are immune.
 
 Full rules: `CONTRIBUTING.md` + `docs/git-conventions.md` (both tracked) + `.github/pull_request_template.md`.
 
-## Agent Orchestration — branch-per-agent, worktree isolation
+## Agent Orchestration — the maintainer's loop, and how to stay out of each other's way
 
-**Rule: one agent = one branch = one worktree. Never share a branch.** Shared-branch edits
-previously produced a 26-file stash and cross-branch cherry-picks.
+**This repo is worked by multiple AI agents, often concurrently, and the maintainer holds no
+project state in his head. Read this section before your first edit.**
+
+### The maintainer's loop — what he does and what you do
+
+| step | maintainer | you |
+|---|---|---|
+| 1 | asks for a feature | create branch + worktree, implement, run the gate, **stop** |
+| 2 | tests it himself | idle. **Do not commit. Do not merge.** |
+| 3 | says "it works, commit and merge" | run the gate again, commit, open a PR, **stop** |
+| 4 | merges, or asks you to | merge, return to `main`, clean up |
+
+**Steps 1 and 2 are where agents go wrong.** You are NOT authorised to commit at the end of an
+implementation, and you are NEVER authorised to merge to `main` without being asked in that
+conversation. A commit is cheap to add later; an unwanted merge to `main` is expensive and has
+happened here. If you finish a feature and nobody has tested it, say so and stop.
+
+### One agent = one branch = one worktree. Never share a branch.
 
 ```bash
-cat .opencode/claims/* 2>/dev/null; git worktree list   # check claims first
+cat .opencode/claims/* 2>/dev/null; git worktree list   # ALWAYS check who else is live
 git worktree add ../wt-<agent>-<slug> -b <agent>/<type>/<kebab>
-./scripts/claim-branch.sh <agent>/<type>/<kebab>        # NOT ../cipherroute/... — that path is gone
-./scripts/claim-branch.sh --release <branch>           # when done
+cd ../wt-<agent>-<slug> && ./scripts/dev.sh              # build + run, detached, non-blocking
 ```
 
-- Claim files live in gitignored `.opencode/claims/<branch-with-__slashes>`; the script also
-  rejects names that already exist in git.
-- `dev.sh` warns on a dirty tree; hooks block wrong-branch commits.
-- Return to `main` when finished — don't park the repo on a feature branch.
-- Full spec + recovery: `docs/agent-orchestration.md` (tracked). Note it still contains a few
-  stale `../cipherroute` paths.
+Branch names must match `^([a-z0-9._-]+/)?(feat|fix|docs|chore|refactor|test|build|ci|perf)/[a-z0-9._-]+$`
+or be `main|dev|pr-*`. The pre-push hook enforces this. Never `--no-verify`.
+
+### ⭐ Port 4623 is the #1 conflict between two concurrent agents
+
+Only **one** server can hold `:4623`. A second agent starting one will either fail to bind or —
+worse — **quietly kill or be killed by the first agent's**, leaving the maintainer testing a
+binary he did not expect.
+
+**Use a private port for anything that is not the maintainer's test instance:**
+
+```bash
+PORT=4631 ./scripts/dev.sh          # sanctioned multi-instance escape, documented in scripts/dev.sh
+```
+
+Rules that follow from this:
+- **The default `PORT=4623` belongs to the maintainer.** Do not stop it to free a port.
+- To stop **your own** server, resolve the pid from the port's listener — never `pkill zeroproxy`
+  and never `pkill -x zeroproxy`. Both have killed the maintainer's instance here. Use:
+  `ss -tlnp | grep "127.0.0.1:$PORT" | sed -n 's/.*pid=\([0-9]*\).*/\1/p'` then `kill <pid>`.
+- Before you start or stop anything, run `./scripts/dev.sh --doctor`. It reports which build
+  layers are stale **and** whether the serving process actually has `--web-dir` (a green `/health`
+  cannot tell you that — see Trap 4c).
+
+### Before you touch anything shared
+
+`src/server/api/chat.rs`, `web/src/shared/constants/providers.ts`, and
+`src/core/model/provider_catalog.json` are **hot files** — two features touching the same one will
+conflict on merge. Check `git status` in the main worktree first: if another session is mid-flight
+you will see its dirty files, and you must not overwrite, revert, or commit them.
+
+**Never move or rewrite a git ref while another session is live in a worktree.** Only ref-only
+operations are safe (`git fetch origin main:main` when `main` is not checked out). Deleting a
+worktree kills any server running from it.
+
+### Finishing a feature
+
+```bash
+./scripts/dev.sh --full detach        # the real gate: fmt + clippy + astro + tests
+git status --porcelain                # MUST be empty before you report done
+git log --oneline main..HEAD          # your commits, countable
+```
+
+Then report: the branch name, the commit shas, the gate results, and **explicitly that it is not
+merged**. Uncommitted work is not saved (Trap 14) — a finished analytics feature once sat
+uncommitted in a worktree for a month and was nearly lost.
+
+### Recovering from a confused repo
+
+```bash
+git worktree list                          # what exists
+git for-each-ref --format='%(refname:short) %(upstream:short)' refs/heads
+git rev-list --left-right --count main...origin/main   # 0  0 means synced
+```
+
+If `git branch -d` refuses with "not fully merged", that is often **wrong** — it only asks whether
+the local tip is merged into its *own upstream*, which trips when you are ahead. Prove it with
+`git merge-base --is-ancestor <branch> main` and use `-D` if that says yes.
+
+Full spec + recovery: `docs/agent-orchestration.md` (tracked). Note it still contains a few
+stale `../cipherroute` paths.
 
 ## Schema stability
 
