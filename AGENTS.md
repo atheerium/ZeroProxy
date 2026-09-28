@@ -48,7 +48,9 @@ The short version, which overrides any instinct to be helpful:
 1. **Never merge to `main` without being asked in that same conversation.**
 2. **Never commit at the end of an implementation** — the maintainer tests before committing.
 3. **Never edit in the main worktree** — make a branch and a worktree first.
-4. **Never touch port 4623** unless you are the maintainer's own test instance. Use `PORT=4631`.
+4. **Never touch port 4623** unless you are the maintainer's own test instance. Use `PORT=4631` —
+   but only for runs that start nothing; `PORT=` does not isolate you from the shared
+   `zeroproxy.service` unit (Trap 17).
 
 ## Current state (2026-09-26) — read before planning more work
 
@@ -679,6 +681,37 @@ local gate, because both bugs are runtime-only and the gate never calls AWS:
 must return a real user code. A `clientId` of `zeroproxy` or an empty secret in that path is the
 bug, even if the tests are green.
 
+### 17. `PORT=4631` is NOT a multi-instance escape — dev.sh stops the shared unit anyway
+This line previously told agents `PORT=4631 ./scripts/dev.sh` was a "sanctioned multi-instance
+escape". **That is false for any run that starts a server**, and it cost a live instance.
+
+**Measured (2026-09-28):** `PORT=4631 ./scripts/dev.sh --full detach` stopped the
+`zeroproxy.service` unit (pid 1214, the maintainer's 4623 instance) and left nothing on 4623. The
+`PORT` value is read when *binding*, but the startup path stops the unit / whatever holds the port
+**regardless of `PORT`**. Recovery: `timeout 600 ./scripts/dev.sh --fast detach` (default port).
+No data lost — the sqlite file is not touched by a stop.
+
+**So `PORT=` is a way to bind a second listener, not a way to isolate yourself.** What is safe:
+
+| Run | Safe? | Why |
+|---|---|---|
+| `--check` | yes | lint only, starts nothing |
+| `--backend-only`, `--web-only` | yes | build only, starts nothing |
+| `--fast detach`, `--full detach`, `run` | **no** | stops the shared unit first |
+
+**Run the gate as cargo directly:** `cargo test --lib --all-features` ·
+`cargo clippy --all-targets --all-features` · `cargo fmt --check`. The web half of the gate
+(`cd web && pnpm install --frozen-lockfile && pnpm run build`, vitest, `astro check`) touches only
+`web/` and is safe from a worktree.
+
+**Related worktree gotcha (same day, same cause class):** `./scripts/setup-hooks.sh` **cannot be
+run from a worktree.** It does `mkdir -p .git/hooks`, but `.git` is a regular *file* inside a
+worktree, so `set -euo pipefail` aborts — loudly, but it installs nothing. Git shares hooks across
+worktrees through the common dir, so install there instead:
+`cp .githooks/* "$(git rev-parse --git-common-dir)"/hooks/ && chmod +x "$(git rev-parse --git-common-dir)"/hooks/*`
+Always verify a hook against the **installed** bytes, never the committed file — a stale installed
+copy already bit this repo once (it blocked a legitimate push).
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
@@ -705,7 +738,11 @@ fallback, token refresh, usage tracking, and SSE streaming. A stripped Rust clon
 ordering → provider execution → response translation → SSE streaming`
 
 - **Executor trait**: `ProviderExecutor` — default + per-provider impls (`src/core/executor/`)
-- **Persistence**: SQLite (WAL) + AES-GCM encrypted credential columns (`src/db/`)
+- **Persistence**: SQLite (WAL) + AES-GCM encrypted credential columns (`src/db/`).
+  `encrypt_connection`/`decrypt_connection` cover `access_token`, `refresh_token`, `id_token`,
+  `api_key`, **and `provider_specific_data`** (whole-map ciphertext under a single
+  `__zeroproxy_psd_encrypted__` key, so it inherits the same `opxenc2:` versioning and fail-closed
+  semantics; a legacy plaintext map is passed through untouched).
 - **Security**: HMAC API keys, bcrypt/JWT auth, SSRF protection (`src/server/auth/`)
 
 **Layout**: `src/core` (domain) · `src/server` (axum HTTP + dashboard embedding) · `src/cli`
@@ -798,7 +835,7 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1950 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1954 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
   worth having. **Count it, do not recall it.** This line has now been wrong four times (1905 →
   1913 → 1936 → 1947 → 1950), because the recorded number is the count *at the moment the suite was last
@@ -890,11 +927,27 @@ Only **one** server can hold `:4623`. A second agent starting one will either fa
 worse — **quietly kill or be killed by the first agent's**, leaving the maintainer testing a
 binary he did not expect.
 
-**Use a private port for anything that is not the maintainer's test instance:**
+**Use a private port for anything that is not the maintainer's test instance — but
+`PORT=` does NOT make every dev.sh run safe (measured 2026-09-28, see below):**
 
 ```bash
-PORT=4631 ./scripts/dev.sh          # sanctioned multi-instance escape, documented in scripts/dev.sh
+PORT=4631 ./scripts/dev.sh --check          # SAFE: lint only, starts nothing
+PORT=4631 ./scripts/dev.sh --backend-only   # SAFE: builds only, starts nothing
+PORT=4631 ./scripts/dev.sh --fast detach    # NOT SAFE — see the warning below
 ```
+
+**⚠️ `PORT=4631` does not stop dev.sh from killing the maintainer's 4623 instance.** Any dev.sh
+run that *starts* a server (including `--full detach`) stops the `zeroproxy.service` unit — or
+whatever holds the port — as part of its own startup, and it does that **regardless of `PORT`**.
+Measured: `PORT=4631 ./scripts/dev.sh --full detach` took down the maintainer's instance (pid 1214)
+and left nothing on 4623. Recovery was `timeout 600 ./scripts/dev.sh --fast detach` (default port);
+no data was lost. `PORT=` is therefore only a way to *bind* a second listener, **not** a way to
+isolate yourself from the shared unit.
+
+**Run the full gate as cargo directly, not through dev.sh:**
+`cargo test --lib --all-features` · `cargo clippy --all-targets --all-features` ·
+`cargo fmt --check`. dev.sh additionally runs the web layer (`astro check`, `pnpm build`, vitest),
+which are safe to run from a worktree on their own — `cd web && pnpm run build` touches only `web/`.
 
 Rules that follow from this:
 - **The default `PORT=4623` belongs to the maintainer.** Do not stop it to free a port.
