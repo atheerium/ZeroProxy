@@ -1265,14 +1265,35 @@ mod tests {
         assert!(reset.is_some(), "github 402 monthly text should resolve");
         if let Some(reset_at) = reset {
             let now = Utc::now();
-            let diff = reset_at - now;
-            assert!(diff.num_days() > 0, "should be in the future");
-            assert!(diff.num_days() <= 32, "should be within a month");
-            // First of a month at 00:00 UTC.
-            assert_eq!(reset_at.day(), 1);
-            assert_eq!(reset_at.hour(), 0);
-            assert_eq!(reset_at.minute(), 0);
-            assert_eq!(reset_at.second(), 0);
+            // Seconds, not `num_days()`: that truncates toward zero, so on the
+            // last day of a month the reset is under 24h away and reports 0 days,
+            // failing this assert for ~24h once a month regardless of the code.
+            let delta = reset_at - now;
+            assert!(
+                delta.num_seconds() > 0,
+                "reset {reset_at} should be after now {now}"
+            );
+            assert!(
+                delta.num_seconds() <= 31 * 86_400,
+                "reset should be at most 31 days out, got {delta}"
+            );
+            // First of the month after `now`, at 00:00 UTC.
+            let (year, month) = if now.month() == 12 {
+                (now.year() + 1, 1)
+            } else {
+                (now.year(), now.month() + 1)
+            };
+            assert_eq!(
+                (
+                    reset_at.year(),
+                    reset_at.month(),
+                    reset_at.day(),
+                    reset_at.hour(),
+                    reset_at.minute(),
+                    reset_at.second()
+                ),
+                (year, month, 1, 0, 0, 0)
+            );
         }
     }
 
