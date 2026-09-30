@@ -379,11 +379,19 @@ pub(crate) fn compute_plan(
             // Not in our prior sync. If it exists at all (built-in or
             // user-added without source tag), treat as unchanged so we
             // don't shadow it.
-            if existing_ids
-                .get(&alias)
-                .map(|s| s.contains(&model.id))
-                .unwrap_or(false)
-            {
+            //
+            // `existing_ids` is keyed by alias, but it is filled from two key
+            // spaces: each custom model's own `provider_alias`, and the built-in
+            // catalog's short alias. Upstream's alias for a provider id does not
+            // always match the catalog's (measured: `antigravity` ships as `ag`),
+            // so the catalog's alias has to be consulted as well — otherwise a
+            // model the catalog already ships is staged again as a duplicate.
+            let known_ids = existing_ids.get(&alias).or_else(|| {
+                catalog
+                    .static_alias_for_provider(&provider.id)
+                    .and_then(|catalog_alias| existing_ids.get(catalog_alias))
+            });
+            if known_ids.map(|s| s.contains(&model.id)).unwrap_or(false) {
                 plan.diff.unchanged.push(model_ref);
                 continue;
             }
@@ -894,6 +902,64 @@ mod tests {
             .providers
             .iter()
             .all(|p| !p.id.is_empty() && !p.alias.is_empty()));
+    }
+
+    /// Upstream picks its own alias for a provider and does not always match the
+    /// built-in catalog's short alias for the same provider **id** — measured:
+    /// `antigravity` ships as `ag` in the catalog but `antigravity` in the
+    /// OmniRoute snapshot (also `agentrouter`/`ar` and `kilo-gateway`/`kg`).
+    ///
+    /// The dedup check keyed off the snapshot alias only, so a model the catalog
+    /// already shipped under a different alias was staged again as a second,
+    /// duplicate custom model. That silently grows the model list and is
+    /// invisible in every gate, because nothing else compares the two aliases.
+    #[test]
+    fn sync_does_not_reimport_a_builtin_model_when_the_snapshot_alias_differs() {
+        let app = empty_app();
+        let snap: SourceSnapshot = serde_json::from_str(EMBEDDED_OMNIROUTE_JSON).unwrap();
+        let catalog = provider_catalog();
+
+        let provider = snap
+            .providers
+            .iter()
+            .find(|p| p.id == "antigravity")
+            .expect("antigravity is one of the maintainer's priority providers");
+        let catalog_alias = catalog
+            .static_alias_for_provider("antigravity")
+            .expect("antigravity is present in the built-in catalog");
+        assert_ne!(
+            catalog_alias,
+            provider.alias.as_str(),
+            "this test's premise is that the two aliases differ. If upstream ever \
+             renames `{catalog_alias}` to match, this regression is unreachable \
+             and the alias-aware dedup can be dropped."
+        );
+
+        let plan = compute_plan(&app, &snap, SyncSource::Omniroute, "now", false, false);
+        let duplicated: Vec<&str> = provider
+            .models
+            .iter()
+            .filter(|m| {
+                catalog
+                    .models_for_alias(catalog_alias)
+                    .map(|built_in| built_in.iter().any(|b| b.id == m.id))
+                    .unwrap_or(false)
+                    && plan
+                        .new_models
+                        .iter()
+                        .any(|n| n.provider_alias == provider.alias && n.id == m.id)
+            })
+            .map(|m| m.id.as_str())
+            .collect();
+
+        assert!(
+            duplicated.is_empty(),
+            "{} antigravity model(s) already ship in the built-in catalog under alias \
+             `{catalog_alias}` but sync re-imported them under the snapshot alias `{}`, \
+             so each exists twice: {duplicated:?}",
+            duplicated.len(),
+            provider.alias,
+        );
     }
 
     /// A snapshot exercising all three free-tier signals at once: an explicit
