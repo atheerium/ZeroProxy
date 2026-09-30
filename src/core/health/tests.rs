@@ -1,7 +1,7 @@
 use chrono::{Duration as ChronoDuration, TimeZone, Utc};
 use serde_json::json;
 
-use super::daemon::needs_persist;
+use super::daemon::{clear_sticky_error, has_sticky_error, needs_persist};
 use super::probe::probe_target;
 use super::{
     HealthRegistry, HealthStatus, DEGRADED_UNTIL_KEY, DEGRADE_RATE_LIMITED, DEGRADE_SERVER_ERROR,
@@ -309,4 +309,80 @@ fn needs_persist_detects_transitions_only() {
 
     let healthy = registry.record_probe_at("conn", "openai", Some(200), None, now);
     assert!(needs_persist(&conn, &healthy));
+}
+
+fn with_sticky_error(conn: &mut ProviderConnection) {
+    conn.last_error = Some("probe HTTP 503".to_string());
+    conn.last_error_at = Some("2026-09-22T18:21:57Z".to_string());
+    conn.error_code = Some("503".to_string());
+    conn.backoff_level = Some(1);
+    conn.consecutive_errors = Some(1);
+}
+
+#[test]
+fn a_successful_probe_clears_the_sticky_error_fields() {
+    let mut conn = connection("conn", "agentrouter");
+    conn.test_status = Some("unavailable".to_string());
+    with_sticky_error(&mut conn);
+
+    clear_sticky_error(&mut conn);
+
+    assert_eq!(conn.last_error, None);
+    assert_eq!(conn.last_error_at, None);
+    assert_eq!(conn.error_code, None);
+    assert_eq!(conn.backoff_level, Some(0));
+    assert_eq!(conn.consecutive_errors, Some(0));
+    assert!(!has_sticky_error(&conn));
+    // A background probe must not overwrite a user-initiated connection test.
+    assert_eq!(conn.test_status.as_deref(), Some("unavailable"));
+}
+
+#[test]
+fn a_recovered_connection_is_written_even_when_its_status_did_not_change() {
+    let registry = HealthRegistry::new();
+    let now = fixed_now();
+    let mut conn = connection("conn", "agentrouter");
+    // The shape observed on the live db: probe says healthy, a request-path
+    // error from days earlier is still on the row.
+    conn.extra
+        .insert(HEALTH_STATUS_KEY.into(), json!("healthy"));
+    with_sticky_error(&mut conn);
+
+    let healthy = registry.record_probe_at("conn", "agentrouter", Some(200), None, now);
+    assert!(needs_persist(&conn, &healthy));
+}
+
+#[test]
+fn a_healthy_connection_with_no_error_is_not_rewritten() {
+    let registry = HealthRegistry::new();
+    let mut conn = connection("conn", "openai");
+    conn.extra
+        .insert(HEALTH_STATUS_KEY.into(), json!("healthy"));
+
+    let healthy = registry.record_probe_at("conn", "openai", Some(200), None, fixed_now());
+    assert!(!needs_persist(&conn, &healthy));
+}
+
+#[test]
+fn every_sticky_error_field_is_detected() {
+    // Guards the disjunction in `has_sticky_error` against being "simplified":
+    // a connection left with only `backoff_level` set would otherwise never be
+    // rewritten, so the error would survive every future successful probe.
+    for set in [
+        (Some(0), Some(0), Some("503"), true),
+        (Some(1), Some(0), None, true),
+        (Some(0), Some(2), None, true),
+    ] {
+        let mut conn = connection("conn", "openai");
+        conn.backoff_level = set.0;
+        conn.consecutive_errors = set.1;
+        conn.last_error = set.2.map(str::to_string);
+        assert_eq!(has_sticky_error(&conn), set.3, "{set:?}");
+    }
+
+    let mut clean = connection("conn", "openai");
+    clear_sticky_error(&mut clean);
+    clean.backoff_level = Some(0);
+    clean.consecutive_errors = Some(0);
+    assert!(!has_sticky_error(&clean));
 }
