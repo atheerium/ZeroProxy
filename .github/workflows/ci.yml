@@ -72,9 +72,24 @@ jobs:
         working-directory: web
         run: pnpm run test
 
+      # Per-file tsc ratchet, not a total: `astro check` above is advisory and
+      # `pnpm build` does not type-check at all, so without this step nothing in
+      # CI notices new type errors as long as the total stays flat.
+      - name: Type-error ratchet (per file)
+        working-directory: web
+        run: pnpm run check:types
+
       - name: Build dashboard
         working-directory: web
         run: pnpm run build
+
+      # Must run AFTER the build: a `vite.define` that fails to substitute
+      # leaves a bare `__UI_GIT_SHA__` in the bundle, which pnpm build, vitest,
+      # astro check and tsc all pass -- and which then throws at runtime in the
+      # browser on the freshness badge. See AGENTS.md Trap 9.
+      - name: Check build-identity defines were substituted
+        working-directory: web
+        run: node scripts/check-ui-defines.mjs
 
       - name: Upload dashboard artifact
         uses: actions/upload-artifact@v7
