@@ -334,7 +334,7 @@ deliberate guard against shipping a stale dashboard. Escape hatch:
 
 ### 3. `HARD_CAPS` and `model_has_capability` must stay single-source
 There is exactly **one** definition of each, both in `src/core/combo/mod.rs`:
-`HARD_CAPS` (`:446`) and `model_has_capability` (`:653`), both `pub(crate)` because
+`HARD_CAPS` (`:445`) and `model_has_capability` (`:652`), both `pub(crate)` because
 `src/core/auto/mod.rs` and `src/core/combo/capacity_adapter.rs` now import them.
 
 **This used to be FOUR `HARD_CAPS` and THREE copies of `model_has_capability`.** An
@@ -478,7 +478,7 @@ NOT a prerequisite for provider work: `src/cli/sync.rs`, `scripts/sync/normalize
 upstream commit touching the sync subsystem (`f2b9dfcb`, a 9router snapshot refresh) contains **zero
 brand references** — so single commits can be cherry-picked safely. (An earlier revision of this trap
 claimed `src/cli/sync.rs` leaked an `openproxy.v1.sync.apply` envelope. False: our copy emits
-`zeroproxy.v1.sync.apply` at `src/cli/sync.rs:588`; it was the *upstream* copy that said `openproxy`.)
+`zeroproxy.v1.sync.apply` at `src/cli/sync.rs:621`; it was the *upstream* copy that said `openproxy`.)
 
 **What the 259 are actually worth** (measured): 107 `fix` + 58 `feat` = 165 substantive, plus 23
 `beads` bookkeeping and 29 `chore`. **Zero dependabot** — unlike what the PR list suggests, this is
@@ -601,8 +601,8 @@ and verify by counting the field in the regenerated JSON rather than by the abse
   `…/api/coding/v3/chat/models`, still wrong. The value actually served needs **two** path segments
   stripped, which no principled rule produces. **OmniRoute never resolves it either** — its
   discovery route uses a hardcoded `NAMED_OPENAI_STYLE_PROVIDERS` set, and
-  `providerModelsConfig.ts:495` states outright *"The registry has no modelsUrl, so without this
-  entry the route fell back to a stale 6-model seed."* Their `modelsUrl` is documentation, not a
+  OmniRoute's `open-sse/config/providerModelsConfig.ts:495` states outright *"The registry has no
+  modelsUrl, so without this entry the route fell back to a stale 6-model seed."* Their `modelsUrl` is documentation, not a
   fetch input, so this limitation is **shared, not a ZeroProxy gap**. The guard rejects it, the
   provider keeps its `does not support models listing` error, and
   `models_url_guard_rejects_non_http_schemes` pins the case so it is not deleted as a typo.
@@ -898,7 +898,7 @@ sync boundary, where this now happens.
 `src/core/health/daemon.rs`. The health daemon writes `healthStatus` / `healthCheckedAt` /
 `degradedUntil` into `conn.extra` on every transition, but it **never touched `error_code`,
 `last_error`, `last_error_at`, `consecutive_errors`, or `backoff_level`.** Those were cleared only on
-**request-success** paths — `chat.rs:3353`, `usage.rs:1261`, `web_fetch.rs:741`, `oauth.rs:1390`,
+**request-success** paths — `chat.rs:3355`, `usage.rs:1262`, `web_fetch.rs:741`, `oauth.rs:1390`,
 `credential_manager.rs:454`/`527`, `proxy/mod.rs:289` — all of which run the same 5-field clear.
 
 **Measured on the live db (2026-09-30), `agentrouter`:** `errorCode: 503`, `lastErrorAt:
@@ -943,14 +943,14 @@ is a complete disjunction, so "simplifying" it cannot strand a connection holdin
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
-   (`src/core/combo/mod.rs:446`). `detect_required_capabilities` (`:450`) runs *before*
-   `reorder_by_capabilities` (`:711`), which tier-sorts then falls back. A hard-cap mismatch
+   (`src/core/combo/mod.rs:445`). `detect_required_capabilities` (`:449`) runs *before*
+   `reorder_by_capabilities` (`:710`), which tier-sorts then falls back. A hard-cap mismatch
    **skips the model entirely** — it is not a fallback trigger. See Trap 3: the constant and
    `model_has_capability` are single-source and guarded.
 2. **`context_window` cap.** History is trimmed by `strip_history_for_context`
-   (`src/core/combo/capacity_adapter.rs:254`) — only for capacity-adapter-added models.
+   (`src/core/combo/capacity_adapter.rs:253`) — only for capacity-adapter-added models.
    Budget = `(context_window || 200_000) * 0.8 * 4`.
-3. **Fallback only on eligible errors.** `check_fallback_error` (`src/core/combo/mod.rs:729`)
+3. **Fallback only on eligible errors.** `check_fallback_error` (`src/core/combo/mod.rs:742`)
    delegates to `error_config::classify_error` (`src/core/config/error_config.rs:253`) →
    `ErrorClassification::{Backoff, Cooldown, NoMatch, Permanent}`. `retryAfter` header beats body.
    **404 → 300 s model lock; it is NOT an auth failure.**
