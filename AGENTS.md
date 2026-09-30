@@ -22,6 +22,15 @@ be worth mirroring, so:
   the wrong port. See the "do NOT port" list.
 - **LLM providers are the real targets**, free-tier ones first. Search/fetch/TTS/embedding/image
   providers are lower value — do not let them crowd out LLM work.
+- **Seven providers are the floor, not a sample.** The maintainer uses these hourly and they must
+  "always be up to date and have no errors": **NVIDIA (NIM), OpenRouter, Kilo, OpenCode, Kiro,
+  Gemini + Antigravity, AgentRouter.** They are 7 logical providers but **12 catalog ids**
+  (`opencode` + `opencode-go` + `opencode-zen`; `kilocode` + `kilo-gateway`; `gemini` +
+  `gemini-cli`), and an id is what the code keys on. Free-tier breadth does not outrank a
+  regression in these; when they conflict, they win. Only 3 of the 7 are OAuth (`kiro`,
+  `kilocode`, `antigravity` — all with a `pub fn` in `src/oauth/providers.rs`); the other four are
+  API-key only, so an OAuth-config guard does not cover them. See Trap 19 for the catalog/snapshot
+  alias reconciliation these providers need.
 
 **Do not ask the user to restate these goals.** They are recorded here permanently. If a task seems
 to conflict with this section, this section wins, and you should say so rather than quietly
@@ -240,6 +249,36 @@ LLM proxy. ZeroProxy's purpose is to stay lightweight while moving **closer to O
 
 **Port from OmniRoute. Do not port its non-essential subsystems.** See "do NOT port" below.
 
+**Settled 2026-09-30: OmniRoute's quota *scheduling engine* is a NO-GO. Do not port it.** The
+maintainer's call, answering "if OmniRoute doesn't support it, it's probably very hard for us
+because OmniRoute is more mature than us." OmniRoute *does* have it, so that heuristic does not
+apply here — this is a deliberate scope decision instead, and it is the lightweight constraint
+above winning. The distinction matters, because the two halves are not the same work:
+
+- **Quota FETCHING: we already have it, and it is not a port.** `src/core/usage/quota_fetcher.rs` is
+  3,158+ lines with **14** `fetch_*_quota` functions — `fetch_kiro_quota`, `fetch_antigravity_quota`,
+  `fetch_gemini_cli_quota`, `fetch_codex_quota`, `fetch_github_quota`, `fetch_claude_quota`,
+  `fetch_glm_quota`, `fetch_minimax_quota`, `fetch_qoder_quota`, `fetch_vercel_ai_gateway_quota`,
+  `fetch_codebuddy_quota`, `fetch_grok_cli_quota`, `fetch_ollama_quota` — dispatched by
+  `fetch_oauth_quota` (`src/server/api/usage.rs:55`, match at `:67-79`), with a `zeroproxy quota`
+  CLI at `src/cli/quota.rs:44` and `fetch_oauth_quota_with_refresh` at `usage.rs:1161`. **If a quota
+  feature is ever requested, the work is a UI/aggregation view over data we already collect — do not
+  re-derive the fetchers or assume we lack them.**
+- **Quota SCHEDULING/BUDGET POLICY: that is the no-go.** OmniRoute adds a whole policy engine on top
+  of fetching: `QuotaDimensionSchema`, `QuotaScheduleSchema` (IANA-timezone day windows with
+  `startMinute`/`endMinute` wrapping midnight, `mode: allow|block`, up to **50** schedules),
+  per-window **reserves** (`any|5h|hourly|daily|weekly|monthly`, fractional percent, where `any`
+  lets the most-consumed window decide), its own `budgetValue`/`budgetUnit` in
+  `requests|tokens|usd`, `QuotaStoreSettingsSchema` (sqlite|redis driver), `QuotaPreviewQuerySchema`
+  and an `AuditLogQuerySchema`. That is a scheduling layer, a persistence abstraction, and an audit
+  log — none of which a lightweight proxy needs to route a request.
+
+One genuinely worth stealing from OmniRoute's telemetry spec, and cheap: its five truthful states —
+`healthy` / `approaching_limit` / `exhausted` / `unavailable` / `unknown` — plus the rule **"Unknown
+is not exhausted and does not disable a provider"** and **"local estimates are never presented as
+provider billing data."** We already fail closed on an unset encryption key (see the crypto trap); do
+not repeat that pattern for quota.
+
 ## Repositories to refer to
 
 Look here before reinventing anything, in this order. OmniRoute is first because it is the active
@@ -293,9 +332,44 @@ In **release** builds `build.rs` additionally panics if `web/src` is newer than 
 deliberate guard against shipping a stale dashboard. Escape hatch:
 `cargo build --release --no-default-features`.
 
-### 3. Two `HARD_CAPS` definitions
-`src/core/combo/mod.rs:438` and `src/core/combo/capabilities.rs:20`. Changing one without the
-other desyncs the capability gate from the fallback path.
+### 3. `HARD_CAPS` and `model_has_capability` must stay single-source
+There is exactly **one** definition of each, both in `src/core/combo/mod.rs`:
+`HARD_CAPS` (`:446`) and `model_has_capability` (`:653`), both `pub(crate)` because
+`src/core/auto/mod.rs` and `src/core/combo/capacity_adapter.rs` now import them.
+
+**This used to be FOUR `HARD_CAPS` and THREE copies of `model_has_capability`.** An
+earlier version of this file said "two `HARD_CAPS` definitions" and was wrong, which is
+itself the lesson. The real inventory:
+
+| Site | State before the collapse |
+|---|---|
+| `combo/mod.rs` `HARD_CAPS` | live — the tier gate at `:722` |
+| `auto/mod.rs` `HARD_CAPS` | live — the auto-candidate **drop** |
+| `combo/capacity_adapter.rs` `CAPABILITY_KEYS` | live, under a **different name**, so `rg HARD_CAPS` never found it |
+| `combo/capabilities.rs` `HARD_CAPS` | dead — the whole module has zero consumers |
+
+The three `model_has_capability` copies were byte-identical after normalising comments
+(1123 chars each), so they had **not** drifted yet — the hazard was latent, not realised.
+A grep for the constant name alone is not how you find this class of bug; the third
+copy was filed under a different identifier.
+
+Guarded by `src/core/combo/hard_caps_single_source_tests.rs` (7 tests), which scans
+`src/**` and fails if a second definition appears, and pins the contents plus the
+heuristic's answers. It lives in `src/` rather than `tests/` because `cargo test --lib`
+is the CI gate and `tests/` is excluded from it.
+
+`combo/capabilities.rs` itself was **deleted** once its dead `HARD_CAPS` was gone — 817
+lines, zero consumers. But it hosted `reorder_floats_capable_models_to_front`, which
+tests the **live** `reorder_by_capabilities` and is its only direct test, so that one
+test was **relocated into `combo/mod.rs`'s test module** rather than deleted with the
+file. The general lesson: a dead file can still be the only home of a live test. Check
+what each `#[test]` actually calls before removing a module wholesale.
+
+**Do not add a local `HARD_CAPS` or a second `model_has_capability`**, including a
+"temporary" one in a submodule. The two live call sites deliberately *differ* — the
+combo gate **de-motes** a hard-cap mismatch, the auto path **drops** it — and they are
+only guaranteed consistent because they share one function and one list. The guard test
+`hard_cap_mismatch_demotes_rather_than_removes` pins that contrast.
 
 ### 4. `zeroproxy.service` respawns and steals the port
 The systemd user unit has `Restart=always`; killing the process alone lets it return in ~5 s and
@@ -664,10 +738,16 @@ Rules that follow, because both bugs were the same mistake:
   registration. Do not try to narrow it there.
 - **Registered credentials expire** (`clientSecretExpiresAt`, 3600s here). Re-register rather
   than caching them; the dashboard registers per connect attempt, which is why that is fine.
-- **`src/oauth/kiro.rs`'s `register_client` / `start_device_authorization` / `poll_device_token`
-  are dead code** — no callers in `src/` or `tests/`. That file is otherwise live for
-  `normalize_kiro_external_idp_auth` and the `KiroAuthMethod` enum. Do not assume its presence
-  means a flow is wired.
+- **A THIRD copy of the AWS device-code flow used to live in `src/oauth/kiro.rs`** — a second
+  `register_client` / `start_device_authorization` / `poll_device_token`, with zero callers, next
+  to the two broken copies that caused this whole saga. **Deleted 2026-09-30**, which is what
+  makes "there must be exactly one implementation" checkable by reading the tree. What remains in
+  that file is `oidc_base_url` (which delegates to `mod.rs`), the social/import/external-IdP
+  flows, `normalize_kiro_external_idp_auth`, and the `KiroAuthMethod` enum. **Do not re-add a
+  device-code implementation there** — and note the module doc used to be actively wrong about
+  this, listing BuilderId/Idc as "supported in this module" when the device flow lives in
+  `mod.rs` + `server/api/oauth.rs`. If you audit "is this flow wired?", the single source of
+  truth is `kiro_registration_body()` + `parse_kiro_registration_response()` in `mod.rs`.
 - **Open question, deliberately not "fixed":** we send `issuerUrl =
   https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6` while the Kiro IDE appears to
   send `https://view.awsapps.com/start`. AWS documents `issuerUrl` as optional and does not
@@ -764,12 +844,109 @@ name is still honoured**, deliberately, so an existing shell profile keeps worki
   is a branding change, not the env-var prefix, and mass-renaming i18n values without
   their keys breaks translation lookups.
 
+### 19. A snapshot provider's alias need not match the built-in catalog's — and sync deduped on the wrong one
+There are **three** alias key spaces, and they are not interchangeable:
+
+| space | built from | key → value |
+|---|---|---|
+| `provider_catalog.json` `providerIdToAlias` | our own data | provider **id** → short alias (`antigravity` → `ag`) |
+| `provider_catalog.json` `providerModels[].alias` | our own data | short alias → the built-in model list |
+| the snapshot's own `provider_id_to_alias` | upstream | upstream's id → upstream's alias |
+
+`src/cli/sync.rs::plan_sync` built one map, `existing_ids`, from **two** of them — every existing
+custom model's `provider_alias` *and* each built-in `entry.alias` — then looked models up under
+**only the snapshot's alias**. When the two disagree, the built-in half of the map is unreachable
+under that key and the dedup silently misses.
+
+**Measured on the embedded OmniRoute snapshot (270 providers), the 7 priority providers that
+disagree:**
+
+| provider id | catalog alias | snapshot alias | snapshot models |
+|---|---|---|---|
+| `antigravity` | `ag` | `antigravity` | 10 |
+| `agentrouter` | `ar` | `agentrouter` | 3 |
+| `kilo-gateway` | `kgw` | `kg` | 6 |
+
+`antigravity` is the live damage: **8 of its 10 snapshot model ids already ship in the built-in
+catalog** (`gemini-3.7-flash-high`, `gemini-pro-agent`, `claude-sonnet-4-6`, …), so a full
+`sync omniroute` re-imported every one of them as a second custom model under the snapshot alias.
+Nothing in any gate can see this — the plan is well-formed, the write succeeds, the model simply
+exists twice.
+
+Fixed by making the lookup fall back to the catalog's alias for that provider id
+(`static_alias_for_provider(&provider.id)`), and pinned by
+`cli::sync::tests::sync_does_not_reimport_a_builtin_model_when_the_snapshot_alias_differs`, which
+fails on the unfixed code and carries an `assert_ne!` that **invalidates itself** if upstream ever
+reconciles the two spellings. `sync omniroute --free-only` is unaffected today because all three
+providers are `free: None` and get skipped — which is exactly why this sat unnoticed.
+
+Two things deliberately **not** concluded from this, after both were checked and found wanting:
+- **A short alias alone is not proof of a bad row.** `resolve_provider_alias`
+  (`src/core/model/mod.rs:162`) resolves against `ALIAS_TO_PROVIDER_ID`, a *hand-maintained static*
+  — a fourth space, not derived from the catalog. The snapshot also ships its own
+  `provider_id_to_alias`, so a snapshot alias has a resolution path independent of ours. Do not
+  assert a model is "unroutable" from alias shape alone; trace the lookup first.
+- **The custom-model key is `providerAlias`, not `provider`.** `SELECT
+  json_extract(value,'$.provider') … GROUP BY` returns 0 rows against a 1601-row `kv` table — the
+  path is simply absent. Aggregate on `$.providerAlias` or the measurement is a false zero.
+
+Related: catalog aliases are **local, stable, and user-visible** (combos, `disabledModels`, the
+picker reference them), so do not "fix" a mismatch by renaming a catalog alias. Reconcile at the
+sync boundary, where this now happens.
+
+### 20. A successful health probe did not clear the error fields — a recovered provider still showed a stale error forever
+`src/core/health/daemon.rs`. The health daemon writes `healthStatus` / `healthCheckedAt` /
+`degradedUntil` into `conn.extra` on every transition, but it **never touched `error_code`,
+`last_error`, `last_error_at`, `consecutive_errors`, or `backoff_level`.** Those were cleared only on
+**request-success** paths — `chat.rs:3353`, `usage.rs:1261`, `web_fetch.rs:741`, `oauth.rs:1390`,
+`credential_manager.rs:454`/`527`, `proxy/mod.rs:289` — all of which run the same 5-field clear.
+
+**Measured on the live db (2026-09-30), `agentrouter`:** `errorCode: 503`, `lastErrorAt:
+2026-09-22T18:21:57`, `consecutiveErrors: 1`, `backoffLevel: 1` — while `healthStatus: "healthy"`
+from a `2026-09-29T22:32` probe. The 503 was AgentRouter's own *"当前分组 default 下对于模型 glm-5.3
+无可用渠道"* (no channel for that model), correctly answered with a `modelLock_glm-5.3`. Nothing was
+broken; the row just carried an 8-day-old error next to a 1-day-old green health dot, and **the
+dashboard has no way to know they are different eras.** `/health` reported that provider
+`healthy: 1` at the same moment `/api/providers` reported `errorCode: 503`.
+
+**This misled me personally.** I first reported it to the user as "agentrouter has a live 503" and
+had to walk it back after reading the timestamps. That is the argument for the fix: the defect
+manufactures a false current error, and it will keep doing so to whoever reads that field next.
+
+Fixed by `clear_sticky_error` (called from `persist_records` when `!record.status.is_failure()`),
+whose field set is copied from the request-success clears so the two cannot drift. Three things
+worth not re-deriving:
+- **A probe IS proof of life.** `probe_connection` (`probe.rs:80`) sends the connection's own
+  credential — the auth header is attached to a GET of the provider's `/models` sibling — so a 2xx
+  is exactly as good as a successful chat request. Without that fact this looks like an unjustified
+  widening of what a background daemon may clear.
+- **`needs_persist` is a change-detector, so it needed a second trigger.** A connection that
+  recovers *without* a status change was never written, so the clear would only ever run on the one
+  tick where the status flipped, and any later request-path error would stick again. The extra
+  `has_sticky_error(conn)` clause is what makes the fix hold; it looks redundant next to the status
+  comparison and is not.
+- **`test_status` is deliberately NOT cleared.** It holds the result of a user-initiated "test this
+  connection" action, which a background probe must not overwrite — that is why the live
+  `agentrouter` row shows `testStatus: unavailable` beside `healthStatus: healthy`, and both are
+  correct.
+- Only **API-key** connections are probed at all (`tick_inner` filters on `is_api_key_auth`; the
+  module doc explains OAuth liveness checks would burn subscription quota). So an OAuth-only stale
+  error is still not cleared by this fix.
+
+4 tests in `src/core/health/tests.rs`, RED-proven by making the clear a no-op and short-circuiting
+the `needs_persist` clause: exactly the 2 tests targeting those 2 edits failed. The other 2 hold
+either way by design — one pins that a *clean* healthy connection is not rewritten every tick
+(without it the daemon would write on every probe forever), the other pins that `has_sticky_error`
+is a complete disjunction, so "simplifying" it cannot strand a connection holding only
+`backoff_level`.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
-   (`src/core/combo/mod.rs:438`). `detect_required_capabilities` (`:442`) runs *before*
-   `reorder_by_capabilities` (`:697`), which tier-sorts then falls back. A hard-cap mismatch
-   **skips the model entirely** — it is not a fallback trigger.
+   (`src/core/combo/mod.rs:446`). `detect_required_capabilities` (`:450`) runs *before*
+   `reorder_by_capabilities` (`:711`), which tier-sorts then falls back. A hard-cap mismatch
+   **skips the model entirely** — it is not a fallback trigger. See Trap 3: the constant and
+   `model_has_capability` are single-source and guarded.
 2. **`context_window` cap.** History is trimmed by `strip_history_for_context`
    (`src/core/combo/capacity_adapter.rs:254`) — only for capacity-adapter-added models.
    Budget = `(context_window || 200_000) * 0.8 * 4`.
@@ -887,13 +1064,16 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1973 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1986 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. **Count it, do not recall it.** This line has now been wrong five times (1905 →
-  1913 → 1936 → 1947 → 1950 → 1954), because the recorded number is the count *at the moment the suite was last
+  worth having. **Count it, do not recall it.** This line has now been wrong seven times (1905 →
+  1913 → 1936 → 1947 → 1950 → 1954 → 1987 → 1994), because the recorded number is the count *at the moment the suite was last
   run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
   file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
-  it whenever the count moves.
+  it whenever the count moves. **It can also legitimately go *down*** — deleting dead code drops
+  dead tests, and that is not a regression: 1994 → 1986 was 4 dead tests in `src/oauth/kiro.rs`
+  plus a net 4 from deleting `src/core/combo/capabilities.rs` (5 tests gone, 1 relocated into
+  `combo/mod.rs`). Compare the *delta against your own diff*, not against the last recorded number.
 - Integration tests under `tests/` are intentionally excluded (their build was repaired separately
   — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
   is *not* the gate.
