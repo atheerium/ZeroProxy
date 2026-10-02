@@ -47,7 +47,9 @@ The short version, which overrides any instinct to be helpful:
 
 1. **Never merge to `main` without being asked in that same conversation.**
 2. **Never commit at the end of an implementation** — the maintainer tests before committing.
-3. **Never edit in the main worktree** — make a branch and a worktree first.
+3. **Never edit on `main` itself.** Small work edits **in the main worktree on a branch**; only
+   serious/big features get their own `wt-<agent>-<slug>` worktree. See the Tier 1 / Tier 2
+   split below — a worktree per small addition is not required, and it is expensive.
 4. **Never touch port 4623** unless you are the maintainer's own test instance. Use `PORT=4631` —
    but only for runs that start nothing; `PORT=` does not isolate you from the shared
    `zeroproxy.service` unit (Trap 17).
@@ -581,6 +583,11 @@ commit can land on the wrong branch or sweep in unrelated files, which is its ow
 error. Report the state, ask once, act on the answer. This applies to this file too: a `docs(agents)`
 rule written but left uncommitted protects nobody.
 
+**Tier 1 (small changes in the main worktree) does not soften this table.** A branch in the main
+worktree is *not* a safer place to be vague than a worktree — it is a **shared** worktree, so an
+unreported branch there also blocks the maintainer's own `git switch main` and hides which session
+owns which dirty file. A Tier 1 report must name the branch exactly as a Tier 2 one does.
+
 ### 15. `apply_normalization_hooks` was DEAD CODE for every OpenAI→OpenAI request
 The request dispatch in `src/server/api/chat.rs` was `if passthrough {…} else if
 plan.needs_translation() { translate_request_with_strip(…) }` — **with no third arm**. And
@@ -952,7 +959,7 @@ project state in his head. Read this section before your first edit.**
 
 | step | maintainer | you |
 |---|---|---|
-| 1 | asks for a feature | create branch + worktree, implement, run the gate, **stop** |
+| 1 | asks for a feature | create a branch (worktree only for Tier 2), implement, run the gate, **stop** |
 | 2 | tests it himself | idle. **Do not commit. Do not merge.** |
 | 3 | says "it works, commit and merge" | run the gate again, commit, open a PR, **stop** |
 | 4 | merges, or asks you to | merge, return to `main`, clean up |
@@ -962,13 +969,53 @@ implementation, and you are NEVER authorised to merge to `main` without being as
 conversation. A commit is cheap to add later; an unwanted merge to `main` is expensive and has
 happened here. If you finish a feature and nobody has tested it, say so and stop.
 
-### One agent = one branch = one worktree. Never share a branch.
+### One branch per unit of work. A worktree only for Tier 2. Never share a branch.
+
+**Worktrees are expensive here** (measured 2026-10-02, `du -sh` on `wt-free`): **6.7 GB each** —
+`target/` alone is **6.2 GB**, `web/node_modules` 448 MB, `web/dist` 11 MB. A fresh worktree also
+starts with a **cold** build cache, so the gate costs minutes instead of seconds. That cost is
+justified for a big feature and absurd for a provider row or a CSS tweak. Pick a tier:
+
+| | **Tier 1 — small/routine** | **Tier 2 — serious/big** |
+|---|---|---|
+| where | **main worktree**, on a branch | `../wt-<agent>-<slug>` worktree + branch |
+| shape | one concern, ~5 files or fewer, one PR's worth | multi-file / multi-session / multi-day |
+| touches | not the routing core | chat pipeline, translator, executor fallback, SQLite/persistence, envelope schemas, OAuth flows |
+| lifetime | committed + merged in the same session | may sit uncommitted >24 h |
+| gate | `cargo`/`vitest` directly (**never** a dev.sh run that starts a server) | `--fast detach` in the worktree is fine |
+
+Typical Tier 1: **adding a provider**, adding models, one API route, copy/CSS, a config value,
+a small bugfix. The apmix provider (PR #22) — 6 files, one provider, one commit — was pure
+Tier 1 overhead.
+
+Typical Tier 2: new dashboard pages, analytics work, refactors, anything touching the
+invariants above, and **any time a second agent is live at the same time** on overlapping files
+(that is a concurrency constraint, not a size judgement — see the hot-file rule below).
+
+**Tier 1 procedure:**
+
+```bash
+git status --porcelain                    # another session's dirty files? see hot-file rule
+git switch -c <type>/<kebab>               # work HERE, in the main worktree
+# ... edit, then the gate as cargo/vitest directly (Trap 17: no starting dev.sh) ...
+cargo test --lib --all-features && cargo clippy --all-targets --all-features && cargo fmt --check
+git commit && git push -u origin HEAD     # only when the maintainer asked for a commit
+# PR or merge, then: git switch main && git branch -d <type>/<kebab>
+```
+
+**Always leave the main worktree back on `main` when you stop.** If the maintainer's live server
+runs from it, a rebuild is `./scripts/dev.sh --fast detach` — after `git switch main`.
+
+**Tier 2 procedure:**
 
 ```bash
 cat .opencode/claims/* 2>/dev/null; git worktree list   # ALWAYS check who else is live
 git worktree add ../wt-<agent>-<slug> -b <agent>/<type>/<kebab>
 cd ../wt-<agent>-<slug> && ./scripts/dev.sh              # build + run, detached, non-blocking
 ```
+
+Remove Tier 2 worktrees **promptly after merge** (`git worktree remove ../wt-<agent>-<slug>`) —
+each is ~6.7 GB, and deleting one kills any server running from it.
 
 Branch names must match `^([a-z0-9._-]+/)?(feat|fix|docs|chore|refactor|test|build|ci|perf)/[a-z0-9._-]+$`
 or be `main|dev|pr-*`. The pre-push hook enforces this. Never `--no-verify`.
@@ -1017,6 +1064,12 @@ Rules that follow from this:
 conflict on merge. Check `git status` in the main worktree first: if another session is mid-flight
 you will see its dirty files, and you must not overwrite, revert, or commit them.
 
+**This rule applies to Tier 1 too, and it is the reason Tier 1 is a size judgement, not a
+licence to be careless.** A hot file is not automatically Tier 2 — apmix edited
+`provider_catalog.json` and `providers.ts` and was still a small change. What matters is
+whether *another session currently has that file dirty*; check, and if it does, that specific
+collision is a Tier 2 event (use a worktree, or wait).
+
 **Never move or rewrite a git ref while another session is live in a worktree.** Only ref-only
 operations are safe (`git fetch origin main:main` when `main` is not checked out). Deleting a
 worktree kills any server running from it.
@@ -1024,14 +1077,17 @@ worktree kills any server running from it.
 ### Finishing a feature
 
 ```bash
-./scripts/dev.sh --full detach        # the real gate: fmt + clippy + astro + tests
+# Tier 2 (in the worktree): ./scripts/dev.sh --full detach — fmt + clippy + astro + tests
+# Tier 1 (main worktree):   cargo test --lib --all-features && cargo clippy --all-targets --all-features && cargo fmt --check
 git status --porcelain                # MUST be empty before you report done
 git log --oneline main..HEAD          # your commits, countable
+git switch main                       # Tier 1: leave the main worktree on main
 ```
 
 Then report: the branch name, the commit shas, the gate results, and **explicitly that it is not
 merged**. Uncommitted work is not saved (Trap 14) — a finished analytics feature once sat
-uncommitted in a worktree for a month and was nearly lost.
+uncommitted in a worktree for a month and was nearly lost. **Tier 1 lowers the storage cost, not
+the reporting duty**: work on a main-worktree branch is just as unsaved until it is merged.
 
 ### Recovering from a confused repo
 
