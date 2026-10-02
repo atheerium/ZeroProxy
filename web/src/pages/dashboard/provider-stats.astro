@@ -1,0 +1,22 @@
+---
+/**
+ * /dashboard/provider-stats was merged into /dashboard/analytics: its provider
+ * table is now the sortable, expandable Provider Breakdown there, and its
+ * per-provider model rows come from the same `byModel` data. Kept as a
+ * redirect so old bookmarks do not fall through to the SPA shell (which would
+ * silently render the API Endpoint page instead).
+ */
+const target = "/dashboard/analytics";
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Provider Stats → Analytics</title>
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <p>Moved to <a href={target}>Analytics</a>.</p>
+  </body>
+</html>
