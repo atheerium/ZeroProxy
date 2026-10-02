@@ -17,10 +17,11 @@ use crate::types::{AppDb, Combo, PricingTable};
 
 pub mod attempt_stats;
 pub mod auto_combo;
-pub mod capabilities;
 pub mod capacity_adapter;
 pub mod decision_trace;
 pub mod fusion;
+#[cfg(test)]
+mod hard_caps_single_source_tests;
 pub mod hedging;
 pub mod ordering;
 pub mod shadow;
@@ -436,7 +437,12 @@ pub fn get_quota_cooldown(backoff_level: u32) -> Duration {
 
 /// Hard capabilities that models must support to handle the request — a model
 /// missing any of these gets tier-2 (last-resort) placement.
-const HARD_CAPS: &[&str] = &["vision", "pdf", "audioInput", "videoInput"];
+///
+/// Single source of truth. This list was previously copy-pasted into
+/// `combo/capabilities.rs` and `core/auto`, so a cap added to the combo gate
+/// silently failed to apply to the auto-candidate drop path. Both now import
+/// this. `hard_caps_are_defined_once` fails if a second copy reappears.
+pub(crate) const HARD_CAPS: &[&str] = &["vision", "pdf", "audioInput", "videoInput"];
 
 /// Detect required capabilities from the request body by scanning the last
 /// user turn for multimodal blocks (9router detectRequiredCapabilities parity).
@@ -637,7 +643,13 @@ fn scan_message_capabilities(m: &Value, required: &mut HashSet<String>) {
 /// Heuristic check: does the combo model entry (e.g. "openai/gpt-4o") support
 /// a given capability? Uses provider-prefix and model-name patterns rather
 /// than an explicit capability database (9router reads PROVIDERS[].capabilities).
-fn model_has_capability(entry: &str, capability: &str) -> bool {
+///
+/// Single source of truth. This function was copy-pasted verbatim into
+/// `combo/capacity_adapter.rs` and `core/auto`; the copies happened to agree,
+/// but a capability fix applied to one of them would have silently not applied
+/// to the other two. `model_has_capability_is_defined_once` fails if a second
+/// copy reappears.
+pub(crate) fn model_has_capability(entry: &str, capability: &str) -> bool {
     let entry_lower = entry.to_lowercase();
 
     match capability {
@@ -1673,5 +1685,23 @@ mod tests {
             1,
             "permanent error must stop dispatch at the first member"
         );
+    }
+
+    /// Relocated from the now-deleted `src/core/combo/capabilities.rs`, which was
+    /// 817 lines of dead table-driven code that happened to host the only direct
+    /// test of the LIVE `reorder_by_capabilities`. Deleting the file without moving
+    /// this would have silently dropped coverage of the capability tier-sort.
+    #[test]
+    fn reorder_floats_capable_models_to_front() {
+        use super::reorder_by_capabilities;
+        let models = vec![
+            "openai/gpt-3.5-turbo".to_string(), // text-only per pattern
+            "google/gemini-3-pro".to_string(),  // full multimodal
+            "anthropic/claude-3-haiku".to_string(),
+        ];
+        let mut required = std::collections::HashSet::new();
+        required.insert("vision".to_string());
+        let ordered = reorder_by_capabilities(&models, &required);
+        assert_eq!(ordered[0], "google/gemini-3-pro");
     }
 }

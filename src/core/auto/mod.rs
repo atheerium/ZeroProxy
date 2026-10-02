@@ -35,6 +35,7 @@ use serde_json::Value;
 use crate::core::account_fallback::filter_available_accounts;
 use crate::core::circuit_breaker::{CircuitBreakerRegistry, CircuitState};
 use crate::core::combo::quarantined_members;
+use crate::core::combo::{model_has_capability, HARD_CAPS};
 use crate::core::model::{catalog::provider_catalog, resolve_provider_alias};
 use crate::core::performance::get_auto_pool_models;
 use crate::types::{AppDb, ProviderConnection, Settings};
@@ -44,10 +45,6 @@ use scoring::{is_free_model, order_by_score};
 
 /// Quarantine namespace consulted by [`select_candidates`].
 pub const AUTO_QUARANTINE_KEY: &str = "auto";
-
-/// Hard capabilities — a candidate missing any *required* one is dropped
-/// outright (mirrors `HARD_CAPS` in `src/core/combo/mod.rs`).
-const HARD_CAPS: &[&str] = &["vision", "pdf", "audioInput", "videoInput"];
 
 /// Chat endpoints whose breaker keys gate auto candidates. Keys are built
 /// with the exact construction in `src/server/api/chat.rs:1523` —
@@ -417,49 +414,6 @@ fn missing_hard_cap(candidate: &str, required: &HashSet<String>) -> bool {
     HARD_CAPS
         .iter()
         .any(|cap| required.contains(*cap) && !model_has_capability(candidate, cap))
-}
-
-fn model_has_capability(entry: &str, capability: &str) -> bool {
-    let entry_lower = entry.to_lowercase();
-    match capability {
-        "vision" => {
-            if entry_lower.starts_with("openai/o1")
-                || entry_lower.starts_with("openai/o3")
-                || entry_lower.starts_with("anthropic/claude")
-                || entry_lower.starts_with("google/gemini")
-                || entry_lower.starts_with("vertex/claude")
-                || entry_lower.starts_with("vertex/gemini")
-                || entry_lower.starts_with("aws/claude")
-                || entry_lower.starts_with("gcp/gemini")
-                || entry_lower.starts_with("custom/node-openai")
-            {
-                return true;
-            }
-            if entry_lower.contains("vision")
-                || entry_lower.contains("-4o")
-                || entry_lower.contains("gemini")
-                || entry_lower.starts_with("oc/mimo")
-            {
-                return true;
-            }
-            false
-        }
-        "pdf" => {
-            if entry_lower.starts_with("anthropic/claude")
-                || entry_lower.starts_with("vertex/claude")
-                || entry_lower.starts_with("aws/claude")
-                || entry_lower.starts_with("google/gemini")
-                || entry_lower.starts_with("vertex/gemini")
-                || entry_lower.starts_with("gcp/gemini")
-            {
-                return true;
-            }
-            false
-        }
-        "audioInput" => entry_lower.starts_with("oc/mimo"),
-        "videoInput" => entry_lower.starts_with("oc/mimo"),
-        _ => false,
-    }
 }
 
 fn circuit_blocked(circuit: &CircuitBreakerRegistry, provider: &str, connection_id: &str) -> bool {

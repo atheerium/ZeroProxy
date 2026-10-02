@@ -201,6 +201,9 @@ async fn persist_records(state: &AppState, pending: Vec<(String, HealthRecord)>)
                     HEALTH_CHECKED_AT_KEY.into(),
                     json!(record.checked_at.to_rfc3339()),
                 );
+                if !record.status.is_failure() {
+                    clear_sticky_error(conn);
+                }
                 match record.degraded_until {
                     Some(until) => {
                         conn.extra
@@ -216,8 +219,35 @@ async fn persist_records(state: &AppState, pending: Vec<(String, HealthRecord)>)
         .await;
 }
 
+/// Clear the error fields a successful run invalidates.
+///
+/// Safe from a background daemon because [`probe_connection`] sends the
+/// connection's own credential, so a 2xx is proof of life. Without it these
+/// fields are cleared only on request-success paths, so a connection that
+/// errors once and is then left idle reports that error forever, beside a green
+/// health dot, with nothing to indicate how old it is.
+///
+/// The field set matches the request-success clears exactly so the two paths
+/// cannot drift. `test_status` is deliberately **not** cleared — it holds the
+/// result of a user-initiated "test this connection" action.
+pub(super) fn clear_sticky_error(conn: &mut ProviderConnection) {
+    conn.last_error = None;
+    conn.last_error_at = None;
+    conn.error_code = None;
+    conn.backoff_level = Some(0);
+    conn.consecutive_errors = Some(0);
+}
+
+pub(super) fn has_sticky_error(conn: &ProviderConnection) -> bool {
+    conn.error_code.is_some()
+        || conn.last_error.is_some()
+        || conn.consecutive_errors.unwrap_or(0) > 0
+        || conn.backoff_level.unwrap_or(0) > 0
+}
+
 /// Whether the record changed enough to justify a DB write: status flipped, a
-/// degrade window was opened/closed, or the window moved by ≥ 60 s.
+/// degrade window was opened/closed, the window moved by ≥ 60 s, or a recovered
+/// connection still carries an uncleared error.
 pub(super) fn needs_persist(conn: &ProviderConnection, record: &HealthRecord) -> bool {
     let stored_status = conn
         .extra
@@ -225,6 +255,14 @@ pub(super) fn needs_persist(conn: &ProviderConnection, record: &HealthRecord) ->
         .and_then(Value::as_str)
         .unwrap_or_default();
     if stored_status != record.status.as_str() {
+        return true;
+    }
+
+    // This is a change-detector, so without the sticky-error check a connection
+    // that recovers *without* a status change is never written and
+    // `clear_sticky_error` never runs — leaving the fix effective only on the
+    // single tick where the status flipped.
+    if !record.status.is_failure() && has_sticky_error(conn) {
         return true;
     }
 
