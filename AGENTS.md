@@ -1101,6 +1101,25 @@ If `git branch -d` refuses with "not fully merged", that is often **wrong** — 
 the local tip is merged into its *own upstream*, which trips when you are ahead. Prove it with
 `git merge-base --is-ancestor <branch> main` and use `-D` if that says yes.
 
+### Known-stale branches on `origin` — do NOT mistake these for live work
+
+Left in place deliberately (2026-10-02) after the worktree cleanup. None has an open PR, all are
+far behind `main`, and **they cost no disk**, so deleting them buys nothing and loses work. If you
+are about to build on one of these, you are building on abandoned code — rebase on `main` first
+and expect to redo it.
+
+| branch | unique commits | what it is |
+|---|---|---|
+| `fix/provider-parity-claude-scopes` | 16 | provider-parity work, furthest behind (251 commits) |
+| `feat/free-tier-additional-providers` | 6 | free-tier provider batch + a clippy/fmt sweep |
+| `fix/providers-empty-state` | 5 | providers-page ErrorBoundary, fetch-error surfacing, catalog seeding as inactive connections |
+| `backup-local` | 2 | **security**: OAuth client secrets → env vars; plus an SSE usage-tracking restore |
+| `pr-feat-import-catalog` | 1 | import catalog from live provider models |
+| `pr-fix-pnpm-lock` | 1 | pnpm-lock conflict fix + dep bumps (recharts 3.10, astro 5.18.2) |
+
+`backup-local` is the one worth a look — a hardcoded-secret removal is exactly the kind of change
+that should not sit unmerged forever. `pr-fix-pnpm-lock` is the cheapest useful one.
+
 Full spec + recovery: `docs/agent-orchestration.md` (tracked). Note it still contains a few
 stale `../cipherroute` paths.
 
