@@ -104,6 +104,7 @@ async fn validate_provider(
         "completions" => validate_bearer(&client, "https://completions.me/api/v1/models", &api_key).await,
         "freetheai" => validate_bearer(&client, "https://api.freetheai.xyz/v1/models", &api_key).await,
         "llm7" => validate_bearer(&client, "https://api.llm7.io/v1/models", &api_key).await,
+        "apmix" => validate_bearer(&client, "https://api.apmix.ai/v1/models", &api_key).await,
         "kluster" => validate_bearer(&client, "https://api.kluster.ai/v1/models", &api_key).await,
         "predibase" => validate_bearer(&client, "https://serving.app.predibase.com/v1/models", &api_key).await,
         "bytez" => validate_bearer(&client, "https://api.bytez.com/models/v2", &api_key).await,

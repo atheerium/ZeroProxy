@@ -413,6 +413,31 @@ mod tests {
             .is_some_and(|ms| { ms.len() == 1 && ms[0].id == "kokoro" && ms[0].kind == "tts" }));
     }
 
+    // apmix: hand-added free-promotion gateway (not an OmniRoute/9router
+    // provider, so it lives only in provider_catalog.json). Exactly the two
+    // promo models — deliberately not the full apmix catalog.
+    #[test]
+    fn apmix_carries_only_the_two_free_promo_models() {
+        let catalog = provider_catalog();
+
+        let models = catalog.models_for_alias("apmix").expect("apmix models");
+        let ids: Vec<&str> = models.iter().map(|m| m.id.as_str()).collect();
+        assert_eq!(ids, vec!["gpt-6-luna-free", "deepseek-v4-flash-free"]);
+        assert!(models.iter().all(|m| m.kind == "llm"));
+
+        let provider = catalog.provider_info("apmix").expect("apmix provider");
+        assert_eq!(provider.alias, "apmix");
+        assert_eq!(provider.service_kinds, vec!["llm"]);
+        assert!(provider.tts_models.is_empty());
+        assert!(provider.embedding_models.is_empty());
+        assert!(!provider.has_search);
+        assert!(!provider.has_fetch);
+
+        // The dashboard must see apmix as free tier (FREE_TIER_PROVIDERS in
+        // web/src/shared/constants/providers.ts keys off the same id).
+        assert_eq!(catalog.static_alias_for_provider("apmix"), Some("apmix"));
+    }
+
     // providerIdToAlias must resolve provider ids to the JS aliases, and
     // find_model must reach models through them (bead .46).
     #[test]

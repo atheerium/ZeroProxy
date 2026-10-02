@@ -106,6 +106,7 @@
     "gemini-web": "gweb",
     "muse-spark-web": "ms-web",
     "api-airforce": "af",
+    "apmix": "apmix",
     "bazaarlink": "bzl",
     "bluesminds": "bm",
     "llm7": "llm7",
@@ -6195,6 +6196,21 @@
           "kind": "llm"
         }
       ]
+    },
+    {
+      "alias": "apmix",
+      "models": [
+        {
+          "id": "gpt-6-luna-free",
+          "name": "GPT 6 Luna Free",
+          "kind": "llm"
+        },
+        {
+          "id": "deepseek-v4-flash-free",
+          "name": "DeepSeek V4 Flash Free",
+          "kind": "llm"
+        }
+      ]
     }
   ],
   "providers": [
@@ -7696,6 +7712,17 @@
     {
       "id": "ovhcloud",
       "alias": "ovh",
+      "serviceKinds": [
+        "llm"
+      ],
+      "ttsModels": [],
+      "embeddingModels": [],
+      "hasSearch": false,
+      "hasFetch": false
+    },
+    {
+      "id": "apmix",
+      "alias": "apmix",
       "serviceKinds": [
         "llm"
       ],

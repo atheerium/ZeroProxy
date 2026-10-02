@@ -222,6 +222,12 @@ static PROVIDER_CONFIGS: Lazy<BTreeMap<&'static str, ProviderConfig>> = Lazy::ne
             ProviderConfig::openai("https://api.tokenrouter.com/v1/chat/completions"),
         ),
         (
+            "apmix",
+            // Promotion gateway (free gpt-6-luna-free / deepseek-v4-flash-free).
+            // Both base URLs take the same apx_live_… key; we only need OpenAI wire.
+            ProviderConfig::openai("https://api.apmix.ai/v1/chat/completions"),
+        ),
+        (
             "venice",
             // /api/v1 (double path) — do NOT "fix" to /v1.
             ProviderConfig::openai("https://api.venice.ai/api/v1/chat/completions"),
@@ -2088,5 +2094,25 @@ mod tests {
             .build_url("tencent/hy3:free", false, &credentials)
             .unwrap();
         assert_eq!(url, "https://api.kilo.ai/api/openrouter/chat/completions");
+    }
+
+    #[test]
+    fn apmix_posts_to_live_promotion_endpoint() {
+        // Per apmix.ai model pages: POST https://api.apmix.ai/v1/chat/completions
+        // with `Authorization: Bearer apx_live_…`. The Anthropic-compatible
+        // mirror (/v1/messages) is not wired — we only expose the OpenAI wire.
+        let executor = DefaultExecutor::new("apmix", Arc::new(ClientPool::new()), None)
+            .expect("apmix must be a supported provider");
+        let credentials = ProviderConnection {
+            api_key: Some("apx_live_test".to_string()),
+            ..ProviderConnection::default()
+        };
+        for model in ["gpt-6-luna-free", "deepseek-v4-flash-free"] {
+            let url = executor.build_url(model, false, &credentials).unwrap();
+            assert_eq!(
+                url, "https://api.apmix.ai/v1/chat/completions",
+                "apmix must post {model} to the OpenAI-compatible endpoint"
+            );
+        }
     }
 }
