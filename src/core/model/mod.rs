@@ -135,6 +135,9 @@ static ALIAS_TO_PROVIDER_ID: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
         // TokenRouter (trk alias per OmniRoute parity)
         ("trk", "tokenrouter"),
         ("tokenrouter", "tokenrouter"),
+        // APMIX (apmix alias; free promotion models)
+        ("apx", "apmix"),
+        ("apmix", "apmix"),
     ])
 });
 
