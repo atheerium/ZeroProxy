@@ -1,10 +1,23 @@
 ---
-import Layout from '@/layouts/Layout.astro';
-import UsagePageClient from '@/components/usage/UsagePageClient';
-import DashboardLayout from '@/shared/components/layouts/DashboardLayout';
+/**
+ * /dashboard/usage was merged into /dashboard/analytics (the newer page, with
+ * the better global metrics). This file is kept as a redirect so old bookmarks,
+ * screenshots and any stale sidebar cache still land somewhere real.
+ *
+ * The live provider topology that used to live here is preserved on the
+ * analytics page (`components/analytics/LiveProviderTopology.tsx`).
+ */
+const target = "/dashboard/analytics";
 ---
-<Layout>
-  <DashboardLayout client:only="react">
-    <UsagePageClient client:only="react" />
-  </DashboardLayout>
-</Layout>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Usage → Analytics</title>
+    <meta http-equiv="refresh" content={`0; url=${target}`} />
+    <link rel="canonical" href={target} />
+    <meta name="robots" content="noindex" />
+  </head>
+  <body>
+    <p>Moved to <a href={target}>Analytics</a>.</p>
+  </body>
+</html>

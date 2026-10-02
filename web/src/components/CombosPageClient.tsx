@@ -6,7 +6,16 @@ import { ConfirmModal } from "@/shared/components/Modal";
 import { useNotificationStore } from "@/store/notificationStore";
 import { useCopyToClipboard } from "@/shared/hooks/useCopyToClipboard";
 import { useModelCaps } from "@/shared/hooks/useModelCaps";
+import AutoBreakdown from "@/components/usage/AutoBreakdown";
+import SegmentedControl from "@/shared/components/SegmentedControl";
 import type { ComboStrategyConfig, ComboStrategyOption } from "@/types";
+
+const AUTO_PERIODS = [
+  { value: "today", label: "24h" },
+  { value: "7d", label: "7d" },
+  { value: "30d", label: "30d" },
+  { value: "60d", label: "60d" },
+];
 
 function tierValue(label?: string): number {
   switch ((label || "").toLowerCase()) {
@@ -127,6 +136,7 @@ export default function CombosPage() {
   const [testingCombo, setTestingCombo] = useState<string | null>(null);
   const [testResults, setTestResults] = useState<{ combo: string; results: any[] } | null>(null);
   const [testLoading, setTestLoading] = useState<boolean>(false);
+  const [autoPeriod, setAutoPeriod] = useState("7d");
   const notify = useNotificationStore();
   const { copied, copy } = useCopyToClipboard();
   const { getCaps } = useModelCaps();
@@ -393,6 +403,26 @@ export default function CombosPage() {
           ))}
         </div>
       )}
+
+      {/* AUTO / PRESET BREAKDOWN — moved here from the retired /dashboard/usage
+          "Auto" tab. It is per-preset routing behaviour, so it belongs with the
+          combos rather than on the analytics page. */}
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <span className="material-symbols-outlined text-[20px] text-text-muted">auto_awesome</span>
+            <h2 className="text-lg font-semibold">Auto &amp; Preset Breakdown</h2>
+          </div>
+          <SegmentedControl
+            options={AUTO_PERIODS}
+            value={autoPeriod}
+            onChange={setAutoPeriod}
+            size="sm"
+            className="w-full sm:w-auto"
+          />
+        </div>
+        <AutoBreakdown period={autoPeriod} />
+      </div>
 
       {/* Create Modal - Use key to force remount and reset state */}
       <ComboFormModal
