@@ -8,11 +8,21 @@ interface CacheStats {
   misses: number;
   sets: number;
   entries: number;
+  /** Live bytes held in cached bodies, against a 64 MiB budget. */
+  bytes: number;
   hit_rate: number;
 }
 
 const fmtPct = (n: number) => `${(n * 100).toFixed(1)}%`;
 const fmt = (n: number) => new Intl.NumberFormat().format(n || 0);
+
+/** Human-readable cache footprint, e.g. `3.4 MB` / `812 KB`. */
+const fmtBytes = (n: number) => {
+  const b = n || 0;
+  if (b >= 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(1)} MB`;
+  if (b >= 1024) return `${Math.round(b / 1024)} KB`;
+  return `${b} B`;
+};
 
 /**
  * Response-cache hit-rate card for the dashboard home.
@@ -61,7 +71,7 @@ export default function CacheStatsCard() {
       ) : !stats ? (
         <p className="text-sm text-text-muted">Loading…</p>
       ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
           <div className="flex flex-col gap-1">
             <span className="text-text-muted text-xs uppercase font-semibold">Hit Rate</span>
             <span className="text-2xl font-bold text-success">{fmtPct(stats.hit_rate)}</span>
@@ -78,10 +88,15 @@ export default function CacheStatsCard() {
             <span className="text-text-muted text-xs uppercase font-semibold">Cached</span>
             <span className="text-2xl font-bold text-info">{fmt(stats.entries)}</span>
           </div>
+          <div className="flex flex-col gap-1">
+            <span className="text-text-muted text-xs uppercase font-semibold">Size</span>
+            <span className="text-2xl font-bold text-info">{fmtBytes(stats.bytes)}</span>
+          </div>
         </div>
       )}
       <p className="mt-3 text-[11px] text-text-muted">
         Repeated prompts served from cache (24h TTL) save provider quota. Non-streaming only.
+        Size is capped at 64 MB.
       </p>
     </Card>
   );
