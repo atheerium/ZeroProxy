@@ -68,12 +68,6 @@ static ALIAS_TO_PROVIDER_ID: Lazy<HashMap<&'static str, &'static str>> = Lazy::n
         ("grok-web", "grok-web"),
         ("pw", "perplexity-web"),
         ("perplexity-web", "perplexity-web"),
-        ("kw", "kimi-web"),
-        ("kimi-web", "kimi-web"),
-        ("dw", "deepseek-web"),
-        ("dsw", "deepseek-web"),
-        ("ds-web", "deepseek-web"),
-        ("deepseek-web", "deepseek-web"),
         // ── Enterprise & Cloud ──
         ("databricks", "databricks"),
         ("snowflake", "snowflake"),

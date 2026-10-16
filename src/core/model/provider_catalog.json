@@ -55,8 +55,6 @@
     "opencode-go": "opencode-go",
     "grok-web": "grok-web",
     "perplexity-web": "perplexity-web",
-    "kimi-web": "kimi-web",
-    "deepseek-web": "deepseek-web",
     "azure": "azure",
     "cloudflare-ai": "cloudflare-ai",
     "xiaomi-mimo": "xiaomi-mimo",
@@ -3335,96 +3333,6 @@
         {
           "id": "pplx-nemotron",
           "name": "Nemotron 3 Super (via Perplexity)",
-          "kind": "llm"
-        }
-      ]
-    },
-    {
-      "alias": "kimi-web",
-      "models": [
-        {
-          "id": "k3",
-          "name": "K3",
-          "kind": "llm"
-        },
-        {
-          "id": "k2d6",
-          "name": "K2.6",
-          "kind": "llm"
-        }
-      ]
-    },
-    {
-      "alias": "deepseek-web",
-      "models": [
-        {
-          "id": "deepseek-v4-pro",
-          "name": "DeepSeek V4 Pro",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-pro-think",
-          "name": "DeepSeek V4 Pro Think",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-pro-search",
-          "name": "DeepSeek V4 Pro Search",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-pro-think-search",
-          "name": "DeepSeek V4 Pro Think+Search",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-flash",
-          "name": "DeepSeek V4 Flash",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-flash-think",
-          "name": "DeepSeek V4 Flash Think",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-flash-search",
-          "name": "DeepSeek V4 Flash Search",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v4-flash-think-search",
-          "name": "DeepSeek V4 Flash Think+Search",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-chat",
-          "name": "DeepSeek Chat",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-reasoner",
-          "name": "DeepSeek Reasoner",
-          "kind": "llm"
-        },
-        {
-          "id": "DeepSeek-R1",
-          "name": "DeepSeek R1",
-          "kind": "llm"
-        },
-        {
-          "id": "DeepSeek-R1-Search",
-          "name": "DeepSeek R1 Search",
-          "kind": "llm"
-        },
-        {
-          "id": "DeepSeek-V3.2",
-          "name": "DeepSeek V3.2",
-          "kind": "llm"
-        },
-        {
-          "id": "DeepSeek-Search",
-          "name": "DeepSeek Search",
           "kind": "llm"
         }
       ]
@@ -7290,28 +7198,6 @@
     {
       "id": "perplexity-web",
       "alias": "pw",
-      "serviceKinds": [
-        "llm"
-      ],
-      "ttsModels": [],
-      "embeddingModels": [],
-      "hasSearch": false,
-      "hasFetch": false
-    },
-    {
-      "id": "kimi-web",
-      "alias": "kw",
-      "serviceKinds": [
-        "llm"
-      ],
-      "ttsModels": [],
-      "embeddingModels": [],
-      "hasSearch": false,
-      "hasFetch": false
-    },
-    {
-      "id": "deepseek-web",
-      "alias": "dw",
       "serviceKinds": [
         "llm"
       ],
