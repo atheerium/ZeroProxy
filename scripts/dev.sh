@@ -85,6 +85,18 @@ fi
 BIN_DEBUG="target/debug/zeroproxy"
 BIN_RELEASE="target/release/zeroproxy"
 BIN="$BIN_DEBUG"
+
+# glibc allocator tuning — measured 2026-10-16, keep these three together.
+# Each worker thread gets its own malloc arena on contention, and an arena only
+# returns memory at the top of its heap, so multi-MB response buffers accumulate
+# permanently across 8 arenas. A/B under 1.5 GB of transient churn on an
+# identical binary: default +12.2 MB RSS, ARENA_MAX=2 alone +8.3 MB, all three
+# +0.9 MB (-93%). Live instance went 300 MB -> 115 MB on restart.
+# These are glibc env vars, so they must be exported *before* the binary starts.
+export MALLOC_ARENA_MAX=2
+export MALLOC_TRIM_THRESHOLD_=131072
+export MALLOC_MMAP_THRESHOLD_=131072
+
 CARGO_ARGS=(build --bin zeroproxy)
 if [[ "$BUILD_MODE" == "release" ]]; then
   BIN="$BIN_RELEASE"
