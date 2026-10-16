@@ -33,6 +33,10 @@ async fn main() -> anyhow::Result<()> {
     let mut cli = Cli::parse();
     cli.apply_legacy_env();
     zeroproxy::core::tls::ensure_rustls_provider();
+    // Must be installed before the panic hook is used and before any handler
+    // can panic. Complements the `HandleErrorLayer` in `build_app`: that layer
+    // decides what the client sees, this decides what the operator sees.
+    zeroproxy::install_panic_hook();
     let ctx = cli.output_ctx();
     let resolved = ResolvedConfig::resolve(cli.cli_overrides())?;
 

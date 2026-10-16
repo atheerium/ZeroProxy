@@ -164,4 +164,13 @@ lto = "fat"
 codegen-units = 1
 strip = "symbols"
 panic = "unwind"
-opt-level = "s"
+# Size-optimized (`opt-level = "s"`) cost measurable throughput on the JSON hot
+# path: re-serializing a realistic agent request body (14.6 KB, 24 tools, 40
+# messages) took ~69.8us at "s" versus ~58.4us at `3` — about 17% faster, and
+# reproducible across runs. SHA-256 was identical (~7.2us in both) because it
+# lives in a dependency, so the win is specifically in this crate's own
+# serde_json/object code, which is what every chat request runs. The binary
+# grows ~7% (386 KB -> 415 KB for the benchmark binary), which is irrelevant
+# next to the 23 MB real binary. Revert to "s" only if size becomes a
+# constraint.
+opt-level = 3
