@@ -30,6 +30,30 @@ const DEFAULT_CACHE_TTL_SECS: u64 = 86_400; // 24 hours
 /// limit just prevents an upstream from forcing an unbounded hold.
 const MAX_UPSTREAM_CACHE_TTL_SECS: u64 = 3600; // 1 hour
 
+/// Maximum number of cached entries.
+///
+/// This used to be 10_000, which was safe only while nothing bounded the
+/// *size* of an entry. With a24h TTL and no byte ceiling, 10_000 large
+/// responses could hold hundreds of megabytes resident for the life of the
+/// process. The byte budget below is now the binding constraint for large
+/// responses; this count ceiling still bounds the many-tiny-response case.
+const DEFAULT_MAX_ENTRIES: usize = 2_000;
+
+/// Hard ceiling on the total bytes held in cached response bodies.
+///
+/// This is the real memory bound for the cache. It exists because the process
+/// has no allocator that returns freed pages promptly (see the glibc-arena
+/// note in AGENTS.md): anything the cache stores stays resident until it is
+/// evicted, so "unbounded until the entry count trips" is not a safe design.
+const DEFAULT_MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024; // 64 MiB
+
+/// Per-entry ceiling. A single response bigger than this is never stored.
+///
+/// One large response can otherwise eat a large slice of the total budget by
+/// itself, and the odds of it being re-requested often enough to pay for that
+/// are low. Skipping is a plain miss later — never a correctness problem.
+const DEFAULT_MAX_ENTRY_BYTES: usize = 2 * 1024 * 1024; // 2 MiB
+
 /// A single cached entry.
 #[derive(Clone)]
 struct CacheEntry {
@@ -61,6 +85,13 @@ pub struct ResponseCache {
     default_ttl: Duration,
     /// Maximum number of entries before proactive eviction.
     max_entries: usize,
+    /// Maximum total bytes of cached response bodies before proactive eviction.
+    max_total_bytes: u64,
+    /// Largest single response body that will be stored.
+    max_entry_bytes: usize,
+    /// Running total of bytes held in `inner`. Maintained on every insert and
+    /// every removal path so `reclaim` can decide without an `O(n)` sum.
+    total_bytes: Arc<AtomicU64>,
     /// Monotonic hit counter (cache served a stored response).
     hits: Arc<AtomicU64>,
     /// Monotonic miss counter (lookup found nothing / expired / no-cache).
@@ -75,7 +106,10 @@ impl Default for ResponseCache {
             inner: Arc::new(DashMap::new()),
             provider_ttls: Arc::new(DashMap::new()),
             default_ttl: Duration::from_secs(DEFAULT_CACHE_TTL_SECS),
-            max_entries: 10_000,
+            max_entries: DEFAULT_MAX_ENTRIES,
+            max_total_bytes: DEFAULT_MAX_TOTAL_BYTES,
+            max_entry_bytes: DEFAULT_MAX_ENTRY_BYTES,
+            total_bytes: Arc::new(AtomicU64::new(0)),
             hits: Arc::new(AtomicU64::new(0)),
             misses: Arc::new(AtomicU64::new(0)),
             sets: Arc::new(AtomicU64::new(0)),
@@ -84,16 +118,113 @@ impl Default for ResponseCache {
 }
 
 impl ResponseCache {
-    /// Create a new response cache with the given default TTL.
+    /// Create a new response cache with the given default TTL and the default
+    /// entry/byte budgets.
     pub fn new(default_ttl_secs: u64) -> Self {
+        Self::with_limits(
+            default_ttl_secs,
+            DEFAULT_MAX_ENTRIES,
+            DEFAULT_MAX_TOTAL_BYTES,
+            DEFAULT_MAX_ENTRY_BYTES,
+        )
+    }
+
+    /// Create a cache with explicit budgets. The limits are parameters so tests
+    /// can exercise eviction without allocating megabytes.
+    fn with_limits(
+        default_ttl_secs: u64,
+        max_entries: usize,
+        max_total_bytes: u64,
+        max_entry_bytes: usize,
+    ) -> Self {
         Self {
             inner: Arc::new(DashMap::new()),
             provider_ttls: Arc::new(DashMap::new()),
             default_ttl: Duration::from_secs(default_ttl_secs.max(1)),
-            max_entries: 10_000,
+            max_entries,
+            max_total_bytes,
+            max_entry_bytes,
+            total_bytes: Arc::new(AtomicU64::new(0)),
             hits: Arc::new(AtomicU64::new(0)),
             misses: Arc::new(AtomicU64::new(0)),
             sets: Arc::new(AtomicU64::new(0)),
+        }
+    }
+
+    /// Current tracked cache size in bytes.
+    pub fn bytes(&self) -> u64 {
+        self.total_bytes.load(Ordering::Relaxed)
+    }
+
+    /// Add to the byte counter, saturating rather than wrapping.
+    fn add_bytes(&self, n: u64) {
+        let _ = self
+            .total_bytes
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |cur| {
+                Some(cur.saturating_add(n))
+            });
+    }
+
+    /// Subtract from the byte counter, saturating rather than wrapping.
+    ///
+    /// Saturating matters: an underflow here would wrap to near `u64::MAX` and
+    /// make `reclaim` believe the cache is permanently over budget, silently
+    /// disabling caching. A plain `fetch_sub` turns any accounting slip into
+    /// that failure, so the clamp is deliberate.
+    fn sub_bytes(&self, n: u64) {
+        let _ = self
+            .total_bytes
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |cur| {
+                Some(cur.saturating_sub(n))
+            });
+    }
+
+    /// Reclaim cache memory when either budget is exceeded.
+    ///
+    /// Two allocation-free steps:
+    /// 1. Drop expired entries with a linear `retain`. Under a 24h TTL this is
+    ///    normally where the bytes come from.
+    /// 2. If still over budget, evict arbitrary entries until **both** budgets
+    ///    are back under a low-water mark (75% of each).
+    ///
+    /// The low-water mark is why this does not simply evict the excess:
+    /// backing off to a *fraction* of the ceiling amortizes the `O(n)` scan
+    /// over many inserts. Evicting only the excess would leave the cache
+    /// pinned at exactly the budget, so every later insert would rescan.
+    ///
+    /// Eviction stays arbitrary rather than oldest-first for the same reason
+    /// the count-only path did: sorting by `created_at` would put an
+    /// `O(n log n)` sort on the insert path. See the struct-level note on
+    /// [`ResponseCache`] for the background-eviction alternative.
+    fn reclaim(&self) {
+        if self.inner.len() <= self.max_entries && self.bytes() <= self.max_total_bytes {
+            return;
+        }
+
+        let mut freed = 0u64;
+        self.inner.retain(|_key, entry| {
+            if entry.is_expired() {
+                freed += entry.body.len() as u64;
+                false
+            } else {
+                true
+            }
+        });
+        if freed > 0 {
+            self.sub_bytes(freed);
+        }
+
+        let entry_target = self.max_entries.saturating_sub(self.max_entries / 4);
+        let byte_target = self
+            .max_total_bytes
+            .saturating_sub(self.max_total_bytes / 4);
+        while self.inner.len() > entry_target || self.bytes() > byte_target {
+            let Some(victim) = self.inner.iter().next().map(|e| *e.key()) else {
+                break;
+            };
+            if let Some((_key, entry)) = self.inner.remove(&victim) {
+                self.sub_bytes(entry.body.len() as u64);
+            }
         }
     }
 
@@ -221,7 +352,9 @@ impl ResponseCache {
         if entry.is_expired() {
             // Drop the guard before removing to avoid deadlock on the same shard
             drop(entry);
-            self.inner.remove(&key);
+            if let Some((_key, dropped)) = self.inner.remove(&key) {
+                self.sub_bytes(dropped.body.len() as u64);
+            }
             self.misses.fetch_add(1, Ordering::Relaxed);
             return None;
         }
@@ -313,6 +446,14 @@ impl ResponseCache {
             return;
         }
 
+        // A body over the per-entry ceiling is never stored: it would consume a
+        // large slice of the total budget alone, and the odds of it being
+        // re-requested often enough to pay for that are low. Skipping is a
+        // plain miss on the next identical request, never a wrong answer.
+        if response_body.len() > self.max_entry_bytes {
+            return;
+        }
+
         let key = Self::build_cache_key(body);
 
         // Determine TTL: upstream Cache-Control > provider TTL > default
@@ -327,51 +468,33 @@ impl ResponseCache {
             ttl,
         };
 
-        self.inner.insert(key, entry);
+        let body_len = entry.body.len() as u64;
+
+        // A repeat `set` for the same key replaces the old entry rather than
+        // adding a second one, so the replaced bytes have to come off the
+        // counter or it drifts upward and over-evicts forever.
+        if let Some(replaced) = self.inner.insert(key, entry) {
+            self.sub_bytes(replaced.body.len() as u64);
+        }
+        self.add_bytes(body_len);
         self.sets.fetch_add(1, Ordering::Relaxed);
 
-        // Proactive eviction when cache grows too large
-        if self.inner.len() > self.max_entries {
-            // First remove all expired entries (linear scan, no allocation).
-            self.inner.retain(|_key, entry| !entry.is_expired());
-
-            // If still over the limit, evict arbitrary entries to get back
-            // under it. This avoids an O(n log n) sort of all entries that
-            // would be needed to guarantee oldest-first eviction.
-            //
-            // LIMITATION: Under sustained over-capacity pressure, entries
-            // with long TTLs may be evicted before older entries that have
-            // already expired (those are cleaned lazily on subsequent get/set
-            // calls). Cache correctness (freshness) is unaffected — no
-            // expired entry is ever returned — only the hit rate may degrade
-            // slightly under sustained overflow, because a soon-to-expire
-            // entry could be dropped before it would have served a request.
-            // In practice this is acceptable: expired entries are removed
-            // opportunistically on every insert past the limit, and the
-            // cheaper strategy saves an O(n log n) sort per insertion.
-            // See the struct-level note on `ResponseCache` for a recommended
-            // improvement path.
-            if self.inner.len() > self.max_entries {
-                let excess = self.inner.len() - self.max_entries;
-                let to_remove: Vec<[u8; 32]> =
-                    self.inner.iter().take(excess).map(|e| *e.key()).collect();
-                for key in &to_remove {
-                    self.inner.remove(key);
-                }
-            }
-        }
+        self.reclaim();
     }
 
     /// Remove a cached entry by request body. Useful when a subsequent request
     /// indicates the cached response is stale.
     pub fn invalidate(&self, body: &Value) {
         let key = Self::build_cache_key(body);
-        self.inner.remove(&key);
+        if let Some((_key, removed)) = self.inner.remove(&key) {
+            self.sub_bytes(removed.body.len() as u64);
+        }
     }
 
     /// Clear all cached entries.
     pub fn clear(&self) {
         self.inner.clear();
+        self.total_bytes.store(0, Ordering::Relaxed);
     }
 
     /// Return the number of entries currently in the cache.
@@ -405,6 +528,7 @@ impl ResponseCache {
             misses,
             sets: self.sets.load(Ordering::Relaxed),
             entries: self.inner.len(),
+            bytes: self.bytes(),
             hit_rate,
         }
     }
@@ -421,6 +545,8 @@ pub struct CacheStats {
     pub sets: u64,
     /// Live entry count.
     pub entries: usize,
+    /// Live bytes held in cached response bodies, against `max_total_bytes`.
+    pub bytes: u64,
     /// `hits / (hits + misses)`, `0.0` when no lookups have occurred.
     pub hit_rate: f64,
 }
@@ -485,6 +611,7 @@ impl std::fmt::Debug for ResponseCache {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ResponseCache")
             .field("entries", &self.inner.len())
+            .field("bytes", &self.bytes())
             .field("default_ttl", &self.default_ttl)
             .finish()
     }
@@ -856,5 +983,164 @@ mod tests {
         assert_eq!(served, b"response");
         // 24h TTL, just inserted → remaining is essentially the full day.
         assert!(remaining > 86_000, "remaining TTL should be ~24h");
+    }
+
+    // ---- byte-budget tests ----
+
+    /// A request body unique to each call, so every `set` lands on its own key.
+    fn body_for(i: usize) -> Value {
+        json!({
+            "model": "gpt-4o",
+            "messages": [{"role": "user", "content": format!("prompt-{i}")}],
+        })
+    }
+
+    #[test]
+    fn test_oversized_entry_is_not_stored() {
+        let cache = ResponseCache::with_limits(86_400, 100, 1_000_000, 1_024);
+        let body = body_for(0);
+
+        // 2 KiB body against a 1 KiB per-entry ceiling.
+        cache.set(&body, vec![b'x'; 2_048], "openai", None);
+
+        assert!(cache.is_empty(), "oversized body must not be cached");
+        assert_eq!(cache.bytes(), 0, "oversized body must not count bytes");
+        assert_eq!(cache.stats().sets, 0, "skipped store is not a set");
+    }
+
+    #[test]
+    fn test_total_bytes_tracks_inserts_and_removals() {
+        let cache = ResponseCache::with_limits(86_400, 100, 1_000_000, 1_024);
+
+        cache.set(&body_for(0), vec![b'a'; 100], "openai", None);
+        cache.set(&body_for(1), vec![b'b'; 250], "openai", None);
+        assert_eq!(cache.bytes(), 350, "bytes must sum live entry bodies");
+
+        cache.invalidate(&body_for(0));
+        assert_eq!(cache.bytes(), 250, "invalidate must release bytes");
+
+        cache.clear();
+        assert_eq!(cache.bytes(), 0, "clear must zero the counter");
+    }
+
+    #[test]
+    fn test_repeated_set_on_same_key_does_not_drift() {
+        let cache = ResponseCache::with_limits(86_400, 100, 1_000_000, 1_024);
+        let body = body_for(0);
+
+        // Same key re-stored 50x: a replacement must net out, not accumulate.
+        for _ in 0..50 {
+            cache.set(&body, vec![b'x'; 200], "openai", None);
+        }
+
+        assert_eq!(cache.len(), 1, "same key must replace, not append");
+        assert_eq!(
+            cache.bytes(),
+            200,
+            "replacing an entry must not drift the byte counter upward"
+        );
+    }
+
+    #[test]
+    fn test_byte_budget_is_never_exceeded() {
+        // Budget fits ~10 x 100-byte entries, so the cache cannot hold 100.
+        let cache = ResponseCache::with_limits(86_400, 1_000, 1_000, 1_024);
+
+        for i in 0..100 {
+            cache.set(&body_for(i), vec![b'x'; 100], "openai", None);
+            assert!(
+                cache.bytes() <= 1_000,
+                "byte budget must hold on every insert, saw {}",
+                cache.bytes()
+            );
+        }
+
+        assert!(
+            cache.len() < 100,
+            "eviction must actually drop entries, still hold {}",
+            cache.len()
+        );
+    }
+
+    #[test]
+    fn test_reclaim_backs_off_to_low_water_mark() {
+        // Fill to exactly the budget: 10 x 100 bytes, reclaim not yet triggered.
+        let cache = ResponseCache::with_limits(86_400, 1_000, 1_000, 1_024);
+        for i in 0..10 {
+            cache.set(&body_for(i), vec![b'x'; 100], "openai", None);
+        }
+        assert_eq!(cache.bytes(), 1_000, "cache should sit at the budget");
+
+        // One more entry crosses it. Reclaim must evict down to the 75% mark
+        // rather than shedding a single entry — shedding only the excess would
+        // leave the cache pinned at the ceiling and rescan on every insert.
+        cache.set(&body_for(99), vec![b'y'; 100], "openai", None);
+        assert!(
+            cache.bytes() <= 750,
+            "reclaim should back off below the budget, saw {}",
+            cache.bytes()
+        );
+    }
+
+    #[test]
+    fn test_eviction_preserves_cache_correctness() {
+        let cache = ResponseCache::with_limits(86_400, 1_000, 1_000, 1_024);
+        for i in 0..50 {
+            cache.set(
+                &body_for(i),
+                format!("resp-{i}").into_bytes(),
+                "openai",
+                None,
+            );
+        }
+
+        // Every surviving entry must return its OWN body — arbitrary eviction
+        // may drop any entry, but must never mis-serve one.
+        for i in 0..50 {
+            let body = body_for(i);
+            if let Some(served) = cache.get(&body) {
+                assert_eq!(
+                    served,
+                    format!("resp-{i}").into_bytes(),
+                    "entry {i} was served the wrong body"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_expired_entries_are_reclaimed_by_byte_budget() {
+        // TTL 1s, byte budget 1000. Sleep past the TTL, then insert enough to
+        // trip the budget: the expired entries must free their bytes first.
+        let cache = ResponseCache::with_limits(1, 1_000, 1_000, 1_024);
+
+        for i in 0..5 {
+            cache.set(&body_for(i), vec![b'x'; 150], "openai", None);
+        }
+        assert_eq!(cache.bytes(), 750);
+
+        std::thread::sleep(Duration::from_millis(1_100));
+
+        cache.set(&body_for(99), vec![b'y'; 100], "openai", None);
+
+        // Without the expired sweep the new entry would push past the budget
+        // and force arbitrary eviction; with it, the bytes were reclaimed.
+        assert!(
+            cache.bytes() <= 1_000,
+            "expired entries must be reclaimed to stay in budget, saw {}",
+            cache.bytes()
+        );
+    }
+
+    #[test]
+    fn test_default_budgets_are_bounded() {
+        let cache = ResponseCache::default();
+        assert_eq!(cache.max_entries, DEFAULT_MAX_ENTRIES);
+        assert_eq!(cache.max_total_bytes, DEFAULT_MAX_TOTAL_BYTES);
+        assert_eq!(cache.max_entry_bytes, DEFAULT_MAX_ENTRY_BYTES);
+        assert!(
+            cache.max_total_bytes <= 64 * 1024 * 1024,
+            "the cache must not be able to grow past its byte budget"
+        );
     }
 }
