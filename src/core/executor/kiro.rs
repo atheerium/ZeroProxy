@@ -38,6 +38,67 @@ const KIRO_BASE_URLS: &[&str] = &[
 const KIRO_REGION: &str = "us-east-1";
 const KIRO_SERVICE: &str = "codewhisperer";
 
+/// Shared builder-id profile used when the connection carries none.
+///
+/// Builder ID sign-in stores only the OIDC token response, and that payload has
+/// no `profileArn`, so the Kiro request translators could never set one — they
+/// read `credentials.providerSpecificData`, but `chat.rs` builds that JSON with
+/// only `provider` and `rawHeaders`. Every Kiro inference request therefore went
+/// out without a profile and AWS rejected it with
+/// `profileArn is required for this request.` The quota path has always fallen
+/// back to this ARN for the same case (`quota_fetcher::kiro_resolve_profile_arn`),
+/// so this restores parity rather than inventing a value.
+///
+/// Deliberately not applied to `api_key` auth: CodeWhisperer answers that shared
+/// placeholder with 403 for arbitrary keys, which is why the quota resolver
+/// returns an empty string there.
+const KIRO_BUILDER_ID_PROFILE_ARN: &str =
+    "arn:aws:codewhisperer:us-east-1:638616132270:profile/AAAACCCCXXXX";
+
+fn kiro_connection_is_api_key(credentials: &ProviderConnection) -> bool {
+    credentials.auth_type.eq_ignore_ascii_case("api_key")
+        || credentials
+            .provider_specific_data
+            .get("authMethod")
+            .and_then(Value::as_str)
+            .is_some_and(|method| method == "api_key")
+}
+
+fn kiro_profile_arn(credentials: &ProviderConnection) -> Option<String> {
+    if let Some(explicit) = credentials
+        .provider_specific_data
+        .get("profileArn")
+        .and_then(Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+    {
+        return Some(explicit.to_string());
+    }
+    if kiro_connection_is_api_key(credentials) {
+        return None;
+    }
+    Some(KIRO_BUILDER_ID_PROFILE_ARN.to_string())
+}
+
+/// Ensure the translated Kiro payload carries a `profileArn`.
+fn apply_kiro_profile_arn(body: &Value, credentials: &ProviderConnection) -> Value {
+    if body
+        .get("profileArn")
+        .and_then(Value::as_str)
+        .is_some_and(|v| !v.trim().is_empty())
+    {
+        return body.clone();
+    }
+    let Some(profile_arn) = kiro_profile_arn(credentials) else {
+        return body.clone();
+    };
+    let mut patched = body.clone();
+    if let Some(object) = patched.as_object_mut() {
+        object.insert("profileArn".to_string(), Value::String(profile_arn));
+    }
+    patched
+}
+
 /// Rewrite the AWS region segment of an amazonaws.com host, e.g.
 /// `q.us-east-1.amazonaws.com` → `q.{region}.amazonaws.com`.
 /// 9router getOrderedBaseUrls parity: `([a-z]+)\.[a-z0-9-]+\.amazonaws\.com`
@@ -633,7 +694,8 @@ impl KiroExecutor {
         credentials: &ProviderConnection,
         stream: bool,
     ) -> Result<(reqwest::Response, HeaderMap), KiroExecutorError> {
-        let body_bytes = serde_json::to_vec(body)?;
+        let body = apply_kiro_profile_arn(body, credentials);
+        let body_bytes = serde_json::to_vec(&body)?;
         let content_hash = sha256_hex(&body_bytes);
 
         // AWS JSON credentials → SigV4 (IDC / some enterprise paths)
@@ -818,7 +880,9 @@ impl KiroExecutor {
                                                     .status(200)
                                                     .header("content-type", "text/event-stream")
                                                     .header("cache-control", "no-cache")
-                                                    .body(reqwest::Body::from(retry_bytes))
+                                                    .body(reqwest::Body::from(decode_body_to_sse(
+                                                        &retry_bytes,
+                                                    )))
                                                     .map_err(KiroExecutorError::InvalidRequest)?
                                                     .into(),
                                             ),
@@ -890,13 +954,17 @@ impl KiroExecutor {
                             }
                         }
                     }
-                    // Not retryable: return the buffered first attempt
-                    // (already OpenAI-chunk SSE).
+                    // Not retryable: return the decoded first attempt.
+                    // `full` is the raw binary AWS EventStream, so it has to go
+                    // through the decode step before it can be labelled
+                    // text/event-stream — otherwise a non-streaming client
+                    // receives the undecoded frames and sees empty content,
+                    // while the streaming path happened to work.
                     let http_response = http::Response::builder()
                         .status(200)
                         .header("content-type", "text/event-stream")
                         .header("cache-control", "no-cache")
-                        .body(reqwest::Body::from(full))
+                        .body(reqwest::Body::from(decode_body_to_sse(&full)))
                         .map_err(KiroExecutorError::InvalidRequest)?;
                     return Ok(KiroExecutorResponse {
                         response: UpstreamResponse::Reqwest(http_response.into()),
@@ -1372,6 +1440,66 @@ pub fn consumed_eventstream_bytes(data: &[u8]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn connection_with_psd(auth_method: &str, profile_arn: Option<&str>) -> ProviderConnection {
+        let mut psd = std::collections::BTreeMap::new();
+        psd.insert("authMethod".to_string(), json!(auth_method));
+        if let Some(arn) = profile_arn {
+            psd.insert("profileArn".to_string(), json!(arn));
+        }
+        ProviderConnection {
+            provider: "kiro".to_string(),
+            provider_specific_data: psd,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn builder_id_without_profile_arn_gets_the_shared_profile() {
+        let connection = connection_with_psd("builder-id", None);
+        let body = json!({"conversationState": {"history": []}});
+
+        let patched = apply_kiro_profile_arn(&body, &connection);
+
+        assert_eq!(
+            patched["profileArn"].as_str(),
+            Some(KIRO_BUILDER_ID_PROFILE_ARN)
+        );
+    }
+
+    #[test]
+    fn explicit_profile_arn_wins_over_the_shared_one() {
+        let connection = connection_with_psd("builder-id", Some("arn:aws:custom"));
+        let patched = apply_kiro_profile_arn(&json!({}), &connection);
+
+        assert_eq!(patched["profileArn"].as_str(), Some("arn:aws:custom"));
+    }
+
+    #[test]
+    fn api_key_auth_never_gets_the_shared_profile() {
+        let connection = connection_with_psd("api_key", None);
+        let patched = apply_kiro_profile_arn(&json!({}), &connection);
+
+        assert!(patched.get("profileArn").is_none());
+    }
+
+    #[test]
+    fn api_key_auth_is_detected_from_auth_type_too() {
+        let mut connection = connection_with_psd("builder-id", None);
+        connection.auth_type = "api_key".to_string();
+        let patched = apply_kiro_profile_arn(&json!({}), &connection);
+
+        assert!(patched.get("profileArn").is_none());
+    }
+
+    #[test]
+    fn an_existing_profile_arn_in_the_payload_is_never_overwritten() {
+        let connection = connection_with_psd("builder-id", Some("arn:aws:custom"));
+        let patched =
+            apply_kiro_profile_arn(&json!({"profileArn": "arn:aws:from-body"}), &connection);
+
+        assert_eq!(patched["profileArn"].as_str(), Some("arn:aws:from-body"));
+    }
 
     #[test]
     fn test_parse_aws_credentials() {

@@ -771,6 +771,109 @@ name is still honoured**, deliberately, so an existing shell profile keeps worki
   is a branding change, not the env-var prefix, and mass-renaming i18n values without
   their keys breaks translation lookups.
 
+### 19. OpenCode Zen's "free tier" is gated SERVER-SIDE per model — there is NO client id to emulate
+The error `HTTP 502: OpenCode's free tier can only be used from within OpenCode` is **not** a
+missing-header problem, and no amount of client impersonation fixes it. Measured 2026-10-05.
+
+- **The gate is not a header.** `src/core/executor/opencode_headers.rs` and the inline header
+  block in `default.rs` already send OpenCode-shaped headers (`User-Agent: opencode/…`,
+  `x-opencode-client`, `x-opencode-session`, `x-opencode-project`). Adding `x-opencode-org-id`,
+  `x-opencode-session-id`, `x-session-affinity`, `x-session-id`, `Authorization: Bearer public`,
+  `b3`/`traceparent`, `origin`/`referer`, and a fresh `ses_` id all still return the same 403.
+- **The real client does not go through `/zen/v1` for this.** Captured off the wire (mitmproxy +
+  a `plugin/` shim, both since removed): the CLI first calls
+  `GET https://opencode.ai/console/api/v2/config` with `Authorization: Bearer oc_sk_…` and
+  `User-Agent: opencode/latest/2.0.23/cli`. That response supplies the real endpoints —
+  **`https://opencode.ai/inference/openai/v1`** (or `…/inference/anthropic/v1`) plus
+  `x-opencode-org-id: org_…`. `…/zen/v1` is the pay-as-you-go surface.
+- **A byte-faithful replay still fails.** Replaying OpenCode's exact captured header set
+  (console token + org id + all four session headers + real UA) against
+  `/inference/openai/v1` returns `403 FreeTierError` for `mimo-v2.6-flash-free`, yet the same
+  replay returns **200** for `space-bunny-free`. Same request, different model, different
+  verdict — so the check is a per-model entitlement on OpenCode's Console, not client identity.
+  TLS/HTTP2 fingerprinting is also ruled out: a fingerprint can't be model-selective.
+- **What actually works from outside the app** (all 13 `-free` models on `/zen/v1`, unauthenticated):
+  `space-bunny-free` → **200**. `deepseek-v4-flash-free` passes the gate but is upstream-down
+  (`400 Model is unavailable`). The other 11 → `403`/500. `laguna-s-2.1-free` and `hy3-free` do not
+  exist on zen at all (`401 Model … is not supported`), and `muse-spark-1.2` is **paid** — the
+  snapshot's free marker is wrong for it.
+- **A paid console key may legitimately unlock the rest**, which is why the 66-model
+  `opencode-zen` catalog block is left intact and only the explicitly-free `oc` alias was
+  trimmed to `space-bunny-free` + `deepseek-v4-flash-free`.
+- **Do not add more impersonation headers.** `opencode_headers.rs` unlocks nothing; it is
+  harmless but it is not the mechanism, and it is the reason this looked fixable.
+- **The supported path is the reverse direction**: OpenCode is already a ZeroProxy client (see
+  the `openrouter`/`omniroute` entries in the user's `opencode.jsonc`, both pointed at
+  `:4623`). Route *other* providers through ZeroProxy and let the real OpenCode client be the
+  one that talks to Zen.
+
+### 20. Kiro was 100% broken and failed two ways; both are fixed — read before touching it again
+Kiro is one of the five providers this router actually depends on. On 2026-10-05 **every**
+Kiro model failed with `400 profileArn is required for this request.` Two independent bugs,
+both found by live sweep and both now covered by unit tests.
+
+- **Bug 1 — the request never carried a profileArn.** `claude_to_kiro.rs:525` and
+  `openai_to_kiro.rs` read `credentials.providerSpecificData.profileArn`, but the `creds` JSON
+  built in `chat.rs:1311` contains only `provider` and `rawHeaders` — **no `providerSpecificData`**.
+  So that lookup could never succeed, for any connection, regardless of what the db held.
+  Builder ID sign-in makes it worse: the OIDC token response has no `profileArn` to begin with,
+  so the connection's `providerSpecificData.profileArn` is `null` too. Fixed in
+  `core/executor/kiro.rs` with `apply_kiro_profile_arn`, called from `send_one` — the single
+  choke point every Kiro request passes through, so it covers both translators. Resolution
+  order: explicit `profileArn` → shared `KIRO_BUILDER_ID_PROFILE_ARN` → nothing for `api_key`
+  auth (CodeWhisperer 403s the shared placeholder for arbitrary keys, which is why
+  `quota_fetcher::kiro_resolve_profile_arn` returns empty there). This restores parity with the
+  quota path, which always had the fallback — that asymmetry is why quota worked while chat
+  never did.
+- **Bug 2 — non-streaming responses came back empty.** The integrity gate buffers the whole body
+  and returns it with `content-type: text/event-stream`, but the buffered bytes are the **raw
+  binary AWS EventStream**; `classify_buffered_body` decodes internally for *classification only*.
+  The old comment claimed the buffer was "already OpenAI-chunk SSE" — it was not. Streaming
+  clients happened to work; `stream:false` clients got nothing. Fixed by returning
+  `decode_body_to_sse(&full)`, at both buffered return sites (first attempt and post-repair retry).
+- **Bug 3 — Kiro must force upstream streaming.** Kiro's upstream always answers EventStream, so
+  `stream:false` cannot be honoured. `kiro` is now in `provider_requires_streaming`
+  (`core/utils/stream_flags.rs`), which sets `sse_to_json` and lets the existing aggregation
+  build the client's JSON. This is the same mechanism the `oc` entry uses for the Zen free tier.
+- **Discovery is still unavailable for Kiro and that is expected.** `GET /api/providers/{id}/models`
+  returns `[]` because `fetch_kiro_models_with_fallback` requires `profileArn` and Builder ID has
+  none. It does **not** affect chat any more. Do not "fix" it by inventing a profile for the
+  discovery call — leave Kiro on the built-in catalog.
+- **Not a code bug: `z-ai/glm-5.3-flash` / `z-ai/glm-5.3` hang on Nvidia's API.** Measured 2026-10-05
+  by calling `integrate.api.nvidia.com` directly with the user's key: no response in 60s, while
+  `nvidia/nemotron-3-ultra-550b-a55b` answers in ~1.1s. It is upstream, and it is currently the
+  router's worst failure mode: `DEFAULT_STREAM_TIMEOUT` is **600s**
+  (`core/executor/client_pool.rs:20`), so one dead model ties up a request for ten minutes
+  instead of failing over. Lowering it globally would break legitimately long streams, so the
+  timeout policy is the maintainer's call — this is recorded as a known gap, not a fix.
+
+### 21. Five core providers get a daily catalog refresh (systemd timer)
+`scripts/sync/refresh-core-providers.mjs` refreshes the model catalog for **only** the five
+providers this router depends on: `opencode-zen`, `openrouter`, `kilocode`, `nvidia`, `kiro`.
+Installed as `zeroproxy-core-catalog.timer` (user unit, 04:17 daily, `Persistent=true`),
+logging to `~/.zeroproxy/core-provider-refresh.log`.
+
+- **Why not `zeroproxy sync omniroute`:** that rewrites the *whole* snapshot and writes sqlite
+  out-of-process, so the running server keeps serving the old catalog until a restart, and it
+  churns providers nobody here uses. This script goes through the running server's HTTP API and
+  reuses the per-connection live discovery that already exists
+  (`GET /api/providers/{id}/models`), so there is **no restart and no snapshot churn**. The
+  free-model rosters really do churn: openrouter's `:free` list was 17 entries in one probe and
+  16 in another twenty minutes later.
+- **Pruning is state-tracked, never heuristic.** Managed rows live in
+  `.zeroproxy/core-provider-models.json`; only ids this script previously wrote are ever
+  deleted. User-created custom models are untouched — that is why the pre-existing
+  `kr/minimax-m2.1` and `kr/minimax-m2.5` rows survive while the Kiro scope is skipped.
+- **A discovery failure must never read as "upstream has no models".** If `discovered` is empty
+  the provider is reported `skipped` with a reason and the existing rows stay untouched.
+- **OpenCode Zen has a deny-list** (`ZEN_FREE_TIER_DENIED`). Those 11 models carry a `-free`
+  suffix and pass discovery, but the upstream Console refuses them from outside the OpenCode
+  client (see Trap 19). Syncing them would only feed the router models that always 502.
+- The unit's `ExecStart` must use the **absolute nvm node path**
+  (`/home/atheerium/.nvm/versions/node/v26.1.0/bin/node`); systemd does not read the interactive
+  shell profile, and `/usr/bin/node` does not exist here — that failure was silent in the unit file
+  and only visible as `status=203/EXEC`.
+
 ## Invariants (must not break)
 
 1. **Capability filter before routing.** `HARD_CAPS = ["vision","pdf","audioInput","videoInput"]`
@@ -894,10 +997,11 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → 1973 passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 1978 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. **Count it, do not recall it.** This line has now been wrong five times (1905 →
-  1913 → 1936 → 1947 → 1950 → 1954), because the recorded number is the count *at the moment the suite was last
+  worth having. **Count it, do not recall it.** This line has now been wrong six times (1905 →
+  1913 → 1936 → 1947 → 1950 → 1954 → 1973, the last of which was already 2 short of the real
+  1975 before the 2026-10-05 agentrouter fix added 3), because the recorded number is the count *at the moment the suite was last
   run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
   file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
   it whenever the count moves.

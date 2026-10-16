@@ -3228,6 +3228,15 @@ fn earliest_retry_after(
         })
         .flat_map(|connection| {
             let mut retry_after = Vec::new();
+            // The health daemon's degrade window hides the account from
+            // `filter_available_accounts` (via `is_account_degraded`), so it has
+            // to be counted here too. Without this the cooldown was invisible
+            // and a temporarily degraded account surfaced as
+            // `400 No credentials for provider: X — add a connection at ...`,
+            // which is both wrong and unactionable — the connection exists.
+            if let Some(until) = crate::core::account_fallback::account_degraded_until(connection) {
+                retry_after.push(until);
+            }
             if let Some(until) = connection
                 .rate_limited_until
                 .as_deref()
@@ -5358,6 +5367,44 @@ mod tests {
             .expect("retry-after should be derived from the earliest blocked account");
 
         assert!(retry_after <= early + ChronoDuration::seconds(1));
+    }
+
+    #[test]
+    fn earliest_retry_after_reports_the_health_degrade_window() {
+        let degraded_until = Utc::now() + ChronoDuration::seconds(45);
+        let mut degraded = connection("degraded", 1);
+        degraded.extra.insert(
+            crate::core::health::DEGRADED_UNTIL_KEY.to_string(),
+            Value::String(degraded_until.to_rfc3339()),
+        );
+
+        let snapshot = AppDb {
+            provider_connections: vec![degraded],
+            ..AppDb::default()
+        };
+
+        let retry_after = earliest_retry_after(&snapshot, "openai", "gpt-4.1", &HashSet::new())
+            .expect(
+                "a degraded account must surface a retry deadline, not a missing-connection error",
+            );
+
+        assert!(retry_after <= degraded_until + ChronoDuration::seconds(1));
+    }
+
+    #[test]
+    fn expired_degrade_window_is_not_reported_as_a_cooldown() {
+        let mut degraded = connection("degraded", 1);
+        degraded.extra.insert(
+            crate::core::health::DEGRADED_UNTIL_KEY.to_string(),
+            Value::String((Utc::now() - ChronoDuration::seconds(45)).to_rfc3339()),
+        );
+
+        let snapshot = AppDb {
+            provider_connections: vec![degraded],
+            ..AppDb::default()
+        };
+
+        assert!(earliest_retry_after(&snapshot, "openai", "gpt-4.1", &HashSet::new()).is_none());
     }
 
     #[test]

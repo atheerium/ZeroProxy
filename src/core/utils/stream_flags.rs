@@ -23,6 +23,7 @@ pub fn provider_requires_streaming(provider: &str) -> bool {
             | "grok-cli"
             | "gcli"
             | "gb"
+            | "kiro" // Kiro's upstream always answers with binary AWS EventStream; `stream:false` cannot be honoured upstream, so stream and let the SSE→JSON aggregation build the client's JSON.
     )
 }
 

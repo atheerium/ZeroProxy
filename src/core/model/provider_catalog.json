@@ -397,63 +397,8 @@
       "alias": "ar",
       "models": [
         {
-          "id": "claude-sonnet-4",
-          "name": "Claude Sonnet 4",
-          "kind": "llm"
-        },
-        {
-          "id": "claude-sonnet-4-5",
-          "name": "Claude Sonnet 4.5",
-          "kind": "llm"
-        },
-        {
-          "id": "gpt-4o",
-          "name": "GPT-4o",
-          "kind": "llm"
-        },
-        {
-          "id": "gpt-4o-mini",
-          "name": "GPT-4o Mini",
-          "kind": "llm"
-        },
-        {
-          "id": "gemini-2.0-flash",
-          "name": "Gemini 2.0 Flash",
-          "kind": "llm"
-        },
-        {
-          "id": "gemini-2.0-flash-lite",
-          "name": "Gemini 2.0 Flash Lite",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-v3",
-          "name": "DeepSeek V3",
-          "kind": "llm"
-        },
-        {
-          "id": "deepseek-r1",
-          "name": "DeepSeek R1",
-          "kind": "llm"
-        },
-        {
-          "id": "qwen3-235b-a22b",
-          "name": "Qwen3 235B A22B",
-          "kind": "llm"
-        },
-        {
-          "id": "command-r-plus",
-          "name": "Cohere Command R+",
-          "kind": "llm"
-        },
-        {
-          "id": "command-r7b",
-          "name": "Cohere Command R7B",
-          "kind": "llm"
-        },
-        {
-          "id": "glm-5.3",
-          "name": "GLM 5.3",
+          "id": "claude-opus-4-8",
+          "name": "Claude Opus 4.8",
           "kind": "llm"
         },
         {
@@ -1310,28 +1255,13 @@
       "alias": "oc",
       "models": [
         {
+          "id": "space-bunny-free",
+          "name": "Space Bunny Free",
+          "kind": "llm"
+        },
+        {
           "id": "deepseek-v4-flash-free",
           "name": "DeepSeek V4 Flash (Free)",
-          "kind": "llm"
-        },
-        {
-          "id": "mimo-v2.5-free",
-          "name": "MiMo V2.5 Free",
-          "kind": "llm"
-        },
-        {
-          "id": "nemotron-3-ultra-free",
-          "name": "Nemotron 3 Ultra Free",
-          "kind": "llm"
-        },
-        {
-          "id": "north-mini-code-free",
-          "name": "North Mini Code Free",
-          "kind": "llm"
-        },
-        {
-          "id": "big-pickle",
-          "name": "Big Pickle",
           "kind": "llm"
         }
       ]
