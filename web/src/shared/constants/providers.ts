@@ -220,8 +220,6 @@ export const APIKEY_PROVIDERS: Record<string, Provider> = {
 export const WEB_COOKIE_PROVIDERS: Record<string, Provider> = {
   "grok-web": { id: "grok-web", alias: "gw", name: "Grok Web (Subscription)", icon: "auto_awesome", color: "#1DA1F2", textIcon: "GW", website: "https://grok.com", authType: "cookie", authHint: "Paste your sso= cookie value from grok.com", passthroughModels: true, serviceKinds: ["llm"] },
   "perplexity-web": { id: "perplexity-web", alias: "pw", name: "Perplexity Web (Pro/Max)", icon: "search", color: "#20808D", textIcon: "PW", website: "https://www.perplexity.ai", authType: "cookie", authHint: "Paste your __Secure-next-auth.session-token cookie value from perplexity.ai", serviceKinds: ["llm"] },
-  "deepseek-web": { id: "deepseek-web", alias: "dsw", name: "DeepSeek Web", icon: "code", color: "#4D6BFE", textIcon: "DS", website: "https://chat.deepseek.com", authType: "cookie", authHint: "Paste your userToken from chat.deepseek.com localStorage (use browser DevTools → Application → Local Storage → userToken)", passthroughModels: true, serviceKinds: ["llm"] },
-  "kimi-web": { id: "kimi-web", alias: "kw", name: "Kimi Web", icon: "chat", color: "#6C5CE7", textIcon: "KW", website: "https://www.kimi.ai", authType: "cookie", authHint: "Paste your access_token from kimi.ai localStorage (use browser DevTools → Application → Local Storage → access_token)", passthroughModels: true, serviceKinds: ["llm"] },
 };
 
 // Media provider kinds — each kind maps to a route and endpoint config

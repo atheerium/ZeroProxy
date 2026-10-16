@@ -1661,17 +1661,16 @@ async fn forward_with_provider_fallback(
         use crate::core::executor::{
             AntigravityExecutionRequest, AntigravityExecutor, AzureExecutionRequest, AzureExecutor,
             CodexExecutionRequest, CodexExecutor, CommandCodeExecutionRequest, CommandCodeExecutor,
-            CursorExecutionRequest, CursorExecutor, DeepSeekWebExecutionRequest,
-            DeepSeekWebExecutor, DefaultExecutor, DevinCliExecutor, DevinExecutionRequest,
-            ExecutionRequest, GeminiCliExecutionRequest, GeminiCliExecutor, GithubExecutionRequest,
-            GithubExecutor, GrokWebExecutionRequest, GrokWebExecutor, IFlowExecutionRequest,
-            IFlowExecutor, KimchiExecutor, KimiWebExecutionRequest, KimiWebExecutor,
-            KiroExecutionRequest, KiroExecutor, KiroExecutorResponse, OpenCodeExecutionRequest,
-            OpenCodeExecutor, OpenCodeGoExecutionRequest, OpenCodeGoExecutor,
-            PerplexityWebExecutionRequest, PerplexityWebExecutor, ProviderExecutionRequest,
-            ProviderExecutor, QoderExecutionRequest, QoderExecutor, QwenExecutionRequest,
-            QwenExecutor, TraeExecutionRequest, TraeExecutor, VertexExecutionRequest,
-            VertexExecutor, WindsurfExecutionRequest, WindsurfExecutor,
+            CursorExecutionRequest, CursorExecutor, DefaultExecutor, DevinCliExecutor,
+            DevinExecutionRequest, ExecutionRequest, GeminiCliExecutionRequest, GeminiCliExecutor,
+            GithubExecutionRequest, GithubExecutor, GrokWebExecutionRequest, GrokWebExecutor,
+            IFlowExecutionRequest, IFlowExecutor, KimchiExecutor, KiroExecutionRequest,
+            KiroExecutor, KiroExecutorResponse, OpenCodeExecutionRequest, OpenCodeExecutor,
+            OpenCodeGoExecutionRequest, OpenCodeGoExecutor, PerplexityWebExecutionRequest,
+            PerplexityWebExecutor, ProviderExecutionRequest, ProviderExecutor,
+            QoderExecutionRequest, QoderExecutor, QwenExecutionRequest, QwenExecutor,
+            TraeExecutionRequest, TraeExecutor, VertexExecutionRequest, VertexExecutor,
+            WindsurfExecutionRequest, WindsurfExecutor,
         };
 
         let is_codex_model = model.starts_with("codex/") || provider == "codex";
@@ -2131,54 +2130,6 @@ async fn forward_with_provider_fallback(
                     .map_err(|e| ComboAttemptError {
                         status: 500,
                         message: format!("PerplexityWeb execution failed: {:?}", e),
-                        retry_after: None,
-                        upstream_body: None,
-                    })?;
-                Ok(KiroExecutorResponse {
-                    response: result.response,
-                    url: result.url,
-                    headers: result.headers,
-                    transformed_body: result.transformed_body,
-                    transport: result.transport,
-                })
-            } else if provider == "deepseek-web" {
-                let executor = DeepSeekWebExecutor::new(state.client_pool.clone());
-                let result = executor
-                    .execute_request(DeepSeekWebExecutionRequest {
-                        model: model.to_string(),
-                        body: request_body.clone(),
-                        stream,
-                        credentials: connection.clone(),
-                        proxy,
-                    })
-                    .await
-                    .map_err(|e| ComboAttemptError {
-                        status: 500,
-                        message: format!("DeepSeekWeb execution failed: {:?}", e),
-                        retry_after: None,
-                        upstream_body: None,
-                    })?;
-                Ok(KiroExecutorResponse {
-                    response: result.response,
-                    url: result.url,
-                    headers: result.headers,
-                    transformed_body: result.transformed_body,
-                    transport: result.transport,
-                })
-            } else if provider == "kimi-web" {
-                let executor = KimiWebExecutor::new(state.client_pool.clone());
-                let result = executor
-                    .execute_request(KimiWebExecutionRequest {
-                        model: model.to_string(),
-                        body: request_body.clone(),
-                        stream,
-                        credentials: connection.clone(),
-                        proxy,
-                    })
-                    .await
-                    .map_err(|e| ComboAttemptError {
-                        status: 500,
-                        message: format!("KimiWeb execution failed: {:?}", e),
                         retry_after: None,
                         upstream_body: None,
                     })?;

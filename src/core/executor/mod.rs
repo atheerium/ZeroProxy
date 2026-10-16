@@ -7,7 +7,6 @@ mod codebuddy_intl;
 mod codex;
 mod commandcode;
 mod cursor;
-mod deepseek_web;
 mod default;
 mod devin_cli;
 mod gemini_cli;
@@ -16,7 +15,6 @@ mod grok_cli;
 mod grok_web;
 mod iflow;
 mod kimchi;
-mod kimi_web;
 mod kiro;
 mod mimo_free;
 mod ollama;
@@ -62,10 +60,6 @@ pub use cursor::{
     parse_cursor_sse_events, CursorExecutionRequest, CursorExecutor, CursorExecutorError,
     CursorExecutorResponse, SseEvent,
 };
-pub use deepseek_web::{
-    extract_user_token, DeepSeekWebExecutionRequest, DeepSeekWebExecutor, DeepSeekWebExecutorError,
-    DeepSeekWebExecutorResponse,
-};
 pub(crate) use default::{cline_access_token, provider_config_for};
 pub use default::{
     provider_config_base_url, DefaultExecutor, ExecutionRequest, ExecutionResponse, ExecutorError,
@@ -90,10 +84,6 @@ pub use grok_web::{
 };
 pub use iflow::{IFlowExecutionRequest, IFlowExecutor, IFlowExecutorError, IFlowExecutorResponse};
 pub use kimchi::KimchiExecutor;
-pub use kimi_web::{
-    extract_kimi_access_token, extract_kimi_refresh_token, KimiWebExecutionRequest,
-    KimiWebExecutor, KimiWebExecutorError, KimiWebExecutorResponse,
-};
 pub use kiro::{
     consumed_eventstream_bytes, AwsCredentials, EventStreamDecoder, KiroEvent,
     KiroExecutionRequest, KiroExecutor, KiroExecutorError, KiroExecutorResponse,

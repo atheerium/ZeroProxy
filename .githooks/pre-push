@@ -30,10 +30,20 @@ fi
 #    (the alternative silently goes inert, disabling the whole check) and
 #    `[Rr]efresh_[Tt]oken` still misses the all-caps `REFRESH_TOKEN=` form that a
 #    .env file actually uses. Both were tried and both failed the matrix below.
+#
+#    Only ADDED lines are scanned (2026-10-16). A secret enters a repository when
+#    its content is added; scanning deletions produced a false positive that
+#    blocked removing the kimi-web executor, whose deleted code assigns a
+#    refresh_token from a localStorage-parsing helper — that matches the
+#    assignment pattern below while being exactly the opposite of a leaked
+#    credential. (The line is deliberately not quoted verbatim here: reproducing
+#    it in a comment makes this very hook block the comment.)
+#    Deleting a file that once contained a secret is the fix we want to be able
+#    to push, so `grep '^+'` is the correct scope, not a weakened check.
 BASE=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD HEAD~1 2>/dev/null || echo "HEAD~1")
 DIFF=$(git diff "$BASE"..HEAD -U0 2>/dev/null || true)
 SECRET_RE='sk-[a-zA-Z0-9]{20,}|(refresh_token|Refresh_Token|REFRESH_TOKEN)["'"'"']?[[:space:]]*[:=]>?[[:space:]]*["'"'"']?[A-Za-z0-9_.-]{16,}|Bearer[[:space:]]+[A-Za-z0-9_.-]{20,}|BEGIN (RSA|EC) PRIVATE KEY'
-if echo "$DIFF" | grep -qE "$SECRET_RE"; then
+if echo "$DIFF" | grep '^+' | grep -qE "$SECRET_RE"; then
   echo "!! pre-push: outgoing diff contains potential secret"
   exit 1
 fi
