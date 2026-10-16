@@ -7,6 +7,8 @@ use axum::{
     Json, Router,
 };
 use serde_json::json;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 
 use crate::server::state::AppState;
 use crate::types::CustomModel;
@@ -181,19 +183,42 @@ async fn delete_custom_model(
         return response;
     }
 
+    // Rows are keyed `{provider_alias}/{id}` (see `patch.rs::custom_models_map`),
+    // so the path may carry either the composite key or a bare model id. Matching
+    // only on `m.id` made every composite-keyed request a silent no-op that still
+    // answered `success: true`.
+    let removed = Arc::new(AtomicUsize::new(0));
+    let counter = Arc::clone(&removed);
+    let not_found = format!("Custom model not found: {id}");
     let result = state
         .db
-        .update(|db| {
-            db.custom_models.retain(|m| m.id != id);
+        .update(move |db| {
+            let before = db.custom_models.len();
+            db.custom_models.retain(|m| !custom_model_matches(&id, m));
+            counter.store(before - db.custom_models.len(), Ordering::SeqCst);
         })
         .await;
 
     match result {
-        Ok(_) => Json(serde_json::json!({ "success": true })).into_response(),
+        Ok(_) if removed.load(Ordering::SeqCst) > 0 => {
+            Json(serde_json::json!({ "success": true })).into_response()
+        }
+        Ok(_) => (
+            StatusCode::NOT_FOUND,
+            Json(serde_json::json!({ "error": not_found })),
+        )
+            .into_response(),
         Err(e) => {
             Json(serde_json::json!({ "success": false, "error": e.to_string() })).into_response()
         }
     }
+}
+
+fn custom_model_matches(identifier: &str, model: &CustomModel) -> bool {
+    if identifier.contains('/') {
+        return format!("{}/{}", model.provider_alias, model.id) == identifier;
+    }
+    model.id == identifier
 }
 
 async fn delete_custom_model_by_query(
@@ -234,5 +259,48 @@ async fn delete_custom_model_by_query(
             Json(json!({ "error": "Failed to delete custom model" })),
         )
             .into_response(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::custom_model_matches;
+    use crate::types::CustomModel;
+
+    fn model(alias: &str, id: &str) -> CustomModel {
+        CustomModel {
+            provider_alias: alias.to_string(),
+            id: id.to_string(),
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn composite_key_matches_only_its_own_alias_and_id() {
+        let ar_flash = model("ar", "deepseek-v4-flash");
+        let trk_flash = model("trk", "deepseek-v4-flash");
+
+        assert!(custom_model_matches("ar/deepseek-v4-flash", &ar_flash));
+        assert!(!custom_model_matches("trk/deepseek-v4-flash", &ar_flash));
+        assert!(custom_model_matches("trk/deepseek-v4-flash", &trk_flash));
+    }
+
+    #[test]
+    fn bare_id_still_matches_by_model_id() {
+        let ar_flash = model("ar", "deepseek-v4-flash");
+
+        assert!(custom_model_matches("deepseek-v4-flash", &ar_flash));
+        assert!(!custom_model_matches("deepseek-v3", &ar_flash));
+    }
+
+    #[test]
+    fn nested_model_id_is_not_split_on_its_slash() {
+        let nested = model("cfp", "deepseek-ai/deepseek-v4-flash-0731");
+
+        assert!(custom_model_matches(
+            "cfp/deepseek-ai/deepseek-v4-flash-0731",
+            &nested
+        ));
+        assert!(!custom_model_matches("cfp/deepseek-ai", &nested));
     }
 }
