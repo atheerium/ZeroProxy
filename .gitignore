@@ -66,6 +66,7 @@ docs/*
 !docs/git-conventions.md
 !docs/integrations/
 !docs/parity-9router.md
+!docs/FREE-TIER-LIMITS.md
 test/*
 bin/*
 open-sse/test/*
