@@ -226,6 +226,150 @@ mod free_model_id_tests {
     }
 }
 
+/// A `ProviderConnection` whose `provider` is not in the catalog can never be
+/// routed or rendered, and nothing fails when it is created — the row just sits
+/// in the database forever. Only literals are checked; a runtime-computed id is
+/// validated by whatever produced it. Each file's test region is skipped, because
+/// fixtures use placeholders and one executor test uses `grok-cli`, which has a
+/// dedicated executor and a device-code dispatcher arm but no catalog entry.
+#[cfg(test)]
+mod provider_id_literal_tests {
+    use std::collections::BTreeSet;
+    use std::path::{Path, PathBuf};
+
+    use super::provider_catalog;
+
+    fn repo_root() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src")
+    }
+
+    fn rust_files(dir: &Path, out: &mut Vec<PathBuf>) {
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                rust_files(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    fn production_provider_literals() -> Vec<(String, String)> {
+        // Column-0 only, on purpose: treating an indented `#[cfg(test)]` as a
+        // boundary would shrink the scanned region. The count assert catches that.
+        const BOUNDARY: &str = "#[cfg(test)]";
+        let mut files = Vec::new();
+        rust_files(&repo_root(), &mut files);
+        files.sort();
+
+        let mut found = Vec::new();
+        for file in files {
+            let Ok(text) = std::fs::read_to_string(&file) else {
+                continue;
+            };
+            let test_region = text
+                .lines()
+                .position(|line| line.starts_with(BOUNDARY))
+                .unwrap_or(usize::MAX);
+            for (index, line) in text.lines().enumerate() {
+                if index >= test_region {
+                    break;
+                }
+                let Some(rest) = line.split_once("provider").map(|(_, r)| r) else {
+                    continue;
+                };
+                let Some(rest) = rest.trim_start().strip_prefix(':') else {
+                    continue;
+                };
+                let rest = rest.trim_start();
+                let Some(id) = rest.strip_prefix('"') else {
+                    continue;
+                };
+                let Some(end) = id.find('"') else {
+                    continue;
+                };
+                let id = &id[..end];
+                if id.is_empty() {
+                    continue;
+                }
+                let where_ = format!("{}:{}", file.display(), index + 1);
+                found.push((id.to_string(), where_));
+            }
+        }
+        found
+    }
+
+    #[test]
+    fn production_provider_literals_all_exist_in_the_catalog() {
+        let catalog = provider_catalog();
+        let unknown: Vec<String> = production_provider_literals()
+            .into_iter()
+            // `static_alias_for_provider`, not `provider_info`: the two read
+            // different registration lists, and only the alias map decides
+            // whether an id routes. `gitlab` is registered there but carries no
+            // `providers` entry, so `provider_info` reports it as unknown.
+            .filter(|(id, _)| catalog.static_alias_for_provider(id).is_none())
+            .map(|(id, where_)| format!("  {id}  at  {where_}"))
+            .collect();
+        assert!(
+            unknown.is_empty(),
+            "these provider ids are hard-coded in production code but resolve to no \
+             catalog alias, so any connection created with them can never be routed \
+             or rendered:\n{}",
+            unknown.join("\n")
+        );
+    }
+
+    #[test]
+    fn scans_a_healthy_number_of_literals() {
+        let files = {
+            let mut files = Vec::new();
+            rust_files(&repo_root(), &mut files);
+            files.len()
+        };
+        assert!(
+            files >= 300,
+            "expected the whole src/ tree (300+ files), scanned {files} — the walk is broken"
+        );
+
+        let literals = production_provider_literals();
+        assert!(
+            literals.len() >= 20,
+            "expected 20+ production provider literals, found {} — the scan is broken",
+            literals.len()
+        );
+        let distinct: BTreeSet<&str> = literals.iter().map(|(id, _)| id.as_str()).collect();
+        assert!(
+            distinct.len() >= 10,
+            "expected 10+ distinct provider ids, found {} — the scan is broken",
+            distinct.len()
+        );
+    }
+
+    /// The test above cannot catch this: a UUID *registered* in the catalog would
+    /// resolve happily. The live db had three such rows in `provider`.
+    #[test]
+    fn no_registered_provider_id_is_uuid_shaped() {
+        let mut uuids: Vec<String> = provider_catalog()
+            .provider_ids()
+            .filter(|id| {
+                id.len() == 36
+                    && id.chars().all(|c| c.is_ascii_hexdigit() || c == '-')
+                    && id.matches('-').count() == 4
+            })
+            .map(str::to_string)
+            .collect();
+        uuids.sort();
+        assert!(
+            uuids.is_empty(),
+            "a UUID is registered as a provider id: {uuids:?}"
+        );
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

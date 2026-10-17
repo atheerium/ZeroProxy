@@ -10,9 +10,8 @@ use std::collections::HashSet;
 
 use serde_json::Value;
 
-/// Hard capabilities that a model must support for a request; the adapter
-/// only ever considers these when deciding whether to augment.
-pub const CAPABILITY_KEYS: [&str; 4] = ["vision", "pdf", "audioInput", "videoInput"];
+use super::{model_has_capability, HARD_CAPS};
+
 /// 9router default model used when an enabled pool has no explicit models.
 pub const DEFAULT_FALLBACK_MODEL: &str = "oc/mimo-v2.5-free";
 
@@ -110,12 +109,12 @@ fn get_capacity_adapter_config(cap: &str, settings: &Value) -> CapEntry {
     entry
 }
 
-/// Flatten all enabled pools in `CAPABILITY_KEYS` order, deduped
+/// Flatten all enabled pools in `HARD_CAPS` order, deduped
 /// order-preserving (9router `getCapacityAdapterModels`).
 pub fn get_capacity_adapter_models(settings: &Value) -> Vec<String> {
     let mut seen = HashSet::new();
     let mut out = Vec::new();
-    for cap in CAPABILITY_KEYS {
+    for cap in HARD_CAPS {
         let cfg = get_capacity_adapter_config(cap, settings);
         if !cfg.enabled {
             continue;
@@ -146,8 +145,8 @@ pub fn get_capacity_adapter_strategy(cap: &str, settings: &Value) -> &'static st
 /// `getActiveAdapterStrategy`). Empty pools (which fall back to the default
 /// model) still count as non-empty — that is the 9router behavior.
 pub fn get_active_adapter_strategy(required: &HashSet<String>, settings: &Value) -> &'static str {
-    for cap in CAPABILITY_KEYS {
-        if !required.contains(cap) {
+    for cap in HARD_CAPS {
+        if !required.contains(*cap) {
             continue;
         }
         let entry = get_capacity_adapter_config(cap, settings);
@@ -178,7 +177,7 @@ fn model_satisfies(model_str: &str, required_hard: &HashSet<String>) -> bool {
 ///
 /// Returns the original list unchanged when there is nothing hard to
 /// satisfy, the list is empty, or any original model already satisfies the
-/// caps. Otherwise prepends (in `CAPABILITY_KEYS` order) every pool model
+/// caps. Otherwise prepends (in `HARD_CAPS` order) every pool model
 /// that satisfies the caps and is not already in the list.
 pub fn augment_models_with_capacity_adapter(
     models: &[String],
@@ -193,8 +192,8 @@ pub fn augment_models_with_capacity_adapter(
     }
 
     let mut adapter_models: Vec<String> = Vec::new();
-    for cap in CAPABILITY_KEYS {
-        if !required.contains(cap) {
+    for cap in HARD_CAPS {
+        if !required.contains(*cap) {
             continue;
         }
         for model in get_capacity_adapter_config(cap, settings).models {
@@ -316,55 +315,6 @@ pub fn strip_history_for_context(body: &mut Value, context_window: Option<u64>) 
     messages.extend(head);
     messages.extend(tail);
     true
-}
-
-/// True when the given capability heuristic says `entry` supports
-/// `capability` (provider-prefix / model-name patterns; 9router reads an
-/// explicit capabilities table — the heuristic mirrors `model_has_capability`).
-fn model_has_capability(entry: &str, capability: &str) -> bool {
-    let entry_lower = entry.to_lowercase();
-
-    match capability {
-        "vision" => {
-            // gpt-4 base has no vision; only 4o+ variants (matched via the
-            // `-4o` model-name pattern below).
-            if entry_lower.starts_with("openai/o1")
-                || entry_lower.starts_with("openai/o3")
-                || entry_lower.starts_with("anthropic/claude")
-                || entry_lower.starts_with("google/gemini")
-                || entry_lower.starts_with("vertex/claude")
-                || entry_lower.starts_with("vertex/gemini")
-                || entry_lower.starts_with("aws/claude")
-                || entry_lower.starts_with("gcp/gemini")
-                || entry_lower.starts_with("custom/node-openai")
-            {
-                return true;
-            }
-            if entry_lower.contains("vision")
-                || entry_lower.contains("-4o")
-                || entry_lower.contains("gemini")
-                || entry_lower.starts_with("oc/mimo")
-            {
-                return true;
-            }
-            false
-        }
-        "pdf" => {
-            if entry_lower.starts_with("anthropic/claude")
-                || entry_lower.starts_with("vertex/claude")
-                || entry_lower.starts_with("aws/claude")
-                || entry_lower.starts_with("google/gemini")
-                || entry_lower.starts_with("vertex/gemini")
-                || entry_lower.starts_with("gcp/gemini")
-            {
-                return true;
-            }
-            false
-        }
-        "audioInput" => entry_lower.starts_with("oc/mimo"),
-        "videoInput" => entry_lower.starts_with("oc/mimo"),
-        _ => false,
-    }
 }
 
 #[cfg(test)]

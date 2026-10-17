@@ -11,6 +11,12 @@
 //! 5. **Imported** — Import an existing Kiro AWS SSO refresh token (`aorAAAAAG...`).
 //! 6. **ExternalIdp** — Microsoft Entra external IdP (CLIProxyAPI enterprise import).
 //!    Refresh is form-urlencoded against a validated Microsoft token endpoint.
+//!
+//! Methods 1 and 2 are named here but **not implemented in this file**: the AWS
+//! device-code flow lives in `mod.rs` (`kiro_registration_body`) and
+//! `server/api/oauth.rs`. A second copy used to sit here, unreachable, which is
+//! what made the "Invalid client provided" bug unreproducible — see Trap 16 in
+//! AGENTS.md. Do not re-add a device-code implementation to this module.
 
 use serde::{Deserialize, Serialize};
 
@@ -83,31 +89,6 @@ impl KiroAuthMethod {
 // Response types (camelCase to match AWS OIDC / Kiro API)
 // ---------------------------------------------------------------------------
 
-/// Response from the AWS SSO OIDC `/client/register` endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ClientRegistrationResponse {
-    pub client_id: String,
-    pub client_secret: String,
-    #[serde(default)]
-    pub client_secret_expires_at: Option<i64>,
-}
-
-/// Response from the AWS SSO OIDC `/device_authorization` endpoint.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DeviceAuthorizationResponse {
-    pub device_code: String,
-    pub user_code: String,
-    pub verification_uri: String,
-    #[serde(default)]
-    pub verification_uri_complete: Option<String>,
-    #[serde(default)]
-    pub expires_in: Option<i64>,
-    #[serde(default)]
-    pub interval: Option<u64>,
-}
-
 /// Response from the AWS SSO OIDC `/token` endpoint (also used by Cognito).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -170,152 +151,7 @@ fn oidc_base_url(region: &str) -> String {
 }
 
 // ---------------------------------------------------------------------------
-// 1. AWS OIDC Client Registration
-// ---------------------------------------------------------------------------
-
-/// Register an OAuth client with the AWS SSO OIDC endpoint.
-///
-/// POST `https://oidc.{region}.amazonaws.com/client/register`
-pub async fn register_client(region: &str) -> Result<ClientRegistrationResponse, KiroError> {
-    let client = reqwest::Client::new();
-    let url = format!("{}/client/register", oidc_base_url(region));
-
-    let body = serde_json::json!({
-        "clientName": "kiro-oauth-client",
-        "clientType": "public",
-        "scopes": [
-            "codewhisperer:completions",
-            "codewhisperer:analysis",
-            "codewhisperer:conversations"
-        ],
-        "grantTypes": [
-            "urn:ietf:params:oauth:grant-type:device_code",
-            "refresh_token"
-        ],
-        "issuerUrl": "https://identitycenter.amazonaws.com/ssoins-722374e8c3c8e6c6"
-    });
-
-    let response = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| KiroError {
-            error: "request_failed".to_string(),
-            error_description: Some(e.to_string()),
-        })?;
-
-    if !response.status().is_success() {
-        let text = response.text().await.unwrap_or_default();
-        return Err(KiroError {
-            error: "client_registration_failed".to_string(),
-            error_description: Some(text),
-        });
-    }
-
-    response.json().await.map_err(|e| KiroError {
-        error: "parse_error".to_string(),
-        error_description: Some(e.to_string()),
-    })
-}
-
-// ---------------------------------------------------------------------------
-// 2. Device Authorization
-// ---------------------------------------------------------------------------
-
-/// Start a device authorization flow with AWS SSO OIDC.
-///
-/// POST `https://oidc.{region}.amazonaws.com/device_authorization`
-pub async fn start_device_authorization(
-    client_id: &str,
-    client_secret: &str,
-    start_url: &str,
-    region: &str,
-) -> Result<DeviceAuthorizationResponse, KiroError> {
-    let client = reqwest::Client::new();
-    let url = format!("{}/device_authorization", oidc_base_url(region));
-
-    let body = serde_json::json!({
-        "clientId": client_id,
-        "clientSecret": client_secret,
-        "startUrl": start_url,
-    });
-
-    let response = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&body)
-        .send()
-        .await
-        .map_err(|e| KiroError {
-            error: "request_failed".to_string(),
-            error_description: Some(e.to_string()),
-        })?;
-
-    if !response.status().is_success() {
-        let text = response.text().await.unwrap_or_default();
-        return Err(KiroError {
-            error: "device_authorization_failed".to_string(),
-            error_description: Some(text),
-        });
-    }
-
-    response.json().await.map_err(|e| KiroError {
-        error: "parse_error".to_string(),
-        error_description: Some(e.to_string()),
-    })
-}
-
-// ---------------------------------------------------------------------------
-// 3. Poll Device Token
-// ---------------------------------------------------------------------------
-
-/// Poll the AWS SSO OIDC token endpoint for device code completion.
-///
-/// POST `https://oidc.{region}.amazonaws.com/token`
-///
-/// Known protocol errors returned from the API (not thrown):
-/// - `authorization_pending` — user has not yet approved
-/// - `slow_down` — reduce polling frequency
-/// - `expired_token` — the device code has expired
-/// - `access_denied` — the user denied the request
-pub async fn poll_device_token(
-    client_id: &str,
-    client_secret: &str,
-    device_code: &str,
-    region: &str,
-) -> Result<TokenPollResponse, KiroError> {
-    let client = reqwest::Client::new();
-    let url = format!("{}/token", oidc_base_url(region));
-
-    let response = client
-        .post(&url)
-        .header("Content-Type", "application/json")
-        .header("Accept", "application/json")
-        .json(&serde_json::json!({
-            "clientId": client_id,
-            "clientSecret": client_secret,
-            "deviceCode": device_code,
-            "grantType": "urn:ietf:params:oauth:grant-type:device_code",
-        }))
-        .send()
-        .await
-        .map_err(|e| KiroError {
-            error: "request_failed".to_string(),
-            error_description: Some(e.to_string()),
-        })?;
-
-    response.json().await.map_err(|e| KiroError {
-        error: "parse_error".to_string(),
-        error_description: Some(e.to_string()),
-    })
-}
-
-// ---------------------------------------------------------------------------
-// 4. Social login
+// 1. Social login
 // ---------------------------------------------------------------------------
 
 /// Build the Kiro social login URL for the given identity provider.
@@ -374,7 +210,7 @@ pub async fn exchange_social_code(
 }
 
 // ---------------------------------------------------------------------------
-// 5. Import token validation
+// 2. Import token validation
 // ---------------------------------------------------------------------------
 
 /// Check whether a token is a valid Kiro import token.
@@ -385,7 +221,7 @@ pub fn validate_import_token(token: &str) -> bool {
 }
 
 // ---------------------------------------------------------------------------
-// 6. Refresh
+// 3. Refresh
 // ---------------------------------------------------------------------------
 
 // ---------------------------------------------------------------------------
@@ -1121,48 +957,6 @@ mod tests {
     }
 
     // -- deserialization tests ---------------------------------------------
-
-    #[test]
-    fn test_client_registration_response_deserialize() {
-        let json = r#"{"clientId":"c1","clientSecret":"s1","clientSecretExpiresAt":12345}"#;
-        let resp: ClientRegistrationResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.client_id, "c1");
-        assert_eq!(resp.client_secret, "s1");
-        assert_eq!(resp.client_secret_expires_at, Some(12345));
-    }
-
-    #[test]
-    fn test_client_registration_response_minimal() {
-        let json = r#"{"clientId":"c1","clientSecret":"s1"}"#;
-        let resp: ClientRegistrationResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.client_id, "c1");
-        assert_eq!(resp.client_secret, "s1");
-        assert!(resp.client_secret_expires_at.is_none());
-    }
-
-    #[test]
-    fn test_device_authorization_response_full() {
-        let json = r#"{"deviceCode":"dc1","userCode":"UC1","verificationUri":"https://x.com","verificationUriComplete":"https://x.com/uc","expiresIn":600,"interval":5}"#;
-        let resp: DeviceAuthorizationResponse = serde_json::from_str(json).unwrap();
-        assert_eq!(resp.device_code, "dc1");
-        assert_eq!(resp.user_code, "UC1");
-        assert_eq!(resp.verification_uri, "https://x.com");
-        assert_eq!(
-            resp.verification_uri_complete,
-            Some("https://x.com/uc".to_string())
-        );
-        assert_eq!(resp.expires_in, Some(600));
-        assert_eq!(resp.interval, Some(5));
-    }
-
-    #[test]
-    fn test_device_authorization_response_minimal() {
-        let json = r#"{"deviceCode":"d","userCode":"u","verificationUri":"https://x.com"}"#;
-        let resp: DeviceAuthorizationResponse = serde_json::from_str(json).unwrap();
-        assert!(resp.verification_uri_complete.is_none());
-        assert!(resp.expires_in.is_none());
-        assert!(resp.interval.is_none());
-    }
 
     #[test]
     fn test_token_poll_response_success() {

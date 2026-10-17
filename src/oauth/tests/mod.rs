@@ -3,6 +3,7 @@
 use super::*;
 
 pub mod oauth_url_tests;
+pub mod priority_provider_guards;
 pub mod token_refresh_tests;
 
 mod pkce_extended_tests {
