@@ -1174,15 +1174,19 @@ Raw Astro dev: `cd web && pnpm dev` → `:4624`, proxies `/api`, `/v1`, `/health
   but its test step is `- name: cargo test (Linux only)` / `if: runner.os == 'Linux'`. So **macOS
   proves fmt + clippy only**, and a green macOS run says nothing about tests. Do not read a macOS
   pass as "tests pass" — that misreading happened here once already.
-- **The gate is green: `cargo test --lib --all-features` → <MEASURE> passed, 0 failed.** Keep it that
+- **The gate is green: `cargo test --lib --all-features` → 2000 passed, 0 failed.** Keep it that
   way; a red merge is not worth landing, because it destroys the only thing that makes the gate
-  worth having. **Count it, do not recall it.** This line has now been wrong <N> times (<SEQ>), because the recorded number is the count *at the moment the suite was last
+  worth having. **Count it, do not recall it.** This line has now been wrong eight times (1905 →
+  1913 → 1936 → 1947 → 1950 → 1954 → 1987 → 1994), because the recorded number is the count *at the moment the suite was last
   run* and every test-adding commit silently invalidates it. A branch whose diff touches no `.rs`
   file must produce the same number; if it does not, this baseline is stale. Re-measure and correct
   it whenever the count moves. **It can also legitimately go *down*** — deleting dead code drops
   dead tests, and that is not a regression: 1994 → 1986 was 4 dead tests in `src/oauth/kiro.rs`
   plus a net 4 from deleting `src/core/combo/capabilities.rs` (5 tests gone, 1 relocated into
   `combo/mod.rs`). Compare the *delta against your own diff*, not against the last recorded number.
+  **Re-measured after this branch was rebased onto current `main` (1978): the real total is 2000,
+  not 1986** — the 1986 was measured before the rebase, when `main` was 12 tests lighter. The
+  branch's own net contribution against today's `main` is +22.
 - Integration tests under `tests/` are intentionally excluded (their build was repaired separately
   — they now compile, but their pass rate is unmeasured), so a green local `cargo test` on `tests/`
   is *not* the gate.
