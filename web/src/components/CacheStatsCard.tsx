@@ -8,7 +8,7 @@ interface CacheStats {
   misses: number;
   sets: number;
   entries: number;
-  /** Live bytes held in cached bodies, against a 64 MiB budget. */
+  /** Live bytes held in cached bodies, against a 32 MiB budget. */
   bytes: number;
   hit_rate: number;
 }
@@ -96,7 +96,7 @@ export default function CacheStatsCard() {
       )}
       <p className="mt-3 text-[11px] text-text-muted">
         Repeated prompts served from cache (24h TTL) save provider quota. Non-streaming only.
-        Size is capped at 64 MB.
+        Size is capped at 32 MiB.
       </p>
     </Card>
   );

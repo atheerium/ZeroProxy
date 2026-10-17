@@ -45,7 +45,7 @@ const DEFAULT_MAX_ENTRIES: usize = 2_000;
 /// has no allocator that returns freed pages promptly (see the glibc-arena
 /// note in AGENTS.md): anything the cache stores stays resident until it is
 /// evicted, so "unbounded until the entry count trips" is not a safe design.
-const DEFAULT_MAX_TOTAL_BYTES: u64 = 64 * 1024 * 1024; // 64 MiB
+const DEFAULT_MAX_TOTAL_BYTES: u64 = 32 * 1024 * 1024; // 32 MiB
 
 /// Per-entry ceiling. A single response bigger than this is never stored.
 ///
